@@ -20,7 +20,7 @@
     "redis": "^4.6.0",
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
-    "multer": "^1.4.5",
+    "multer": "^1.4.5-lts.1",
     "cors": "^2.8.5",
     "helmet": "^7.0.0",
     "express-rate-limit": "^7.0.0",
