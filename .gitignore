@@ -1,98 +1,37 @@
-# Dependencies
+# 依赖文件
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
-# Environment variables
+# 环境变量
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# 构建输出
+dist/
+build/
 
-# Coverage directory
-coverage/
-.nyc_output
-
-# Logs
-logs
+# 日志文件
 *.log
 
-# Optional npm cache directory
-.npm
+# 临时文件
+.tmp/
+temp/
 
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless
-
-# IDE
+# IDE文件
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# OS generated files
+# 系统文件
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Uploads
-uploads/
-temp/
-*.tmp
-
-# Build files
-dist/
-build/
-
-# Cache
-.cache/
-.parcel-cache/
-
-# Test files
-test-results/
-coverage/
-
-# Mobile
-*.ipa
-*.apk
-*.aab
-
-# Backend specific
-logs/
-uploads/
-temp/
-
+# API密钥（如果有配置文件）
+config.js
+keys.js

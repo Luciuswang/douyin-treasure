@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖宝地图 - 实时寻宝</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            color: white;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 20px rgba(255,255,255,0.5); }
+            to { text-shadow: 0 0 30px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.3); }
+        }
+        
+        .map-container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+        
+        .map-title {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .treasure-map {
+            background: linear-gradient(45deg, #e3f2fd 0%, #f3e5f5 50%, #fff3e0 100%);
+            height: 500px;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            border: 3px solid #ddd;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .treasure-marker {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.5rem;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+        
+        .treasure-marker:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+        
+        .treasure-diamond { background: linear-gradient(45deg, #ff6b6b, #ee5a52); }
+        .treasure-gold { background: linear-gradient(45deg, #ffd700, #ffed4e); color: #333; }
+        .treasure-crown { background: linear-gradient(45deg, #9b59b6, #8e44ad); }
+        .treasure-gem { background: linear-gradient(45deg, #3498db, #2980b9); }
+        .treasure-gift { background: linear-gradient(45deg, #e74c3c, #c0392b); }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+        }
+        
+        .user-location {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #4CAF50;
+            border-radius: 50%;
+            border: 4px solid white;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+            animation: userPulse 1.5s infinite;
+        }
+        
+        @keyframes userPulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            max-width: 300px;
+        }
+        
+        .notification.show { transform: translateX(0); }
+        .notification.error { background: #f44336; }
+        .notification.warning { background: #ff9800; }
+        .notification.success { background: #4CAF50; }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .treasure-info {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="logo">🗺️ 抖宝地图</h1>
+            <p>实时寻宝 · 发现惊喜 · 探索世界</p>
+        </div>
+
+        <div class="map-container">
+            <h2 class="map-title">🎯 实时宝藏地图</h2>
+            
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <div class="stat-number" id="treasures-count">0</div>
+                    <div class="stat-label">地图宝藏</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="discovered-count">0</div>
+                    <div class="stat-label">已发现</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="coins-earned">0</div>
+                    <div class="stat-label">获得抖币</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="user-level">1</div>
+                    <div class="stat-label">探险等级</div>
+                </div>
+            </div>
+            
+            <div class="treasure-map" id="treasure-map">
+                <div class="map-grid"></div>
+                <div class="loading-overlay" id="loading-overlay">
+                    <div class="spinner"></div>
+                </div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #666;">
+                    <div style="font-size: 4rem; margin-bottom: 20px;">🗺️</div>
+                    <p style="font-size: 1.2rem; margin-bottom: 20px;">点击下方按钮开始你的寻宝之旅</p>
+                    <button class="btn" onclick="initMap()">📍 获取我的位置</button>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="initMap()">📍 获取位置</button>
+                <button class="btn" onclick="refreshMap()">🔄 刷新地图</button>
+                <button class="btn" onclick="addTreasure()">➕ 添加宝藏</button>
+                <button class="btn" onclick="clearMap()">🗑️ 清空地图</button>
+                <button class="btn" onclick="autoRefresh()">⚡ 自动刷新</button>
+                <button class="btn" onclick="testAPI()">🔧 测试API</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知系统 -->
+    <div id="notification" class="notification">
+        <div id="notification-content"></div>
+    </div>
+
+    <!-- 宝藏信息提示 -->
+    <div id="treasure-info" class="treasure-info"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let userLocation = null;
+        let treasuresData = [];
+        let autoRefreshInterval = null;
+        let gameStats = {
+            treasuresCount: 0,
+            discoveredCount: 0,
+            coinsEarned: 0,
+            userLevel: 1
+        };
+
+        const treasureTypes = [
+            { icon: '💎', name: '钻石', reward: 100, class: 'treasure-diamond' },
+            { icon: '👑', name: '皇冠', reward: 200, class: 'treasure-crown' },
+            { icon: '💰', name: '金币', reward: 50, class: 'treasure-gold' },
+            { icon: '💍', name: '宝石', reward: 150, class: 'treasure-gem' },
+            { icon: '🎁', name: '礼品', reward: 75, class: 'treasure-gift' }
+        ];
+
+        // 初始化地图
+        function initMap() {
+            showLoading(true);
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        userLocation = { lat, lng };
+                        
+                        setupMap();
+                        showNotification(`📍 位置获取成功！\n纬度: ${lat.toFixed(4)}\n经度: ${lng.toFixed(4)}`, 'success');
+                        
+                        // 获取附近宝藏
+                        fetchNearbyTreasures(lat, lng);
+                    },
+                    error => {
+                        showLoading(false);
+                        showNotification('📍 无法获取位置，使用模拟位置', 'warning');
+                        // 使用北京坐标作为默认位置
+                        userLocation = { lat: 39.9042, lng: 116.4074 };
+                        setupMap();
+                        generateRandomTreasures();
+                    }
+                );
+            } else {
+                showLoading(false);
+                showNotification('📍 浏览器不支持地理定位', 'error');
+                userLocation = { lat: 39.9042, lng: 116.4074 };
+                setupMap();
+                generateRandomTreasures();
+            }
+        }
+
+        // 设置地图
+        function setupMap() {
+            const mapElement = document.getElementById('treasure-map');
+            mapElement.innerHTML = '<div class="map-grid"></div><div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>';
+            
+            // 添加用户位置标记
+            if (userLocation) {
+                const userMarker = document.createElement('div');
+                userMarker.className = 'user-location';
+                userMarker.style.left = '50%';
+                userMarker.style.top = '50%';
+                userMarker.title = `我的位置\n${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
+                mapElement.appendChild(userMarker);
+            }
+            
+            showLoading(false);
+        }
+
+        // 获取附近宝藏
+        async function fetchNearbyTreasures(lat, lng) {
+            try {
+                const response = await fetch(`${API_BASE}/api/treasures/nearby?lat=${lat}&lng=${lng}&radius=1000`);
+                const data = await response.json();
+                
+                if (data.success && data.treasures) {
+                    treasuresData = data.treasures;
+                    displayTreasures(data.treasures);
+                    showNotification(`🗺️ 发现 ${data.treasures.length} 个宝藏！`, 'success');
+                } else {
+                    generateRandomTreasures();
+                }
+            } catch (error) {
+                console.error('获取宝藏失败:', error);
+                generateRandomTreasures();
+                showNotification('🔄 使用本地宝藏数据', 'warning');
+            }
+        }
+
+        // 显示宝藏
+        function displayTreasures(treasures) {
+            const mapElement = document.getElementById('treasure-map');
+            
+            // 清除现有宝藏（保留用户位置和网格）
+            const existingTreasures = mapElement.querySelectorAll('.treasure-marker');
+            existingTreasures.forEach(marker => marker.remove());
+            
+            treasures.forEach((treasure, index) => {
+                const marker = createTreasureMarker(treasure, index);
+                mapElement.appendChild(marker);
+            });
+            
+            updateStats();
+        }
+
+        // 创建宝藏标记
+        function createTreasureMarker(treasure, index) {
+            const treasureType = treasureTypes[index % treasureTypes.length];
+            const marker = document.createElement('div');
+            
+            marker.className = `treasure-marker ${treasureType.class}`;
+            marker.innerHTML = treasureType.icon;
+            marker.style.left = Math.random() * 85 + 5 + '%';
+            marker.style.top = Math.random() * 85 + 5 + '%';
+            marker.title = `${treasureType.name}\n奖励: ${treasureType.reward} 抖币\n点击发现！`;
+            
+            // 添加鼠标悬停效果
+            marker.addEventListener('mouseenter', (e) => {
+                showTreasureInfo(e, treasureType, treasure);
+            });
+            
+            marker.addEventListener('mouseleave', () => {
+                hideTreasureInfo();
+            });
+            
+            // 点击发现宝藏
+            marker.addEventListener('click', () => {
+                discoverTreasure(marker, treasureType, treasure);
+            });
+            
+            return marker;
+        }
+
+        // 显示宝藏信息
+        function showTreasureInfo(event, treasureType, treasure) {
+            const info = document.getElementById('treasure-info');
+            info.innerHTML = `
+                <strong>${treasureType.name}</strong><br>
+                奖励: ${treasureType.reward} 抖币<br>
+                ${treasure.description || '神秘的宝藏等待发现'}
+            `;
+            info.style.left = event.pageX + 10 + 'px';
+            info.style.top = event.pageY - 10 + 'px';
+            info.style.opacity = '1';
+        }
+
+        // 隐藏宝藏信息
+        function hideTreasureInfo() {
+            document.getElementById('treasure-info').style.opacity = '0';
+        }
+
+        // 发现宝藏
+        function discoverTreasure(marker, treasureType, treasure) {
+            // 动画效果
+            marker.style.transform = 'scale(1.5)';
+            marker.style.opacity = '0.5';
+            
+            setTimeout(() => {
+                marker.remove();
+                
+                // 更新统计
+                gameStats.discoveredCount++;
+                gameStats.coinsEarned += treasureType.reward;
+                
+                // 检查升级
+                if (gameStats.discoveredCount % 5 === 0) {
+                    gameStats.userLevel++;
+                    showNotification(`🎉 恭喜升级到 Lv.${gameStats.userLevel}！`, 'success');
+                }
+                
+                updateStats();
+                showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 抖币！`, 'success');
+                
+                // 创建发现特效
+                createDiscoveryEffect(marker.style.left, marker.style.top);
+                
+            }, 300);
+        }
+
+        // 创建发现特效
+        function createDiscoveryEffect(left, top) {
+            const effect = document.createElement('div');
+            effect.innerHTML = '✨';
+            effect.style.position = 'absolute';
+            effect.style.left = left;
+            effect.style.top = top;
+            effect.style.fontSize = '2rem';
+            effect.style.pointerEvents = 'none';
+            effect.style.animation = 'fadeOut 1s ease-out forwards';
+            
+            document.getElementById('treasure-map').appendChild(effect);
+            
+            setTimeout(() => effect.remove(), 1000);
+        }
+
+        // 生成随机宝藏
+        function generateRandomTreasures() {
+            const count = Math.floor(Math.random() * 6) + 4; // 4-9个宝藏
+            const randomTreasures = [];
+            
+            for (let i = 0; i < count; i++) {
+                randomTreasures.push({
+                    id: `random_${i}`,
+                    name: treasureTypes[i % treasureTypes.length].name,
+                    description: `随机生成的${treasureTypes[i % treasureTypes.length].name}`
+                });
+            }
+            
+            treasuresData = randomTreasures;
+            displayTreasures(randomTreasures);
+        }
+
+        // 刷新地图
+        function refreshMap() {
+            showLoading(true);
+            showNotification('🔄 正在刷新地图...', 'info');
+            
+            setTimeout(() => {
+                if (userLocation) {
+                    fetchNearbyTreasures(userLocation.lat, userLocation.lng);
+                } else {
+                    generateRandomTreasures();
+                }
+                showNotification('🔄 地图刷新完成！', 'success');
+            }, 1000);
+        }
+
+        // 添加宝藏
+        function addTreasure() {
+            const treasureType = treasureTypes[Math.floor(Math.random() * treasureTypes.length)];
+            const newTreasure = {
+                id: `added_${Date.now()}`,
+                name: treasureType.name,
+                description: `新添加的${treasureType.name}`
+            };
+            
+            const marker = createTreasureMarker(newTreasure, Math.floor(Math.random() * treasureTypes.length));
+            document.getElementById('treasure-map').appendChild(marker);
+            
+            gameStats.treasuresCount++;
+            updateStats();
+            showNotification(`➕ 新的${treasureType.name}已添加到地图！`, 'success');
+        }
+
+        // 清空地图
+        function clearMap() {
+            const mapElement = document.getElementById('treasure-map');
+            const treasureMarkers = mapElement.querySelectorAll('.treasure-marker');
+            
+            treasureMarkers.forEach(marker => {
+                marker.style.animation = 'fadeOut 0.5s ease-out forwards';
+                setTimeout(() => marker.remove(), 500);
+            });
+            
+            treasuresData = [];
+            gameStats.treasuresCount = 0;
+            updateStats();
+            showNotification('🗑️ 地图已清空', 'success');
+        }
+
+        // 自动刷新
+        function autoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                showNotification('⏹️ 自动刷新已停止', 'info');
+            } else {
+                autoRefreshInterval = setInterval(() => {
+                    refreshMap();
+                }, 10000); // 每10秒刷新一次
+                showNotification('⚡ 自动刷新已启动（每10秒）', 'success');
+            }
+        }
+
+        // 测试API
+        async function testAPI() {
+            try {
+                showNotification('🔧 正在测试API连接...', 'info');
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    showNotification('✅ API连接正常！\n服务器运行良好', 'success');
+                } else {
+                    showNotification('⚠️ API响应异常', 'warning');
+                }
+            } catch (error) {
+                showNotification('❌ API连接失败\n请检查服务器状态', 'error');
+            }
+        }
+
+        // 更新统计
+        function updateStats() {
+            document.getElementById('treasures-count').textContent = document.querySelectorAll('.treasure-marker').length;
+            document.getElementById('discovered-count').textContent = gameStats.discoveredCount;
+            document.getElementById('coins-earned').textContent = gameStats.coinsEarned;
+            document.getElementById('user-level').textContent = gameStats.userLevel;
+        }
+
+        // 显示/隐藏加载动画
+        function showLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const content = document.getElementById('notification-content');
+            
+            content.innerHTML = message.replace(/\n/g, '<br>');
+            notification.className = `notification show ${type}`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        // 添加CSS动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                from { opacity: 1; transform: scale(1); }
+                to { opacity: 0; transform: scale(0.5); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            showNotification('🎉 欢迎来到抖宝地图！\n点击"获取位置"开始探险', 'success');
+            updateStats();
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>位置调试 - 抖宝地图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .debug-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .map-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            height: 400px;
+            position: relative;
+            border: 3px solid #ddd;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .user-marker {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #4CAF50;
+            border-radius: 50%;
+            border: 5px solid white;
+            box-shadow: 0 0 25px rgba(76, 175, 80, 0.8);
+            animation: pulse 2s infinite;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .log {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        
+        .center-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: red;
+            border-radius: 50%;
+            z-index: 999;
+        }
+        
+        .center-marker::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 24px;
+            height: 24px;
+            border: 2px solid red;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 位置调试工具</h1>
+            <p>专门用来调试用户位置显示问题</p>
+        </div>
+
+        <div class="debug-panel">
+            <h3>📊 状态信息</h3>
+            <div id="status-info" class="status info">等待操作...</div>
+            
+            <h3>🎮 测试按钮</h3>
+            <button class="btn" onclick="testGeolocation()">📍 测试地理定位</button>
+            <button class="btn" onclick="forceCreateMarker()">🎯 强制创建位置标记</button>
+            <button class="btn" onclick="showMarkerInfo()">ℹ️ 显示标记信息</button>
+            <button class="btn" onclick="clearMap()">🗑️ 清空地图</button>
+            <button class="btn" onclick="testCenterPoint()">📐 测试中心点</button>
+        </div>
+
+        <div class="debug-panel">
+            <h3>🗺️ 调试地图</h3>
+            <div class="map-container" id="debug-map">
+                <div class="center-marker" id="center-marker"></div>
+            </div>
+        </div>
+
+        <div class="debug-panel">
+            <h3>📝 调试日志</h3>
+            <div class="log" id="debug-log">调试日志将在这里显示...\n</div>
+        </div>
+    </div>
+
+    <script>
+        let userLocation = null;
+        let markers = [];
+
+        function log(message) {
+            const logElement = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status-info');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            log(`状态: ${message}`);
+        }
+
+        // 测试地理定位
+        function testGeolocation() {
+            log('开始测试地理定位...');
+            setStatus('正在获取位置...', 'info');
+
+            if (!navigator.geolocation) {
+                setStatus('浏览器不支持地理定位', 'error');
+                log('错误: 浏览器不支持地理定位');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    userLocation = { lat, lng };
+                    
+                    log(`位置获取成功: 纬度=${lat}, 经度=${lng}`);
+                    setStatus(`位置获取成功！纬度: ${lat.toFixed(4)}, 经度: ${lng.toFixed(4)}`, 'success');
+                    
+                    // 自动创建标记
+                    createUserMarker();
+                },
+                error => {
+                    log(`位置获取失败: ${error.message}`);
+                    setStatus(`位置获取失败: ${error.message}`, 'error');
+                    
+                    // 使用默认位置
+                    userLocation = { lat: 39.9042, lng: 116.4074 };
+                    log('使用默认位置: 北京');
+                    setStatus('使用默认位置（北京）', 'warning');
+                    createUserMarker();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 60000
+                }
+            );
+        }
+
+        // 强制创建位置标记
+        function forceCreateMarker() {
+            log('强制创建位置标记...');
+            
+            if (!userLocation) {
+                userLocation = { lat: 39.9042, lng: 116.4074 };
+                log('设置默认位置');
+            }
+            
+            createUserMarker();
+        }
+
+        // 创建用户位置标记
+        function createUserMarker() {
+            const mapElement = document.getElementById('debug-map');
+            
+            // 清除现有的用户标记
+            const existingMarkers = mapElement.querySelectorAll('.user-marker');
+            existingMarkers.forEach(marker => {
+                log('移除现有标记');
+                marker.remove();
+            });
+            
+            log('创建新的用户位置标记...');
+            
+            const userMarker = document.createElement('div');
+            userMarker.className = 'user-marker';
+            userMarker.innerHTML = '📍';
+            userMarker.style.left = '50%';
+            userMarker.style.top = '50%';
+            userMarker.style.transform = 'translate(-50%, -50%)';
+            userMarker.title = `我的位置\n纬度: ${userLocation.lat.toFixed(4)}\n经度: ${userLocation.lng.toFixed(4)}`;
+            
+            // 添加点击事件
+            userMarker.addEventListener('click', () => {
+                alert(`位置信息:\n纬度: ${userLocation.lat}\n经度: ${userLocation.lng}`);
+            });
+            
+            mapElement.appendChild(userMarker);
+            markers.push(userMarker);
+            
+            log('用户位置标记已创建并添加到地图');
+            setStatus('用户位置标记已显示！', 'success');
+        }
+
+        // 显示标记信息
+        function showMarkerInfo() {
+            const mapElement = document.getElementById('debug-map');
+            const userMarkers = mapElement.querySelectorAll('.user-marker');
+            
+            log(`地图中的用户标记数量: ${userMarkers.length}`);
+            
+            if (userMarkers.length > 0) {
+                userMarkers.forEach((marker, index) => {
+                    log(`标记 ${index + 1}: 类名=${marker.className}, 位置=${marker.style.left}, ${marker.style.top}`);
+                });
+                setStatus(`找到 ${userMarkers.length} 个用户标记`, 'success');
+            } else {
+                log('没有找到用户标记');
+                setStatus('没有找到用户标记', 'warning');
+            }
+            
+            log(`userLocation: ${userLocation ? JSON.stringify(userLocation) : 'null'}`);
+        }
+
+        // 清空地图
+        function clearMap() {
+            const mapElement = document.getElementById('debug-map');
+            const userMarkers = mapElement.querySelectorAll('.user-marker');
+            
+            userMarkers.forEach(marker => marker.remove());
+            markers = [];
+            
+            log('地图已清空');
+            setStatus('地图已清空', 'info');
+        }
+
+        // 测试中心点
+        function testCenterPoint() {
+            const centerMarker = document.getElementById('center-marker');
+            centerMarker.style.background = 'blue';
+            centerMarker.style.animation = 'pulse 1s ease-in-out 3';
+            
+            log('中心点已标记（蓝色圆点）');
+            setStatus('中心点已标记', 'info');
+            
+            setTimeout(() => {
+                centerMarker.style.background = 'red';
+                centerMarker.style.animation = '';
+            }, 3000);
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('调试工具已加载');
+            setStatus('调试工具已准备就绪', 'success');
+        });
+    </script>
+</body>
+</html>
+
