@@ -3,293 +3,1347 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝 - 基于GPS的寻宝游戏</title>
+    <title>抖宝 - GPS寻宝游戏</title>
+    <meta name="description" content="基于GPS定位的实时寻宝游戏，支持高德地图">
+    <meta name="keywords" content="GPS寻宝,抖音,高德地图,定位游戏">
+    
+    <!-- PWA支持 -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: system-ui, -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
+            padding: 10px;
+            line-height: 1.6;
         }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .header { text-align: center; padding: 40px 0; color: white; }
-        .logo { font-size: 3.5rem; font-weight: bold; margin-bottom: 10px; }
-        .tagline { font-size: 1.2rem; opacity: 0.9; margin-bottom: 30px; }
-        .demo-section {
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .stat {
+            text-align: center;
+            color: white;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .card {
             background: white;
-            border-radius: 20px;
-            padding: 40px;
-            margin: 40px 0;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        .api-test {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
         }
-        .api-card {
-            background: #f8f9fa;
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .input-group {
+            margin: 20px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .api-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
             border-radius: 10px;
-            padding: 20px;
-            border-left: 4px solid #667eea;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
         }
-        .test-btn {
+        
+        .api-input:focus {
+            border-color: #667eea;
+            outline: none;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 25px;
+            padding: 15px 25px;
+            border-radius: 10px;
             cursor: pointer;
-            font-weight: bold;
-            margin: 5px;
+            font-weight: 600;
+            font-size: 1rem;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
-        .test-btn:hover { transform: scale(1.05); }
-        .response-area {
-            background: #1e1e1e;
-            color: #00ff00;
+        
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover:before {
+            left: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn:disabled:before {
+            display: none;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 0.95rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status.info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f1f8ff 100%);
+            color: #1976d2;
+            border: 1px solid #2196F3;
+        }
+        
+        .status.success {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+            color: #2e7d32;
+            border: 1px solid #4CAF50;
+        }
+        
+        .status.error {
+            background: linear-gradient(135deg, #ffebee 0%, #ffeef0 100%);
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+        
+        .status.warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #fffbf0 100%);
+            color: #856404;
+            border: 1px solid #ffc107;
+        }
+        
+        #map-container {
+            width: 100%;
+            height: 60vh;
+            min-height: 400px;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 3px solid #e1e5e9;
+            margin: 20px 0;
+            position: relative;
+            background: #f8f9fa;
+        }
+        
+        .map-placeholder {
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100%; 
+            color: #666; 
+            flex-direction: column;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        
+        .map-placeholder-icon {
+            font-size: 4rem; 
+            margin-bottom: 20px;
+            opacity: 0.6;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        @media (min-width: 768px) {
+            .controls {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        .gps-info {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #dee2e6;
+        }
+        
+        .gps-info h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .gps-data {
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+            background: white;
             padding: 15px;
             border-radius: 8px;
-            margin-top: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
+            border: 1px solid #dee2e6;
+            line-height: 1.5;
         }
-        .loading { display: none; text-align: center; color: #667eea; margin: 10px 0; }
+        
+        .tutorial {
+            background: linear-gradient(135deg, #fff3cd 0%, #fffbf0 100%);
+            border: 1px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+        
+        .tutorial h4 {
+            color: #856404;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .tutorial ol {
+            margin-left: 20px;
+        }
+        
+        .tutorial li {
+            margin: 8px 0;
+        }
+        
+        .tutorial a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .tutorial a:hover {
+            text-decoration: underline;
+        }
+        
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: 1fr;
             gap: 20px;
-            margin: 40px 0;
+            margin: 30px 0;
         }
-        .feature-card {
+        
+        @media (min-width: 768px) {
+            .features {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .feature {
             background: white;
+            padding: 25px;
             border-radius: 15px;
-            padding: 30px;
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
         }
-        .feature-icon { font-size: 3rem; margin-bottom: 20px; }
-        .feature-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; }
-        .feature-desc { color: #666; line-height: 1.6; }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        .feature h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="logo">🎯 抖宝</h1>
-            <p class="tagline">AI驱动的社交寻宝游戏 - 发现身边的惊喜，分享你的探险</p>
-        </div>
-
-        <!-- 功能特色 -->
-        <div class="features">
-            <div class="feature-card">
-                <div class="feature-icon">🗺️</div>
-                <h3 class="feature-title">地理位置寻宝</h3>
-                <p class="feature-desc">基于真实地理位置的虚拟宝藏系统，每个位置都有独特的挑战和奖励</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📱</div>
-                <h3 class="feature-title">短视频分享</h3>
-                <p class="feature-desc">记录寻宝过程，拍摄短视频分享给好友，获得点赞和奖励</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🤖</div>
-                <h3 class="feature-title">AI智能推荐</h3>
-                <p class="feature-desc">基于你的兴趣和位置，AI为你推荐最适合的宝藏和探险路线</p>
+            <h1 class="title">🗺️ 抖宝</h1>
+            <p class="subtitle">基于GPS的实时寻宝游戏</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number" id="online-users">0</span>
+                    <span class="stat-label">在线用户</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="total-treasures">0</span>
+                    <span class="stat-label">宝藏总数</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="accuracy">0m</span>
+                    <span class="stat-label">定位精度</span>
+                </div>
             </div>
         </div>
 
-        <div class="demo-section">
-            <h2 style="text-align: center; margin-bottom: 30px;">🔧 抖宝API演示</h2>
+        <div class="card">
+            <h3>🔑 高德地图配置</h3>
+            <div class="input-group">
+                <label for="api-key">高德地图API Key:</label>
+                <input type="password" id="api-key" class="api-input" placeholder="请输入您的高德地图Web服务API Key">
+            </div>
+            <button class="btn" onclick="initMap()">
+                <span id="init-btn-text">🚀 启动寻宝之旅</span>
+            </button>
             
-            <div class="api-test">
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">🔧 服务器状态</div>
-                    <button class="test-btn" onclick="testAPI('/health', 'health')">检查服务器</button>
-                    <div class="loading" id="health-loading">⏳ 检查中...</div>
-                    <div class="response-area" id="health-response"></div>
-                </div>
+            <div class="tutorial">
+                <h4>📋 快速开始指南:</h4>
+                <ol>
+                    <li>申请<a href="https://console.amap.com/" target="_blank">高德地图API Key</a></li>
+                    <li>输入API Key并点击启动</li>
+                    <li>允许浏览器获取位置权限</li>
+                    <li>在户外环境中获得最佳GPS体验</li>
+                    <li>开始寻找附近的宝藏！</li>
+                </ol>
+            </div>
+            
+            <div class="status info" id="status">
+                <span>🔄</span>
+                <span>等待配置API Key启动地图服务...</span>
+            </div>
+        </div>
 
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">📚 API文档</div>
-                    <button class="test-btn" onclick="testAPI('/api/docs', 'docs')">查看文档</button>
-                    <div class="loading" id="docs-loading">⏳ 加载中...</div>
-                    <div class="response-area" id="docs-response"></div>
-                </div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <h4>移动端优化</h4>
+                <p>专为手机端设计，支持触摸操作和响应式布局</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎯</div>
+                <h4>精准定位</h4>
+                <p>使用高精度GPS定位，支持室外精确寻宝</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🏆</div>
+                <h4>多种宝藏</h4>
+                <p>钻石、皇冠、金币等多种宝藏类型等你发现</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🌍</div>
+                <h4>实时地图</h4>
+                <p>基于高德地图的实时位置显示和导航</p>
+            </div>
+        </div>
 
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">🗺️ 宝藏搜索</div>
-                    <button class="test-btn" onclick="searchTreasures()">搜索宝藏</button>
-                    <div class="loading" id="treasures-loading">⏳ 搜索中...</div>
-                    <div class="response-area" id="treasures-response"></div>
-                </div>
-
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">👤 用户系统</div>
-                    <button class="test-btn" onclick="testRegister()">测试注册</button>
-                    <button class="test-btn" onclick="testLogin()">测试登录</button>
-                    <div class="loading" id="auth-loading">⏳ 处理中...</div>
-                    <div class="response-area" id="auth-response"></div>
-                </div>
-
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">🎯 创建宝藏</div>
-                    <button class="test-btn" onclick="createTreasure()">创建宝藏</button>
-                    <div class="loading" id="create-loading">⏳ 创建中...</div>
-                    <div class="response-area" id="create-response"></div>
-                </div>
-
-                <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">🚀 完整演示</div>
-                    <button class="test-btn" onclick="runFullDemo()">运行演示</button>
-                    <div class="loading" id="demo-loading">⏳ 演示中...</div>
-                    <div class="response-area" id="demo-response"></div>
+        <div class="card">
+            <h3>📍 GPS状态信息</h3>
+            <div class="gps-info">
+                <h4>当前位置信息:</h4>
+                <div class="gps-data" id="gps-data">
+                    等待获取GPS数据...
                 </div>
             </div>
         </div>
 
-        <div class="demo-section">
-            <h2 style="text-align: center; margin-bottom: 20px;">📱 立即开始探险</h2>
-            <div style="text-align: center;">
-                <p style="margin-bottom: 30px; color: #666;">加入数万名探险者的行列，开始你的寻宝之旅！</p>
-                <button class="test-btn" style="font-size: 1.1rem; padding: 15px 30px;">🍎 App Store 下载</button>
-                <button class="test-btn" style="font-size: 1.1rem; padding: 15px 30px;">🤖 Google Play 下载</button>
-                <button class="test-btn" style="font-size: 1.1rem; padding: 15px 30px;">🌐 微信小程序</button>
+        <div class="card">
+            <div id="map-container">
+                <div class="map-placeholder">
+                    <div class="map-placeholder-icon pulse">🗺️</div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.2rem; margin-bottom: 10px;">地图即将加载</div>
+                        <div style="color: #888;">配置API Key后即可显示高德地图</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="testGPS()" disabled id="gps-btn">
+                    📍 重新定位
+                </button>
+                <button class="btn" onclick="addTreasure()" disabled id="treasure-btn">
+                    ✨ 添加宝藏
+                </button>
+                <button class="btn" onclick="clearMap()" disabled id="clear-btn">
+                    🗑️ 清空地图
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:5000';
+        // 全局变量
+        let map = null;
+        let userMarker = null;
+        let treasureMarkers = [];
+        let userLocation = null;
+        let watchId = null;
 
-        async function testAPI(endpoint, id) {
-            const loading = document.getElementById(id + '-loading');
-            const response = document.getElementById(id + '-response');
-            
-            loading.style.display = 'block';
-            response.textContent = '';
-            
-            try {
-                const res = await fetch(API_BASE + endpoint);
-                const data = await res.json();
-                response.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                response.textContent = `错误: ${error.message}`;
+        // 用户数据管理
+        let userData = {
+            username: '',
+            level: {
+                currentLevel: 1,
+                experience: 0,
+                badges: []
+            },
+            stats: {
+                treasuresCreated: 0,
+                treasuresDiscovered: 0,
+                totalLikes: 0,
+                totalViews: 0
+            },
+            preferences: {
+                interests: [],
+                explorationRadius: 5000,
+                language: 'zh-CN'
+            },
+            discoveredTreasures: [],
+            createdTreasures: [],
+            achievements: [],
+            lastActiveAt: new Date()
+        };
+
+        // 本地存储管理
+        const storageManager = {
+            save: (key, data) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                    return true;
+                } catch (error) {
+                    console.error('存储失败:', error);
+                    return false;
+                }
+            },
+            load: (key) => {
+                try {
+                    const data = localStorage.getItem(key);
+                    return data ? JSON.parse(data) : null;
+                } catch (error) {
+                    console.error('读取失败:', error);
+                    return null;
+                }
+            },
+            remove: (key) => {
+                try {
+                    localStorage.removeItem(key);
+                    return true;
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    return false;
+                }
             }
+        };
+
+        // 完整的宝藏类型系统（基于数据模型）
+        const treasureTypes = [
+            { 
+                icon: '💎', 
+                name: '钻石宝藏', 
+                color: '#e74c3c', 
+                rarity: 'legendary',
+                category: '摄影',
+                rewards: { experience: 100, coins: 50 },
+                discoveryRadius: 30
+            },
+            { 
+                icon: '👑', 
+                name: '皇冠宝藏', 
+                color: '#9b59b6', 
+                rarity: 'epic',
+                category: '历史',
+                rewards: { experience: 80, coins: 40 },
+                discoveryRadius: 35
+            },
+            { 
+                icon: '💰', 
+                name: '金币宝藏', 
+                color: '#f1c40f', 
+                rarity: 'rare',
+                category: '购物',
+                rewards: { experience: 60, coins: 30 },
+                discoveryRadius: 40
+            },
+            { 
+                icon: '🏺', 
+                name: '古董宝藏', 
+                color: '#e67e22', 
+                rarity: 'uncommon',
+                category: '艺术',
+                rewards: { experience: 40, coins: 20 },
+                discoveryRadius: 45
+            },
+            { 
+                icon: '💍', 
+                name: '戒指宝藏', 
+                color: '#3498db', 
+                rarity: 'common',
+                category: '美食',
+                rewards: { experience: 20, coins: 10 },
+                discoveryRadius: 50
+            },
+            { 
+                icon: '🎭', 
+                name: '面具宝藏', 
+                color: '#8e44ad', 
+                rarity: 'rare',
+                category: '音乐',
+                rewards: { experience: 55, coins: 25 },
+                discoveryRadius: 40
+            },
+            { 
+                icon: '⚔️', 
+                name: '神器宝藏', 
+                color: '#2c3e50', 
+                rarity: 'legendary',
+                category: '运动',
+                rewards: { experience: 120, coins: 60 },
+                discoveryRadius: 25
+            },
+            { 
+                icon: '🏆', 
+                name: '奖杯宝藏', 
+                color: '#f39c12', 
+                rarity: 'epic',
+                category: '旅游',
+                rewards: { experience: 90, coins: 45 },
+                discoveryRadius: 30
+            }
+        ];
+
+        // 用户等级系统
+        const levelSystem = {
+            getLevel: (experience) => Math.floor(Math.sqrt(experience / 100)) + 1,
+            getExpForLevel: (level) => Math.pow(level - 1, 2) * 100,
+            getExpToNext: (currentExp) => {
+                const currentLevel = levelSystem.getLevel(currentExp);
+                const nextLevelExp = levelSystem.getExpForLevel(currentLevel + 1);
+                return nextLevelExp - currentExp;
+            }
+        };
+
+        // 徽章系统
+        const badgeSystem = [
+            { name: 'first_treasure', icon: '🎯', title: '初探者', description: '发现第一个宝藏' },
+            { name: 'treasure_hunter', icon: '🏃', title: '寻宝猎人', description: '发现10个宝藏' },
+            { name: 'treasure_master', icon: '👑', title: '寻宝大师', description: '发现50个宝藏' },
+            { name: 'legendary_finder', icon: '💎', title: '传奇发现者', description: '发现传奇级宝藏' },
+            { name: 'category_expert', icon: '🎓', title: '分类专家', description: '在每个分类中都发现宝藏' },
+            { name: 'speed_runner', icon: '⚡', title: '闪电侠', description: '1小时内发现5个宝藏' },
+            { name: 'explorer', icon: '🗺️', title: '探险家', description: '探索超过5公里范围' },
+            { name: 'social_star', icon: '⭐', title: '社交之星', description: '创建的宝藏被发现100次' }
+        ];
+
+        // 更新状态显示
+        function updateStatus(message, type = 'info', showLoading = false) {
+            const status = document.getElementById('status');
+            const iconMap = {
+                info: '🔄',
+                success: '✅',
+                error: '❌',
+                warning: '⚠️'
+            };
             
-            loading.style.display = 'none';
+            const icon = showLoading ? '<span class="loading"></span>' : iconMap[type];
+            status.innerHTML = `${icon}<span>${message}</span>`;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
-        function searchTreasures() {
-            const lat = 39.9 + (Math.random() - 0.5) * 0.1;
-            const lng = 116.4 + (Math.random() - 0.5) * 0.1;
-            testAPI(`/api/treasures/nearby?lat=${lat}&lng=${lng}`, 'treasures');
+        // 更新GPS数据显示
+        function updateGPSData(data) {
+            const gpsData = document.getElementById('gps-data');
+            gpsData.innerHTML = data;
         }
 
-        async function testRegister() {
-            const loading = document.getElementById('auth-loading');
-            const response = document.getElementById('auth-response');
+        // 宝藏管理系统
+        const treasureManager = {
+            // 创建宝藏数据
+            createTreasure: (position, type, creator = 'system') => {
+                const treasure = {
+                    id: Date.now() + Math.random().toString(36).substr(2, 9),
+                    title: type.name,
+                    description: `一个珍贵的${type.name}，等待着勇敢的探险者来发现！`,
+                    creator: creator,
+                    location: {
+                        coordinates: position,
+                        discoveryRadius: type.discoveryRadius
+                    },
+                    category: type.category,
+                    rewards: type.rewards,
+                    rarity: type.rarity,
+                    icon: type.icon,
+                    color: type.color,
+                    stats: {
+                        views: 0,
+                        likes: 0,
+                        discoveries: 0
+                    },
+                    createdAt: new Date(),
+                    status: 'active'
+                };
+                return treasure;
+            },
+
+            // 发现宝藏
+            discoverTreasure: (treasureId, userPosition) => {
+                const treasureIndex = userData.createdTreasures.findIndex(t => t.id === treasureId);
+                if (treasureIndex === -1) return { success: false, reason: 'treasure_not_found' };
+
+                const treasure = userData.createdTreasures[treasureIndex];
+                const distance = calculateDistance(userPosition, treasure.location.coordinates);
+
+                if (distance > treasure.location.discoveryRadius) {
+                    return { 
+                        success: false, 
+                        reason: 'too_far',
+                        distance: distance,
+                        requiredDistance: treasure.location.discoveryRadius
+                    };
+                }
+
+                // 检查是否已经发现过
+                if (userData.discoveredTreasures.includes(treasureId)) {
+                    return { success: false, reason: 'already_discovered' };
+                }
+
+                // 记录发现
+                userData.discoveredTreasures.push(treasureId);
+                userData.stats.treasuresDiscovered += 1;
+                treasure.stats.discoveries += 1;
+
+                // 奖励经验和金币
+                const reward = userManager.addExperience(treasure.rewards.experience);
+                userManager.addCoins(treasure.rewards.coins);
+
+                // 检查成就
+                achievementManager.checkAchievements();
+
+                // 保存数据
+                saveUserData();
+
+                return {
+                    success: true,
+                    treasure: treasure,
+                    rewards: treasure.rewards,
+                    levelUp: reward.levelUp
+                };
+            }
+        };
+
+        // 用户管理系统
+        const userManager = {
+            // 添加经验值
+            addExperience: (points) => {
+                const oldLevel = userData.level.currentLevel;
+                userData.level.experience += points;
+                
+                const newLevel = levelSystem.getLevel(userData.level.experience);
+                if (newLevel > oldLevel) {
+                    userData.level.currentLevel = newLevel;
+                    
+                    // 等级提升奖励
+                    const reward = {
+                        coins: newLevel * 10,
+                        badge: newLevel % 10 === 0 ? `level_${newLevel}` : null
+                    };
+
+                    if (reward.badge) {
+                        userManager.addBadge(reward.badge, '🏆', `达到第${newLevel}级`);
+                    }
+
+                    return {
+                        levelUp: true,
+                        oldLevel: oldLevel,
+                        newLevel: newLevel,
+                        reward: reward
+                    };
+                }
+                
+                return { levelUp: false };
+            },
+
+            // 添加徽章
+            addBadge: (badgeName, icon, description) => {
+                const existingBadge = userData.level.badges.find(badge => badge.name === badgeName);
+                if (!existingBadge) {
+                    userData.level.badges.push({
+                        name: badgeName,
+                        icon: icon,
+                        description: description,
+                        unlockedAt: new Date()
+                    });
+                    return true;
+                }
+                return false;
+            },
+
+            // 添加金币（虚拟货币）
+            addCoins: (amount) => {
+                if (!userData.coins) userData.coins = 0;
+                userData.coins += amount;
+            },
+
+            // 获取用户等级信息
+            getLevelInfo: () => {
+                const currentExp = userData.level.experience;
+                const currentLevel = userData.level.currentLevel;
+                const expForCurrentLevel = levelSystem.getExpForLevel(currentLevel);
+                const expForNextLevel = levelSystem.getExpForLevel(currentLevel + 1);
+                const expToNext = expForNextLevel - currentExp;
+                const progress = ((currentExp - expForCurrentLevel) / (expForNextLevel - expForCurrentLevel)) * 100;
+
+                return {
+                    currentLevel,
+                    currentExp,
+                    expToNext,
+                    progress: Math.max(0, Math.min(100, progress))
+                };
+            }
+        };
+
+        // 成就系统
+        const achievementManager = {
+            checkAchievements: () => {
+                const achievements = [];
+
+                // 第一个宝藏
+                if (userData.stats.treasuresDiscovered === 1) {
+                    achievements.push(userManager.addBadge('first_treasure', '🎯', '发现第一个宝藏'));
+                }
+
+                // 寻宝猎人
+                if (userData.stats.treasuresDiscovered === 10) {
+                    achievements.push(userManager.addBadge('treasure_hunter', '🏃', '发现10个宝藏'));
+                }
+
+                // 寻宝大师
+                if (userData.stats.treasuresDiscovered === 50) {
+                    achievements.push(userManager.addBadge('treasure_master', '👑', '发现50个宝藏'));
+                }
+
+                // 传奇发现者（发现传奇级宝藏）
+                const legendaryFound = userData.createdTreasures.some(t => 
+                    userData.discoveredTreasures.includes(t.id) && t.rarity === 'legendary'
+                );
+                if (legendaryFound) {
+                    achievements.push(userManager.addBadge('legendary_finder', '💎', '发现传奇级宝藏'));
+                }
+
+                return achievements.filter(Boolean);
+            }
+        };
+
+        // 距离计算工具
+        function calculateDistance(pos1, pos2) {
+            const R = 6371000; // 地球半径(米)
+            const lat1 = pos1[1] * Math.PI / 180;
+            const lat2 = pos2[1] * Math.PI / 180;
+            const deltaLat = (pos2[1] - pos1[1]) * Math.PI / 180;
+            const deltaLng = (pos2[0] - pos1[0]) * Math.PI / 180;
+
+            const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
+                    Math.cos(lat1) * Math.cos(lat2) *
+                    Math.sin(deltaLng/2) * Math.sin(deltaLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        // 保存和加载用户数据
+        function saveUserData() {
+            userData.lastActiveAt = new Date();
+            storageManager.save('douyin-treasure-user', userData);
+        }
+
+        function loadUserData() {
+            const saved = storageManager.load('douyin-treasure-user');
+            if (saved) {
+                userData = { ...userData, ...saved };
+                // 确保日期字段正确解析
+                if (saved.lastActiveAt) {
+                    userData.lastActiveAt = new Date(saved.lastActiveAt);
+                }
+            }
+        }
+
+        // 更新统计数据显示
+        function updateStats(accuracy = 0) {
+            document.getElementById('online-users').textContent = '1';
+            document.getElementById('total-treasures').textContent = treasureMarkers.length;
+            document.getElementById('accuracy').textContent = `${Math.round(accuracy)}m`;
             
-            loading.style.display = 'block';
-            response.textContent = '';
+            // 更新用户等级信息
+            const levelInfo = userManager.getLevelInfo();
+            if (document.getElementById('user-level')) {
+                document.getElementById('user-level').textContent = `LV.${levelInfo.currentLevel}`;
+            }
+            if (document.getElementById('user-exp')) {
+                document.getElementById('user-exp').textContent = `${userData.level.experience} EXP`;
+            }
+        }
+
+        // 初始化地图
+        function initMap() {
+            const apiKey = document.getElementById('api-key').value.trim();
             
+            if (!apiKey) {
+                updateStatus('请输入高德地图API Key！', 'error');
+                return;
+            }
+
+            updateStatus('正在加载高德地图...', 'info', true);
+            localStorage.setItem('amap-api-key', apiKey);
+
+            // 更新按钮状态
+            const initBtn = document.getElementById('init-btn-text');
+            initBtn.innerHTML = '<span class="loading"></span> 正在加载...';
+
+            // 动态加载高德地图API
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geolocation`;
+            script.onload = function() {
+                createMap();
+            };
+            script.onerror = function() {
+                updateStatus('高德地图API加载失败！请检查Key是否正确或网络连接', 'error');
+                document.getElementById('init-btn-text').innerHTML = '🚀 重新启动';
+            };
+            document.head.appendChild(script);
+        }
+
+        // 创建地图实例
+        function createMap() {
             try {
-                const res = await fetch(API_BASE + '/api/auth/test-register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: `explorer${Math.floor(Math.random() * 10000)}`,
-                        email: `test${Math.floor(Math.random() * 10000)}@douyin.com`,
-                        password: 'password123'
-                    })
+                updateStatus('正在创建地图实例...', 'info', true);
+                
+                map = new AMap.Map('map-container', {
+                    zoom: 16,
+                    center: [116.397428, 39.90923], // 默认北京坐标
+                    viewMode: '2D',
+                    showLabel: true,
+                    mapStyle: 'amap://styles/normal'
                 });
-                const data = await res.json();
-                response.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                response.textContent = `错误: ${error.message}`;
-            }
-            
-            loading.style.display = 'none';
-        }
 
-        async function testLogin() {
-            const loading = document.getElementById('auth-loading');
-            const response = document.getElementById('auth-response');
-            
-            loading.style.display = 'block';
-            
-            try {
-                const res = await fetch(API_BASE + '/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({username: 'demo_user', password: 'password123'})
+                // 地图加载完成事件
+                map.on('complete', function() {
+                    updateStatus('地图加载成功！正在获取您的位置...', 'success');
+                    
+                    // 重置按钮
+                    document.getElementById('init-btn-text').innerHTML = '✅ 地图已启动';
+                    
+                    // 启用控制按钮
+                    document.querySelectorAll('.btn').forEach(btn => {
+                        if (!btn.onclick || btn.onclick.toString().includes('initMap')) {
+                            return;
+                        }
+                        btn.disabled = false;
+                    });
+
+                    // 自动获取位置
+                    setTimeout(() => {
+                        testGPS();
+                    }, 1000);
                 });
-                const data = await res.json();
-                response.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                response.textContent = `错误: ${error.message}`;
-            }
-            
-            loading.style.display = 'none';
-        }
 
-        async function createTreasure() {
-            const loading = document.getElementById('create-loading');
-            const response = document.getElementById('create-response');
-            
-            loading.style.display = 'block';
-            
-            try {
-                const res = await fetch(API_BASE + '/api/treasures/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: '测试宝藏',
-                        lat: 39.9 + Math.random() * 0.01,
-                        lng: 116.4 + Math.random() * 0.01,
-                        type: 'test',
-                        reward: '100抖币',
-                        description: '这是一个测试宝藏'
-                    })
+                // 地图点击事件 - 添加宝藏
+                map.on('click', function(e) {
+                    if (userLocation && confirm('在此位置添加宝藏？')) {
+                        addTreasureAtPosition([e.lnglat.lng, e.lnglat.lat]);
+                    }
                 });
-                const data = await res.json();
-                response.textContent = JSON.stringify(data, null, 2);
+
             } catch (error) {
-                response.textContent = `错误: ${error.message}`;
+                updateStatus('地图创建失败: ' + error.message, 'error');
+                document.getElementById('init-btn-text').innerHTML = '🚀 重新启动';
             }
-            
-            loading.style.display = 'none';
         }
 
-        async function runFullDemo() {
-            const loading = document.getElementById('demo-loading');
-            const response = document.getElementById('demo-response');
-            
-            loading.style.display = 'block';
-            response.textContent = '🚀 开始完整演示...\n\n';
-            
-            const steps = [
-                '1. 检查服务器状态...',
-                '2. 获取API文档...',
-                '3. 搜索附近宝藏...',
-                '4. 注册新用户...',
-                '5. 创建新宝藏...'
-            ];
-            
-            for (let step of steps) {
-                response.textContent += step + '\n';
-                await new Promise(resolve => setTimeout(resolve, 800));
+        // 测试GPS定位
+        function testGPS() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
             }
-            
-            response.textContent += '\n🎉 演示完成！抖宝API运行正常！';
-            loading.style.display = 'none';
+
+            updateStatus('正在获取GPS位置...', 'info', true);
+            updateGPSData('<div class="loading"></div> 正在定位...');
+
+            // 尝试使用高德地图的定位插件
+            if (window.AMap && AMap.Geolocation) {
+                const geolocation = new AMap.Geolocation({
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 60000,
+                    convert: true,
+                    showButton: false,
+                    showMarker: false,
+                    showCircle: false
+                });
+
+                geolocation.getCurrentPosition((status, result) => {
+                    if (status === 'complete') {
+                        handleLocationSuccess({
+                            coords: {
+                                latitude: result.position.lat,
+                                longitude: result.position.lng,
+                                accuracy: result.accuracy
+                            },
+                            timestamp: Date.now()
+                        });
+                    } else {
+                        // 降级到浏览器原生API
+                        useNativeGeolocation();
+                    }
+                });
+            } else {
+                useNativeGeolocation();
+            }
         }
 
-        // 自动测试服务器状态
-        setTimeout(() => testAPI('/health', 'health'), 1000);
+        // 使用浏览器原生定位API
+        function useNativeGeolocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    handleLocationSuccess,
+                    handleLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 30000
+                    }
+                );
+            } else {
+                updateStatus('浏览器不支持GPS定位功能', 'error');
+                updateGPSData('错误: 浏览器不支持地理定位API');
+            }
+        }
+
+        // 处理定位成功
+        function handleLocationSuccess(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy || 0;
+            const timestamp = new Date(position.timestamp).toLocaleString();
+            
+            userLocation = [lng, lat];
+            
+            updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
+            updateGPSData(`
+                <strong>📍 位置信息</strong><br>
+                纬度: ${lat.toFixed(6)}<br>
+                经度: ${lng.toFixed(6)}<br>
+                精度: ${Math.round(accuracy)}米<br>
+                时间: ${timestamp}<br>
+                <small style="color: #666;">坐标系: WGS84</small>
+            `);
+            
+            updateStats(accuracy);
+            createUserMarker();
+            map.setCenter(userLocation);
+            map.setZoom(17);
+            
+            // 自动添加一个示例宝藏
+            setTimeout(() => {
+                if (treasureMarkers.length === 0) {
+                    addTreasure();
+                    updateStatus('已为您添加示例宝藏，开始寻宝吧！', 'success');
+                }
+            }, 2000);
+        }
+
+        // 处理定位错误
+        function handleLocationError(error) {
+            let errorMsg = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = '用户拒绝了位置权限，请在浏览器设置中允许位置访问';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = '位置信息不可用，请检查GPS是否开启';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = '定位请求超时，请重试';
+                    break;
+                default:
+                    errorMsg = '未知定位错误，请重试';
+                    break;
+            }
+            
+            updateStatus(`GPS定位失败: ${errorMsg}`, 'error');
+            updateGPSData(`
+                <strong>❌ 定位失败</strong><br>
+                错误: ${errorMsg}<br>
+                <small style="color: #666;">
+                    建议:<br>
+                    • 在户外重试<br>
+                    • 检查浏览器权限设置<br>
+                    • 确保GPS功能已开启
+                </small>
+            `);
+            
+            // 使用默认位置（北京天安门）
+            userLocation = [116.397428, 39.90923];
+            createUserMarker();
+            map.setCenter(userLocation);
+            updateStatus('已使用默认位置（北京天安门广场）', 'warning');
+        }
+
+        // 创建用户位置标记
+        function createUserMarker() {
+            if (!map || !userLocation) return;
+
+            if (userMarker) {
+                map.remove(userMarker);
+            }
+
+            userMarker = new AMap.Marker({
+                position: userLocation,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+                            <circle cx="30" cy="30" r="25" fill="#4CAF50" stroke="white" stroke-width="5"/>
+                            <circle cx="30" cy="30" r="8" fill="white"/>
+                            <text x="30" y="38" text-anchor="middle" fill="white" font-size="24">📍</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(60, 60),
+                    imageOffset: new AMap.Pixel(-30, -30)
+                }),
+                title: '我的位置',
+                zIndex: 1000,
+                animation: 'AMAP_ANIMATION_BOUNCE'
+            });
+
+            map.add(userMarker);
+        }
+
+        // 添加宝藏
+        function addTreasure() {
+            if (!map || !userLocation) {
+                updateStatus('请先获取GPS位置！', 'warning');
+                return;
+            }
+
+            const treasureType = treasureTypes[Math.floor(Math.random() * treasureTypes.length)];
+            
+            // 在用户位置附近随机生成宝藏
+            const offsetLng = (Math.random() - 0.5) * 0.008; // 约400米范围
+            const offsetLat = (Math.random() - 0.5) * 0.008;
+            const position = [userLocation[0] + offsetLng, userLocation[1] + offsetLat];
+
+            addTreasureAtPosition(position, treasureType);
+        }
+
+        // 在指定位置添加宝藏
+        function addTreasureAtPosition(position, treasureType = null) {
+            if (!treasureType) {
+                treasureType = treasureTypes[Math.floor(Math.random() * treasureTypes.length)];
+            }
+
+            // 创建宝藏数据
+            const treasureData = treasureManager.createTreasure(position, treasureType, 'player');
+            userData.createdTreasures.push(treasureData);
+            userData.stats.treasuresCreated += 1;
+
+            // 创建地图标记
+            const treasureMarker = new AMap.Marker({
+                position: position,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="${treasureType.color}" stroke="white" stroke-width="4"/>
+                            <circle cx="25" cy="25" r="15" fill="${treasureType.color}" opacity="0.3"/>
+                            <text x="25" y="33" text-anchor="middle" fill="white" font-size="18">${treasureType.icon}</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(50, 50),
+                    imageOffset: new AMap.Pixel(-25, -25)
+                }),
+                title: `${treasureType.name} (${treasureType.rarity})`,
+                zIndex: 500
+            });
+
+            // 存储宝藏ID到标记上
+            treasureMarker.treasureId = treasureData.id;
+
+            // 添加点击事件
+            treasureMarker.on('click', function() {
+                if (userLocation) {
+                    const distance = calculateDistance(userLocation, position);
+                    const requiredDistance = treasureData.location.discoveryRadius;
+                    
+                    if (distance <= requiredDistance) {
+                        // 尝试发现宝藏
+                        const result = treasureManager.discoverTreasure(treasureData.id, userLocation);
+                        
+                        if (result.success) {
+                            // 发现成功
+                            map.remove(treasureMarker);
+                            treasureMarkers = treasureMarkers.filter(m => m !== treasureMarker);
+                            
+                            let message = `🎉 恭喜！您发现了${result.treasure.title}！\n`;
+                            message += `💰 获得 ${result.rewards.coins} 金币\n`;
+                            message += `⭐ 获得 ${result.rewards.experience} 经验`;
+                            
+                            if (result.levelUp) {
+                                message += `\n🎊 等级提升！LV.${result.levelUp.oldLevel} → LV.${result.levelUp.newLevel}`;
+                            }
+                            
+                            updateStatus(message, 'success');
+                            
+                            // 检查新成就
+                            const newAchievements = achievementManager.checkAchievements();
+                            if (newAchievements.length > 0) {
+                                setTimeout(() => {
+                                    updateStatus('🏆 获得新成就！查看徽章系统了解详情', 'success');
+                                }, 2000);
+                            }
+                            
+                        } else {
+                            // 发现失败
+                            if (result.reason === 'already_discovered') {
+                                updateStatus('您已经发现过这个宝藏了', 'warning');
+                            } else if (result.reason === 'too_far') {
+                                updateStatus(`距离太远！还需要靠近${Math.round(result.distance - result.requiredDistance)}米`, 'warning');
+                            }
+                        }
+                    } else {
+                        updateStatus(`${treasureType.name}距离您还有${Math.round(distance)}米（需要在${requiredDistance}米内）`, 'info');
+                        
+                        // 显示距离指示
+                        const infoWindow = new AMap.InfoWindow({
+                            content: `
+                                <div style="padding: 10px; text-align: center;">
+                                    <div style="font-size: 1.2rem; margin-bottom: 5px;">${treasureType.icon} ${treasureType.name}</div>
+                                    <div style="color: #666; font-size: 0.9rem;">距离: ${Math.round(distance)}米</div>
+                                    <div style="color: #666; font-size: 0.9rem;">需要: ${requiredDistance}米内</div>
+                                    <div style="color: #667eea; font-size: 0.8rem; margin-top: 5px;">
+                                        💰 ${treasureType.rewards.coins} 金币 | ⭐ ${treasureType.rewards.experience} 经验
+                                    </div>
+                                </div>
+                            `,
+                            anchor: 'bottom-center',
+                            offset: new AMap.Pixel(0, -5)
+                        });
+                        infoWindow.open(map, position);
+                        
+                        // 3秒后自动关闭
+                        setTimeout(() => {
+                            infoWindow.close();
+                        }, 3000);
+                    }
+                }
+            });
+
+            map.add(treasureMarker);
+            treasureMarkers.push(treasureMarker);
+            
+            // 保存数据
+            saveUserData();
+            
+            updateStatus(`✨ 创建了${treasureType.name}宝藏！（${treasureType.category}类别）`, 'success');
+            updateStats();
+        }
+
+        // 清空地图
+        function clearMap() {
+            if (treasureMarkers.length === 0) {
+                updateStatus('地图上没有宝藏', 'info');
+                return;
+            }
+
+            map.remove(treasureMarkers);
+            treasureMarkers = [];
+            updateStatus('🗑️ 已清空所有宝藏', 'success');
+            updateStats();
+        }
+
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载用户数据
+            loadUserData();
+            
+            const savedKey = localStorage.getItem('amap-api-key');
+            if (savedKey) {
+                document.getElementById('api-key').value = savedKey;
+                updateStatus('发现已保存的API Key，点击启动即可开始游戏', 'success');
+            }
+
+            // 显示用户信息
+            if (userData.stats.treasuresDiscovered > 0) {
+                updateStatus(`欢迎回来！您已发现 ${userData.stats.treasuresDiscovered} 个宝藏，当前等级 LV.${userData.level.currentLevel}`, 'success');
+            }
+
+            // 更新初始统计
+            updateStats();
+            
+            // 显示用户统计信息
+            updateUserDisplay();
+        });
+
+        // 更新用户显示信息
+        function updateUserDisplay() {
+            const levelInfo = userManager.getLevelInfo();
+            
+            // 更新统计显示
+            if (document.getElementById('total-treasures')) {
+                document.getElementById('total-treasures').textContent = userData.stats.treasuresDiscovered;
+            }
+            
+            // 如果有徽章显示区域，更新徽章
+            if (userData.level.badges.length > 0) {
+                console.log('🏆 已获得徽章:', userData.level.badges.map(b => `${b.icon} ${b.description}`).join(', '));
+            }
+        }
+
+        // 导出用户数据（用于调试或备份）
+        function exportUserData() {
+            const dataStr = JSON.stringify(userData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'douyin-treasure-userdata.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            updateStatus('用户数据已导出', 'success');
+        }
+
+        // 重置用户数据
+        function resetUserData() {
+            if (confirm('确定要重置所有游戏数据吗？此操作不可撤销！')) {
+                storageManager.remove('douyin-treasure-user');
+                location.reload();
+            }
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        if (!map) initMap();
+                        else testGPS();
+                        break;
+                    case 't':
+                        e.preventDefault();
+                        addTreasure();
+                        break;
+                    case 'Delete':
+                    case 'Backspace':
+                        e.preventDefault();
+                        clearMap();
+                        break;
+                }
+            }
+        });
     </script>
 </body>
 </html>

@@ -4,9 +4,11 @@
   "description": "基于GPS的真实世界寻宝游戏 - 使用高德地图API",
   "main": "index.html",
   "scripts": {
-    "dev": "npx serve .",
-    "start": "npx serve .",
-    "build": "echo 'Static site - no build needed'"
+    "dev": "npx serve . --cors",
+    "start": "npx serve . --cors",
+    "build": "echo 'Static site - no build needed'",
+    "test": "echo 'Open index.html in browser to test'",
+    "deploy": "echo 'Push to GitHub and enable Pages in repository settings'"
   },
   "keywords": [
     "treasure-hunt",

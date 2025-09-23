@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS寻宝游戏 - 立即测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 10px;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .api-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .api-input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+        
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #2196F3;
+        }
+        
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #4CAF50;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+        }
+        
+        #map-container {
+            width: 100%;
+            height: 50vh;
+            min-height: 300px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            margin: 15px 0;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        @media (min-width: 768px) {
+            .controls {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        .gps-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .gps-info h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .gps-data {
+            font-family: monospace;
+            font-size: 0.9rem;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .tutorial {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+        
+        .tutorial h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .tutorial a {
+            color: #667eea;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🗺️ GPS寻宝游戏</h1>
+            <p class="subtitle">立即测试版 - 专为移动端优化</p>
+        </div>
+
+        <div class="card">
+            <h3>🔑 高德地图API配置</h3>
+            <div class="input-group">
+                <label for="api-key">API Key:</label>
+                <input type="text" id="api-key" class="api-input" placeholder="粘贴你的高德地图API Key">
+            </div>
+            <button class="btn" onclick="initMap()">🚀 初始化地图</button>
+            
+            <div class="tutorial">
+                <h4>📱 移动端测试说明:</h4>
+                <p>1. 输入高德地图API Key<br>
+                2. 点击初始化地图<br>
+                3. 允许位置权限<br>
+                4. 在户外测试获得最佳GPS效果</p>
+            </div>
+            
+            <div class="status info" id="status">
+                等待配置API Key...
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📍 GPS状态信息</h3>
+            <div class="gps-info">
+                <h4>当前位置信息:</h4>
+                <div class="gps-data" id="gps-data">
+                    等待获取GPS数据...
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div id="map-container">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; flex-direction: column;">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">🗺️</div>
+                    <div style="text-align: center;">配置API Key后显示地图</div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="testGPS()" disabled id="gps-btn">📍 测试GPS</button>
+                <button class="btn" onclick="addTreasure()" disabled id="treasure-btn">🎯 添加宝藏</button>
+                <button class="btn" onclick="clearMap()" disabled id="clear-btn">🗑️ 清空</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+        let userMarker = null;
+        let treasureMarkers = [];
+        let userLocation = null;
+
+        const treasureTypes = [
+            { icon: '💎', name: '钻石', color: '#e74c3c' },
+            { icon: '👑', name: '皇冠', color: '#9b59b6' },
+            { icon: '💰', name: '金币', color: '#f1c40f' }
+        ];
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateGPSData(data) {
+            const gpsData = document.getElementById('gps-data');
+            gpsData.innerHTML = data;
+        }
+
+        function initMap() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            
+            if (!apiKey) {
+                updateStatus('请输入高德地图API Key！', 'error');
+                return;
+            }
+
+            updateStatus('正在加载高德地图...', 'info');
+            localStorage.setItem('amap-api-key', apiKey);
+
+            // 动态加载高德地图API
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+            script.onload = function() {
+                createMap();
+            };
+            script.onerror = function() {
+                updateStatus('高德地图API加载失败！请检查Key是否正确', 'error');
+            };
+            document.head.appendChild(script);
+        }
+
+        function createMap() {
+            try {
+                updateStatus('创建地图实例...', 'info');
+                
+                map = new AMap.Map('map-container', {
+                    zoom: 16,
+                    center: [116.397428, 39.90923],
+                    viewMode: '2D'
+                });
+
+                map.on('complete', function() {
+                    updateStatus('✅ 地图加载成功！', 'success');
+                    
+                    // 启用按钮
+                    document.querySelectorAll('.btn').forEach(btn => {
+                        if (btn.id !== 'init-btn') {
+                            btn.disabled = false;
+                        }
+                    });
+
+                    // 自动测试GPS
+                    setTimeout(() => {
+                        testGPS();
+                    }, 1000);
+                });
+
+            } catch (error) {
+                updateStatus('地图创建失败: ' + error.message, 'error');
+            }
+        }
+
+        function testGPS() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+
+            updateStatus('正在获取GPS位置...', 'info');
+            updateGPSData('正在定位...');
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const accuracy = position.coords.accuracy;
+                        const timestamp = new Date(position.timestamp).toLocaleString();
+                        
+                        userLocation = [lng, lat];
+                        
+                        updateStatus(`✅ GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
+                        updateGPSData(`
+                            纬度: ${lat.toFixed(6)}<br>
+                            经度: ${lng.toFixed(6)}<br>
+                            精度: ${Math.round(accuracy)}米<br>
+                            时间: ${timestamp}
+                        `);
+                        
+                        createUserMarker();
+                        map.setCenter(userLocation);
+                        
+                        // 自动添加一个测试宝藏
+                        setTimeout(() => {
+                            addTreasure();
+                        }, 1000);
+                    },
+                    function(error) {
+                        let errorMsg = '';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMsg = '用户拒绝了位置权限';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMsg = '位置信息不可用';
+                                break;
+                            case error.TIMEOUT:
+                                errorMsg = '定位请求超时';
+                                break;
+                            default:
+                                errorMsg = '未知定位错误';
+                                break;
+                        }
+                        
+                        updateStatus(`❌ GPS定位失败: ${errorMsg}`, 'error');
+                        updateGPSData(`错误: ${errorMsg}<br>请在户外重试或检查权限设置`);
+                        
+                        // 使用默认位置
+                        userLocation = [116.397428, 39.90923];
+                        createUserMarker();
+                        updateStatus('使用默认位置（北京天安门）', 'warning');
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 30000
+                    }
+                );
+            } else {
+                updateStatus('❌ 浏览器不支持GPS定位', 'error');
+                updateGPSData('错误: 浏览器不支持地理定位API');
+            }
+        }
+
+        function createUserMarker() {
+            if (!map || !userLocation) return;
+
+            if (userMarker) {
+                map.remove(userMarker);
+            }
+
+            userMarker = new AMap.Marker({
+                position: userLocation,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="#4CAF50" stroke="white" stroke-width="4"/>
+                            <text x="25" y="32" text-anchor="middle" fill="white" font-size="20">📍</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(50, 50)
+                }),
+                title: '我的位置',
+                zIndex: 1000
+            });
+
+            map.add(userMarker);
+        }
+
+        function addTreasure() {
+            if (!map || !userLocation) {
+                updateStatus('请先获取GPS位置！', 'warning');
+                return;
+            }
+
+            const treasureType = treasureTypes[Math.floor(Math.random() * treasureTypes.length)];
+            
+            // 在用户位置附近随机生成
+            const offsetLng = (Math.random() - 0.5) * 0.005;
+            const offsetLat = (Math.random() - 0.5) * 0.005;
+            const position = [userLocation[0] + offsetLng, userLocation[1] + offsetLat];
+
+            const treasureMarker = new AMap.Marker({
+                position: position,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                            <circle cx="20" cy="20" r="18" fill="${treasureType.color}" stroke="white" stroke-width="3"/>
+                            <text x="20" y="27" text-anchor="middle" fill="white" font-size="16">${treasureType.icon}</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(40, 40)
+                }),
+                title: treasureType.name,
+                zIndex: 500
+            });
+
+            treasureMarker.on('click', function() {
+                map.remove(treasureMarker);
+                treasureMarkers = treasureMarkers.filter(m => m !== treasureMarker);
+                updateStatus(`🎉 发现${treasureType.name}！`, 'success');
+            });
+
+            map.add(treasureMarker);
+            treasureMarkers.push(treasureMarker);
+            updateStatus(`✨ 添加了${treasureType.name}宝藏！`, 'success');
+        }
+
+        function clearMap() {
+            if (treasureMarkers.length === 0) {
+                updateStatus('地图上没有宝藏', 'info');
+                return;
+            }
+
+            map.remove(treasureMarkers);
+            treasureMarkers = [];
+            updateStatus('🗑️ 已清空所有宝藏', 'success');
+        }
+
+        // 页面加载时恢复API Key
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedKey = localStorage.getItem('amap-api-key');
+            if (savedKey) {
+                document.getElementById('api-key').value = savedKey;
+                updateStatus('发现已保存的API Key，点击初始化地图即可', 'success');
+            }
+        });
+    </script>
+</body>
+</html>
