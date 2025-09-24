@@ -483,9 +483,6 @@
                 <button class="btn" onclick="clearMap()" disabled id="clear-btn">
                     🗑️ 清空地图
                 </button>
-                <button class="btn" onclick="emergencyTest()" style="background: #ff6b6b;">
-                    🚨 紧急测试
-                </button>
             </div>
         </div>
     </div>
@@ -989,102 +986,23 @@
             updateStatus('正在获取GPS位置...', 'info', true);
             updateGPSData('<div class="loading"></div> 正在定位...');
 
-            // 直接使用浏览器原生GPS（更可靠）
-            useNativeGeolocation();
-            
-            // 如果原生API失败，再尝试高德定位（作为备选）
-            setTimeout(() => {
-                if (!userLocation && window.AMap && AMap.Geolocation) {
-                    updateStatus('尝试高德地图定位服务...', 'info', true);
-                    
-                    const geolocation = new AMap.Geolocation({
+            // 简化的定位逻辑
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    handleLocationSuccess,
+                    handleLocationError,
+                    {
                         enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 10000,
-                        convert: true,
-                        showButton: false,
-                        showMarker: false,
-                        showCircle: false
-                    });
-
-                    geolocation.getCurrentPosition((status, result) => {
-                        if (status === 'complete' && !userLocation) {
-                            handleLocationSuccess({
-                                coords: {
-                                    latitude: result.position.lat,
-                                    longitude: result.position.lng,
-                                    accuracy: result.accuracy || 100
-                                },
-                                timestamp: Date.now()
-                            });
-                        } else if (status === 'error') {
-                            console.log('高德定位失败:', result);
-                            if (!userLocation) {
-                                // 最后使用默认位置
-                                handleLocationError({ code: 0, message: '所有定位方式均失败' });
-                            }
-                        }
-                    });
-                }
-            }, 3000);
-        }
-
-        // 使用浏览器原生定位API
-        function useNativeGeolocation() {
-            console.log('开始GPS定位流程...');
-            
-            if (!navigator.geolocation) {
+                        timeout: 10000,
+                        maximumAge: 60000
+                    }
+                );
+            } else {
                 updateStatus('浏览器不支持GPS定位功能', 'error');
-                updateGPSData('错误: 浏览器不支持地理定位API');
-                console.error('浏览器不支持geolocation');
-                return;
+                handleLocationError({ code: 0, message: '不支持定位' });
             }
-
-            console.log('浏览器支持GPS，开始定位...');
-            updateStatus('正在使用GPS定位...', 'info', true);
-            
-            // 设置定位选项
-            const options = {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 30000
-            };
-            
-            console.log('定位选项:', options);
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    console.log('GPS定位成功:', position);
-                    handleLocationSuccess(position);
-                },
-                (error) => {
-                    console.error('GPS定位失败:', error);
-                    console.log('错误代码:', error.code, '错误消息:', error.message);
-                    
-                    updateStatus('GPS定位失败，尝试低精度定位...', 'warning', true);
-                    
-                    // 降级到低精度定位
-                    const lowAccuracyOptions = {
-                        enableHighAccuracy: false,
-                        timeout: 20000,
-                        maximumAge: 600000
-                    };
-                    
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            console.log('低精度定位成功:', position);
-                            handleLocationSuccess(position);
-                        },
-                        (fallbackError) => {
-                            console.error('所有定位方式失败:', fallbackError);
-                            handleLocationError(fallbackError);
-                        },
-                        lowAccuracyOptions
-                    );
-                },
-                options
-            );
         }
+
 
         // 处理定位成功
         function handleLocationSuccess(position) {
@@ -1113,10 +1031,12 @@
             map.setCenter(userLocation);
             map.setZoom(17);
             
-            // 自动生成周围的宝藏
+            // 立即生成宝藏
             setTimeout(() => {
-                generateNearbyTreasures();
-            }, 1500);
+                if (treasureMarkers.length === 0) {
+                    generateNearbyTreasures();
+                }
+            }, 500);
         }
 
         // 处理定位错误
@@ -1193,65 +1113,39 @@
 
         // 生成周围的宝藏
         function generateNearbyTreasures() {
-            console.log('开始生成宝藏...');
-            console.log('地图状态:', map ? '已初始化' : '未初始化');
-            console.log('用户位置:', userLocation);
-            
-            if (!map) {
-                updateStatus('请先初始化地图！', 'warning');
-                console.error('地图未初始化');
-                return;
-            }
-            
-            if (!userLocation) {
+            if (!map || !userLocation) {
                 updateStatus('请先获取GPS位置！', 'warning');
-                console.error('用户位置未获取');
                 return;
             }
 
             // 清空现有宝藏
             if (treasureMarkers.length > 0) {
-                console.log('清空现有宝藏:', treasureMarkers.length);
                 clearMap();
             }
 
             updateStatus('正在为您生成周围的宝藏...', 'info', true);
-            console.log('开始生成宝藏流程...');
 
-            // 生成3-6个宝藏
-            const treasureCount = Math.floor(Math.random() * 4) + 3;
-            console.log('计划生成宝藏数量:', treasureCount);
+            // 生成3-5个宝藏
+            const treasureCount = Math.floor(Math.random() * 3) + 3;
             
             for (let i = 0; i < treasureCount; i++) {
                 setTimeout(() => {
-                    console.log(`生成第${i + 1}个宝藏...`);
-                    
-                    // 随机选择宝藏类型，稀有度影响概率
                     const treasureType = getRandomTreasureByRarity();
-                    console.log('选择的宝藏类型:', treasureType);
                     
-                    // 在用户位置周围500米内随机生成
+                    // 在用户位置周围生成
                     const angle = Math.random() * 2 * Math.PI;
-                    const distance = Math.random() * 0.005 + 0.001; // 100-600米
+                    const distance = Math.random() * 0.003 + 0.001; // 约100-400米
                     
                     const offsetLng = Math.cos(angle) * distance;
                     const offsetLat = Math.sin(angle) * distance;
                     const position = [userLocation[0] + offsetLng, userLocation[1] + offsetLat];
-                    
-                    console.log('宝藏位置:', position);
 
-                    try {
-                        addTreasureAtPosition(position, treasureType);
-                        console.log(`第${i + 1}个宝藏生成成功`);
-                    } catch (error) {
-                        console.error(`第${i + 1}个宝藏生成失败:`, error);
-                    }
+                    addTreasureAtPosition(position, treasureType);
                     
                     if (i === treasureCount - 1) {
-                        updateStatus(`🗺️ 已生成${treasureCount}个宝藏！开始您的寻宝之旅吧！`, 'success');
-                        console.log('所有宝藏生成完成');
+                        updateStatus(`🗺️ 已生成${treasureCount}个宝藏！开始寻宝吧！`, 'success');
                     }
-                }, i * 300); // 缩短间隔到300ms
+                }, i * 200);
             }
         }
 
@@ -1296,57 +1190,34 @@
 
         // 在指定位置添加宝藏
         function addTreasureAtPosition(position, treasureType = null) {
-            console.log('addTreasureAtPosition 被调用');
-            console.log('位置参数:', position);
-            console.log('宝藏类型参数:', treasureType);
-            console.log('当前地图状态:', map);
-            
-            if (!position || !Array.isArray(position) || position.length !== 2) {
-                console.error('无效的位置参数:', position);
-                updateStatus('❌ 位置参数错误', 'error');
-                return;
-            }
-            
-            if (!map) {
-                console.error('地图未初始化');
-                updateStatus('❌ 地图未初始化', 'error');
-                return;
-            }
+            if (!map || !position) return;
 
             if (!treasureType) {
                 treasureType = treasureTypes[Math.floor(Math.random() * treasureTypes.length)];
-                console.log('随机选择宝藏类型:', treasureType);
             }
 
-            try {
-                // 创建宝藏数据
-                console.log('创建宝藏数据...');
-                const treasureData = treasureManager.createTreasure(position, treasureType, 'player');
-                console.log('宝藏数据创建成功:', treasureData);
-                
-                userData.createdTreasures.push(treasureData);
-                userData.stats.treasuresCreated += 1;
-                console.log('用户数据更新完成');
+            // 创建宝藏数据
+            const treasureData = treasureManager.createTreasure(position, treasureType, 'player');
+            userData.createdTreasures.push(treasureData);
+            userData.stats.treasuresCreated += 1;
 
-                // 创建地图标记
-                console.log('创建地图标记...');
-                const treasureMarker = new AMap.Marker({
-                    position: position,
-                    icon: new AMap.Icon({
-                        image: 'data:image/svg+xml;base64,' + btoa(`
-                            <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
-                                <circle cx="25" cy="25" r="20" fill="${treasureType.color}" stroke="white" stroke-width="4"/>
-                                <circle cx="25" cy="25" r="15" fill="${treasureType.color}" opacity="0.3"/>
-                                <text x="25" y="33" text-anchor="middle" fill="white" font-size="18">${treasureType.icon}</text>
-                            </svg>
-                        `),
-                        size: new AMap.Size(50, 50),
-                        imageOffset: new AMap.Pixel(-25, -25)
-                    }),
-                    title: `${treasureType.name} (${treasureType.rarity})`,
-                    zIndex: 500
-                });
-                console.log('地图标记创建成功:', treasureMarker);
+            // 创建地图标记
+            const treasureMarker = new AMap.Marker({
+                position: position,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="${treasureType.color}" stroke="white" stroke-width="4"/>
+                            <circle cx="25" cy="25" r="15" fill="${treasureType.color}" opacity="0.3"/>
+                            <text x="25" y="33" text-anchor="middle" fill="white" font-size="18">${treasureType.icon}</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(50, 50),
+                    imageOffset: new AMap.Pixel(-25, -25)
+                }),
+                title: `${treasureType.name} (${treasureType.rarity})`,
+                zIndex: 500
+            });
 
             // 存储宝藏ID到标记上
             treasureMarker.treasureId = treasureData.id;
@@ -1420,22 +1291,13 @@
                 }
             });
 
-                // 添加到地图
-                console.log('添加标记到地图...');
-                map.add(treasureMarker);
-                treasureMarkers.push(treasureMarker);
-                console.log('标记已添加到地图，当前宝藏数量:', treasureMarkers.length);
-                
-                // 保存数据
-                saveUserData();
-                
-                updateStatus(`✨ 创建了${treasureType.name}宝藏！（${treasureType.category}类别）`, 'success');
-                updateStats();
-                
-            } catch (error) {
-                console.error('添加宝藏失败:', error);
-                updateStatus(`❌ 宝藏创建失败: ${error.message}`, 'error');
-            }
+            // 添加到地图
+            map.add(treasureMarker);
+            treasureMarkers.push(treasureMarker);
+            
+            // 保存数据
+            saveUserData();
+            updateStats();
         }
 
         // 清空地图
@@ -1534,56 +1396,6 @@
             }
         }
 
-        // 紧急测试功能
-        function emergencyTest() {
-            console.log('🚨 开始紧急测试...');
-            updateStatus('🚨 紧急测试开始...', 'info', true);
-            
-            // 强制设置上海位置
-            userLocation = [121.4737, 31.2304];
-            console.log('设置用户位置:', userLocation);
-            
-            if (!map) {
-                console.error('地图未初始化，无法进行测试');
-                updateStatus('❌ 地图未初始化', 'error');
-                return;
-            }
-            
-            // 创建用户标记
-            createUserMarker();
-            map.setCenter(userLocation);
-            map.setZoom(16);
-            
-            updateGPSData(`
-                <strong>🚨 紧急测试位置</strong><br>
-                纬度: 31.230400 ✅<br>
-                经度: 121.473700 ✅<br>
-                精度: 测试模式<br>
-                时间: ${new Date().toLocaleString()}<br>
-                <small style="color: #666;">🎯 上海外滩测试位置</small>
-            `);
-            
-            // 清空现有宝藏
-            clearMap();
-            
-            // 直接创建一个测试宝藏
-            console.log('创建测试宝藏...');
-            setTimeout(() => {
-                const testPosition = [121.4737 + 0.001, 31.2304 + 0.001]; // 稍微偏移
-                const testTreasure = treasureTypes[0]; // 使用第一个宝藏类型
-                
-                console.log('测试宝藏位置:', testPosition);
-                console.log('测试宝藏类型:', testTreasure);
-                
-                try {
-                    addTreasureAtPosition(testPosition, testTreasure);
-                    updateStatus('🚨 紧急测试完成！如果看到宝藏说明功能正常', 'success');
-                } catch (error) {
-                    console.error('紧急测试失败:', error);
-                    updateStatus('❌ 紧急测试失败: ' + error.message, 'error');
-                }
-            }, 500);
-        }
 
         // 强制使用上海位置（调试用）
         function useShanghai() {
