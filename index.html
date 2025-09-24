@@ -410,6 +410,14 @@
                     <li>在户外环境中获得最佳GPS体验</li>
                     <li>开始寻找附近的宝藏！</li>
                 </ol>
+                
+                <h4>🔧 移动端调试:</h4>
+                <p style="font-size: 0.85rem; color: #666;">
+                    • 长按GPS信息区域查看详细调试信息<br>
+                    • 如果定位失败，会自动使用上海位置<br>
+                    • 确保在HTTPS环境下使用（GitHub Pages自动支持）<br>
+                    • 键盘快捷键: Ctrl+S 切换到上海位置，Ctrl+D 显示调试信息
+                </p>
             </div>
             
             <div class="status info" id="status">
@@ -465,6 +473,9 @@
             <div class="controls">
                 <button class="btn" onclick="testGPS()" disabled id="gps-btn">
                     📍 重新定位
+                </button>
+                <button class="btn" onclick="generateNearbyTreasures()" disabled id="generate-btn">
+                    🗺️ 生成宝藏
                 </button>
                 <button class="btn" onclick="addTreasure()" disabled id="treasure-btn">
                     ✨ 添加宝藏
@@ -923,11 +934,12 @@
                 updateStatus('正在创建地图实例...', 'info', true);
                 
                 map = new AMap.Map('map-container', {
-                    zoom: 16,
-                    center: [116.397428, 39.90923], // 默认北京坐标
+                    zoom: 14,
+                    center: [121.4737, 31.2304], // 默认上海坐标
                     viewMode: '2D',
                     showLabel: true,
-                    mapStyle: 'amap://styles/normal'
+                    mapStyle: 'amap://styles/normal',
+                    resizeEnable: true
                 });
 
                 // 地图加载完成事件
@@ -974,54 +986,80 @@
             updateStatus('正在获取GPS位置...', 'info', true);
             updateGPSData('<div class="loading"></div> 正在定位...');
 
-            // 尝试使用高德地图的定位插件
-            if (window.AMap && AMap.Geolocation) {
-                const geolocation = new AMap.Geolocation({
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000,
-                    convert: true,
-                    showButton: false,
-                    showMarker: false,
-                    showCircle: false
-                });
+            // 直接使用浏览器原生GPS（更可靠）
+            useNativeGeolocation();
+            
+            // 如果原生API失败，再尝试高德定位（作为备选）
+            setTimeout(() => {
+                if (!userLocation && window.AMap && AMap.Geolocation) {
+                    updateStatus('尝试高德地图定位服务...', 'info', true);
+                    
+                    const geolocation = new AMap.Geolocation({
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 10000,
+                        convert: true,
+                        showButton: false,
+                        showMarker: false,
+                        showCircle: false
+                    });
 
-                geolocation.getCurrentPosition((status, result) => {
-                    if (status === 'complete') {
-                        handleLocationSuccess({
-                            coords: {
-                                latitude: result.position.lat,
-                                longitude: result.position.lng,
-                                accuracy: result.accuracy
-                            },
-                            timestamp: Date.now()
-                        });
-                    } else {
-                        // 降级到浏览器原生API
-                        useNativeGeolocation();
-                    }
-                });
-            } else {
-                useNativeGeolocation();
-            }
+                    geolocation.getCurrentPosition((status, result) => {
+                        if (status === 'complete' && !userLocation) {
+                            handleLocationSuccess({
+                                coords: {
+                                    latitude: result.position.lat,
+                                    longitude: result.position.lng,
+                                    accuracy: result.accuracy || 100
+                                },
+                                timestamp: Date.now()
+                            });
+                        } else if (status === 'error') {
+                            console.log('高德定位失败:', result);
+                            if (!userLocation) {
+                                // 最后使用默认位置
+                                handleLocationError({ code: 0, message: '所有定位方式均失败' });
+                            }
+                        }
+                    });
+                }
+            }, 3000);
         }
 
         // 使用浏览器原生定位API
         function useNativeGeolocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    handleLocationSuccess,
-                    handleLocationError,
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 30000
-                    }
-                );
-            } else {
+            if (!navigator.geolocation) {
                 updateStatus('浏览器不支持GPS定位功能', 'error');
                 updateGPSData('错误: 浏览器不支持地理定位API');
+                return;
             }
+
+            // 首先尝试高精度定位
+            updateStatus('正在使用高精度GPS定位...', 'info', true);
+            
+            navigator.geolocation.getCurrentPosition(
+                handleLocationSuccess,
+                (error) => {
+                    console.log('高精度定位失败，尝试普通定位:', error);
+                    updateStatus('高精度定位失败，尝试普通定位...', 'warning', true);
+                    
+                    // 如果高精度失败，降级到普通定位
+                    navigator.geolocation.getCurrentPosition(
+                        handleLocationSuccess,
+                        handleLocationError,
+                        {
+                            enableHighAccuracy: false,
+                            timeout: 20000,
+                            maximumAge: 600000 // 10分钟
+                        }
+                    );
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 60000 // 1分钟
+                }
+            );
         }
 
         // 处理定位成功
@@ -1036,11 +1074,14 @@
             updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
             updateGPSData(`
                 <strong>📍 位置信息</strong><br>
-                纬度: ${lat.toFixed(6)}<br>
-                经度: ${lng.toFixed(6)}<br>
-                精度: ${Math.round(accuracy)}米<br>
+                纬度: ${lat.toFixed(6)} ${lat > 30 && lat < 32 ? '✅' : '❓'}<br>
+                经度: ${lng.toFixed(6)} ${lng > 120 && lng < 122 ? '✅' : '❓'}<br>
+                精度: ${Math.round(accuracy)}米 ${accuracy < 100 ? '✅' : accuracy < 500 ? '⚠️' : '❌'}<br>
                 时间: ${timestamp}<br>
-                <small style="color: #666;">坐标系: WGS84</small>
+                <small style="color: #666;">
+                    坐标系: WGS84<br>
+                    ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '🎯 上海地区定位成功' : '🌍 非上海地区或定位异常'}
+                </small>
             `);
             
             updateStats(accuracy);
@@ -1048,13 +1089,10 @@
             map.setCenter(userLocation);
             map.setZoom(17);
             
-            // 自动添加一个示例宝藏
+            // 自动生成周围的宝藏
             setTimeout(() => {
-                if (treasureMarkers.length === 0) {
-                    addTreasure();
-                    updateStatus('已为您添加示例宝藏，开始寻宝吧！', 'success');
-                }
-            }, 2000);
+                generateNearbyTreasures();
+            }, 1500);
         }
 
         // 处理定位错误
@@ -1087,11 +1125,17 @@
                 </small>
             `);
             
-            // 使用默认位置（北京天安门）
-            userLocation = [116.397428, 39.90923];
+            // 使用默认位置（上海外滩）
+            userLocation = [121.4737, 31.2304];
             createUserMarker();
             map.setCenter(userLocation);
-            updateStatus('已使用默认位置（北京天安门广场）', 'warning');
+            map.setZoom(16);
+            updateStatus('GPS定位失败，使用默认位置（上海外滩）。建议在户外重新尝试定位。', 'warning');
+            
+            // 即使是默认位置也生成宝藏
+            setTimeout(() => {
+                generateNearbyTreasures();
+            }, 1000);
         }
 
         // 创建用户位置标记
@@ -1123,7 +1167,69 @@
             map.add(userMarker);
         }
 
-        // 添加宝藏
+        // 生成周围的宝藏
+        function generateNearbyTreasures() {
+            if (!map || !userLocation) {
+                updateStatus('请先获取GPS位置！', 'warning');
+                return;
+            }
+
+            // 如果已经有宝藏了，就不重复生成
+            if (treasureMarkers.length > 0) {
+                updateStatus('周围已有宝藏，开始寻宝吧！', 'success');
+                return;
+            }
+
+            updateStatus('正在为您生成周围的宝藏...', 'info', true);
+
+            // 生成3-6个宝藏
+            const treasureCount = Math.floor(Math.random() * 4) + 3;
+            
+            for (let i = 0; i < treasureCount; i++) {
+                setTimeout(() => {
+                    // 随机选择宝藏类型，稀有度影响概率
+                    const treasureType = getRandomTreasureByRarity();
+                    
+                    // 在用户位置周围500米内随机生成
+                    const angle = Math.random() * 2 * Math.PI;
+                    const distance = Math.random() * 0.005 + 0.001; // 100-600米
+                    
+                    const offsetLng = Math.cos(angle) * distance;
+                    const offsetLat = Math.sin(angle) * distance;
+                    const position = [userLocation[0] + offsetLng, userLocation[1] + offsetLat];
+
+                    addTreasureAtPosition(position, treasureType);
+                    
+                    if (i === treasureCount - 1) {
+                        updateStatus(`🗺️ 已生成${treasureCount}个宝藏！开始您的寻宝之旅吧！`, 'success');
+                    }
+                }, i * 500); // 每500ms生成一个，增加仪式感
+            }
+        }
+
+        // 根据稀有度随机选择宝藏类型
+        function getRandomTreasureByRarity() {
+            const rarityWeights = {
+                'common': 40,
+                'uncommon': 30,
+                'rare': 20,
+                'epic': 8,
+                'legendary': 2
+            };
+
+            // 创建加权数组
+            let weightedArray = [];
+            treasureTypes.forEach(type => {
+                const weight = rarityWeights[type.rarity] || 10;
+                for (let i = 0; i < weight; i++) {
+                    weightedArray.push(type);
+                }
+            });
+
+            return weightedArray[Math.floor(Math.random() * weightedArray.length)];
+        }
+
+        // 手动添加单个宝藏
         function addTreasure() {
             if (!map || !userLocation) {
                 updateStatus('请先获取GPS位置！', 'warning');
@@ -1323,7 +1429,53 @@
             }
         }
 
-        // 键盘快捷键
+        // 移动端调试功能
+        function debugLocationInfo() {
+            let debugInfo = `
+                <strong>🔧 调试信息</strong><br>
+                用户代理: ${navigator.userAgent.substring(0, 50)}...<br>
+                支持GPS: ${navigator.geolocation ? '✅' : '❌'}<br>
+                当前时间: ${new Date().toLocaleString()}<br>
+                地图状态: ${map ? '✅ 已初始化' : '❌ 未初始化'}<br>
+                用户位置: ${userLocation ? `${userLocation[1].toFixed(4)}, ${userLocation[0].toFixed(4)}` : '❌ 未获取'}<br>
+                宝藏数量: ${treasureMarkers.length}<br>
+                HTTPS: ${location.protocol === 'https:' ? '✅' : '❌ GPS需要HTTPS'}<br>
+            `;
+            
+            // 检查权限状态
+            if (navigator.permissions) {
+                navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+                    debugInfo += `GPS权限: ${result.state}<br>`;
+                    updateGPSData(debugInfo);
+                });
+            } else {
+                updateGPSData(debugInfo);
+            }
+        }
+
+        // 强制使用上海位置（调试用）
+        function useShanghai() {
+            userLocation = [121.4737, 31.2304]; // 上海外滩
+            createUserMarker();
+            map.setCenter(userLocation);
+            map.setZoom(16);
+            updateStatus('🗺️ 已切换到上海外滩位置', 'success');
+            updateGPSData(`
+                <strong>📍 上海外滩位置</strong><br>
+                纬度: 31.230400 ✅<br>
+                经度: 121.473700 ✅<br>
+                精度: 模拟位置<br>
+                时间: ${new Date().toLocaleString()}<br>
+                <small style="color: #666;">🎯 上海地区模拟定位</small>
+            `);
+            
+            // 生成宝藏
+            setTimeout(() => {
+                generateNearbyTreasures();
+            }, 1000);
+        }
+
+        // 键盘快捷键和触摸事件
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey || e.metaKey) {
                 switch(e.key) {
@@ -1336,6 +1488,14 @@
                         e.preventDefault();
                         addTreasure();
                         break;
+                    case 's':
+                        e.preventDefault();
+                        useShanghai();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        debugLocationInfo();
+                        break;
                     case 'Delete':
                     case 'Backspace':
                         e.preventDefault();
@@ -1343,6 +1503,20 @@
                         break;
                 }
             }
+        });
+
+        // 移动端长按显示调试信息
+        let touchTimer;
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.id === 'gps-data') {
+                touchTimer = setTimeout(() => {
+                    debugLocationInfo();
+                }, 1000);
+            }
+        });
+
+        document.addEventListener('touchend', function() {
+            clearTimeout(touchTimer);
         });
     </script>
 </body>
