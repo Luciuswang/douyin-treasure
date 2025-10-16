@@ -474,6 +474,9 @@
                 <button class="btn" onclick="testGPS()" disabled id="gps-btn">
                     📍 重新定位
                 </button>
+                <button class="btn" onclick="centerToUser()" disabled id="center-btn">
+                    🎯 回到我的位置
+                </button>
                 <button class="btn" onclick="generateNearbyTreasures()" disabled id="generate-btn">
                     🗺️ 生成宝藏
                 </button>
@@ -915,35 +918,51 @@
             const initBtn = document.getElementById('init-btn-text');
             initBtn.innerHTML = '<span class="loading"></span> 正在加载...';
 
-            // 动态加载高德地图API
+            // 动态加载高德地图API（包含坐标转换插件）
             const script = document.createElement('script');
-            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geolocation`;
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
             script.onload = function() {
+                console.log('高德地图API加载成功');
                 createMap();
             };
             script.onerror = function() {
+                console.error('高德地图API加载失败');
                 updateStatus('高德地图API加载失败！请检查Key是否正确或网络连接', 'error');
                 document.getElementById('init-btn-text').innerHTML = '🚀 重新启动';
             };
             document.head.appendChild(script);
         }
 
-        // 创建地图实例
+        // 创建地图实例（改进版本）
         function createMap() {
             try {
+                console.log('开始创建地图实例...');
                 updateStatus('正在创建地图实例...', 'info', true);
                 
+                // 检查AMap是否可用
+                if (typeof AMap === 'undefined') {
+                    throw new Error('AMap对象未定义，地图API可能未正确加载');
+                }
+                
                 map = new AMap.Map('map-container', {
-                    zoom: 14,
+                    zoom: 15,
                     center: [121.4737, 31.2304], // 默认上海坐标
                     viewMode: '2D',
                     showLabel: true,
                     mapStyle: 'amap://styles/normal',
-                    resizeEnable: true
+                    resizeEnable: true,
+                    rotateEnable: false,
+                    pitchEnable: false,
+                    dragEnable: true,
+                    zoomEnable: true,
+                    doubleClickZoom: true
                 });
+
+                console.log('地图实例创建成功，等待加载完成...');
 
                 // 地图加载完成事件
                 map.on('complete', function() {
+                    console.log('地图加载完成');
                     updateStatus('地图加载成功！正在获取您的位置...', 'success');
                     
                     // 重置按钮
@@ -959,24 +978,33 @@
 
                     // 自动获取位置
                     setTimeout(() => {
+                        console.log('开始自动获取GPS位置...');
                         testGPS();
                     }, 1000);
                 });
 
                 // 地图点击事件 - 添加宝藏
                 map.on('click', function(e) {
+                    console.log('地图点击事件:', e.lnglat);
                     if (userLocation && confirm('在此位置添加宝藏？')) {
                         addTreasureAtPosition([e.lnglat.lng, e.lnglat.lat]);
                     }
                 });
+                
+                // 地图移动事件（用于调试）
+                map.on('moveend', function() {
+                    const center = map.getCenter();
+                    console.log('地图中心:', center.lng, center.lat, '缩放级别:', map.getZoom());
+                });
 
             } catch (error) {
+                console.error('地图创建失败:', error);
                 updateStatus('地图创建失败: ' + error.message, 'error');
                 document.getElementById('init-btn-text').innerHTML = '🚀 重新启动';
             }
         }
 
-        // 测试GPS定位
+        // 测试GPS定位（改进版本）
         function testGPS() {
             if (!map) {
                 updateStatus('请先初始化地图！', 'warning');
@@ -986,15 +1014,27 @@
             updateStatus('正在获取GPS位置...', 'info', true);
             updateGPSData('<div class="loading"></div> 正在定位...');
 
-            // 简化的定位逻辑
             if (navigator.geolocation) {
+                // 先尝试高精度定位
                 navigator.geolocation.getCurrentPosition(
                     handleLocationSuccess,
-                    handleLocationError,
+                    (error) => {
+                        // 如果高精度失败，尝试普通精度
+                        console.log('高精度定位失败，尝试普通精度定位...');
+                        navigator.geolocation.getCurrentPosition(
+                            handleLocationSuccess,
+                            handleLocationError,
+                            {
+                                enableHighAccuracy: false,
+                                timeout: 15000,
+                                maximumAge: 0
+                            }
+                        );
+                    },
                     {
                         enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 60000
+                        timeout: 8000,
+                        maximumAge: 0
                     }
                 );
             } else {
@@ -1004,16 +1044,88 @@
         }
 
 
-        // 处理定位成功
+        // 处理定位成功（改进版本 - 添加坐标转换）
         function handleLocationSuccess(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             const accuracy = position.coords.accuracy || 0;
             const timestamp = new Date(position.timestamp).toLocaleString();
             
+            console.log('✅ 原始GPS坐标 (WGS84):', { lat, lng, accuracy });
+            console.log('🔄 开始坐标转换...');
+            
+            // 检查AMap.convertFrom是否可用
+            if (typeof AMap === 'undefined' || !AMap.convertFrom) {
+                console.warn('⚠️ AMap.convertFrom 不可用，直接使用原始坐标');
+                useRawCoordinates(lat, lng, accuracy, timestamp);
+                return;
+            }
+            
+            // 使用高德地图的坐标转换功能将WGS84转换为GCJ-02
+            try {
+                AMap.convertFrom([lng, lat], 'gps', function(status, result) {
+                    console.log('坐标转换状态:', status);
+                    console.log('坐标转换结果:', result);
+                    
+                    if (result.info === 'ok' && result.locations && result.locations.length > 0) {
+                        const convertedLocation = result.locations[0];
+                        userLocation = [convertedLocation.lng, convertedLocation.lat];
+                        
+                        console.log('✅ 转换后坐标 (GCJ-02):', userLocation);
+                        console.log('📏 偏移距离:', calculateDistance([lng, lat], userLocation).toFixed(2), '米');
+                        
+                        updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米 (坐标已转换)`, 'success');
+                        updateGPSData(`
+                            <strong>📍 位置信息</strong><br>
+                            原始位置 (WGS84):<br>
+                            纬度: ${lat.toFixed(6)}<br>
+                            经度: ${lng.toFixed(6)}<br>
+                            <br>
+                            转换后位置 (GCJ-02):<br>
+                            纬度: ${convertedLocation.lat.toFixed(6)} ${convertedLocation.lat > 30 && convertedLocation.lat < 32 ? '✅' : '❓'}<br>
+                            经度: ${convertedLocation.lng.toFixed(6)} ${convertedLocation.lng > 120 && convertedLocation.lng < 122 ? '✅' : '❓'}<br>
+                            <br>
+                            精度: ${Math.round(accuracy)}米 ${accuracy < 100 ? '✅' : accuracy < 500 ? '⚠️' : '❌'}<br>
+                            时间: ${timestamp}<br>
+                            <small style="color: #666;">
+                                坐标系: WGS84 → GCJ-02 (高德)<br>
+                                ${convertedLocation.lat > 30 && convertedLocation.lat < 32 && convertedLocation.lng > 120 && convertedLocation.lng < 122 ? '🎯 上海地区定位成功' : '🌍 非上海地区'}
+                            </small>
+                        `);
+                        
+                        updateStats(accuracy);
+                        console.log('📌 准备创建用户标记...');
+                        createUserMarker();
+                        console.log('🗺️ 设置地图中心到用户位置...');
+                        map.setCenter(userLocation);
+                        map.setZoom(17);
+                        
+                        // 立即生成宝藏
+                        setTimeout(() => {
+                            if (treasureMarkers.length === 0) {
+                                console.log('🎁 开始生成宝藏...');
+                                generateNearbyTreasures();
+                            }
+                        }, 500);
+                    } else {
+                        // 如果转换失败，直接使用原始坐标（可能会有偏移）
+                        console.warn('⚠️ 坐标转换失败，使用原始坐标');
+                        useRawCoordinates(lat, lng, accuracy, timestamp);
+                    }
+                });
+            } catch (error) {
+                console.error('❌ 坐标转换异常:', error);
+                useRawCoordinates(lat, lng, accuracy, timestamp);
+            }
+        }
+
+        // 使用原始坐标的辅助函数
+        function useRawCoordinates(lat, lng, accuracy, timestamp) {
             userLocation = [lng, lat];
             
-            updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
+            console.log('📍 使用原始坐标 (WGS84):', userLocation);
+            
+            updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米 (未转换坐标，可能有偏移)`, 'warning');
             updateGPSData(`
                 <strong>📍 位置信息</strong><br>
                 纬度: ${lat.toFixed(6)} ${lat > 30 && lat < 32 ? '✅' : '❓'}<br>
@@ -1021,19 +1133,22 @@
                 精度: ${Math.round(accuracy)}米 ${accuracy < 100 ? '✅' : accuracy < 500 ? '⚠️' : '❌'}<br>
                 时间: ${timestamp}<br>
                 <small style="color: #666;">
-                    坐标系: WGS84<br>
-                    ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '🎯 上海地区定位成功' : '🌍 非上海地区或定位异常'}
+                    坐标系: WGS84 (未转换)<br>
+                    ⚠️ 坐标转换失败，位置可能有偏移 50-500米<br>
+                    ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '🎯 上海地区定位成功' : '🌍 非上海地区'}
                 </small>
             `);
             
             updateStats(accuracy);
+            console.log('📌 准备创建用户标记...');
             createUserMarker();
+            console.log('🗺️ 设置地图中心到用户位置...');
             map.setCenter(userLocation);
             map.setZoom(17);
             
-            // 立即生成宝藏
             setTimeout(() => {
                 if (treasureMarkers.length === 0) {
+                    console.log('🎁 开始生成宝藏...');
                     generateNearbyTreasures();
                 }
             }, 500);
@@ -1082,33 +1197,104 @@
             }, 1000);
         }
 
-        // 创建用户位置标记
+        // 创建用户位置标记（改进版本 - 添加调试信息）
         function createUserMarker() {
-            if (!map || !userLocation) return;
-
-            if (userMarker) {
-                map.remove(userMarker);
+            console.log('========== 开始创建用户标记 ==========');
+            console.log('当前地图对象:', map ? '✅ 已初始化' : '❌ 未初始化');
+            console.log('当前用户位置:', userLocation);
+            
+            if (!map) {
+                console.error('❌ 地图未初始化');
+                updateStatus('地图未初始化，无法创建标记', 'error');
+                return false;
+            }
+            
+            if (!userLocation || !Array.isArray(userLocation) || userLocation.length !== 2) {
+                console.error('❌ 用户位置无效:', userLocation);
+                updateStatus('用户位置无效，无法创建标记', 'error');
+                return false;
             }
 
-            userMarker = new AMap.Marker({
-                position: userLocation,
-                icon: new AMap.Icon({
-                    image: 'data:image/svg+xml;base64,' + btoa(`
-                        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
-                            <circle cx="30" cy="30" r="25" fill="#4CAF50" stroke="white" stroke-width="5"/>
-                            <circle cx="30" cy="30" r="8" fill="white"/>
-                            <text x="30" y="38" text-anchor="middle" fill="white" font-size="24">📍</text>
-                        </svg>
-                    `),
-                    size: new AMap.Size(60, 60),
-                    imageOffset: new AMap.Pixel(-30, -30)
-                }),
-                title: '我的位置',
-                zIndex: 1000,
-                animation: 'AMAP_ANIMATION_BOUNCE'
-            });
+            console.log('📍 准备创建标记，位置:', userLocation);
+            console.log('经度:', userLocation[0], '纬度:', userLocation[1]);
 
-            map.add(userMarker);
+            // 移除旧标记
+            if (userMarker) {
+                console.log('🗑️ 移除旧的用户标记');
+                try {
+                    map.remove(userMarker);
+                    userMarker = null;
+                    console.log('✅ 旧标记已移除');
+                } catch (error) {
+                    console.error('❌ 移除旧标记失败:', error);
+                }
+            }
+
+            try {
+                console.log('🎨 创建标记图标...');
+                const svgIcon = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+                        <circle cx="30" cy="30" r="25" fill="#4CAF50" stroke="white" stroke-width="5" opacity="0.9"/>
+                        <circle cx="30" cy="30" r="20" fill="#4CAF50" opacity="0.5"/>
+                        <circle cx="30" cy="30" r="8" fill="white"/>
+                        <text x="30" y="38" text-anchor="middle" fill="white" font-size="24">📍</text>
+                    </svg>
+                `;
+                
+                console.log('📌 创建Marker对象...');
+                userMarker = new AMap.Marker({
+                    position: new AMap.LngLat(userLocation[0], userLocation[1]),
+                    icon: new AMap.Icon({
+                        image: 'data:image/svg+xml;base64,' + btoa(svgIcon),
+                        size: new AMap.Size(60, 60),
+                        imageSize: new AMap.Size(60, 60),
+                        imageOffset: new AMap.Pixel(0, 0)
+                    }),
+                    title: `我的位置\n经度: ${userLocation[0].toFixed(6)}\n纬度: ${userLocation[1].toFixed(6)}`,
+                    zIndex: 1000,
+                    offset: new AMap.Pixel(-30, -30),
+                    animation: 'AMAP_ANIMATION_BOUNCE',
+                    clickable: true
+                });
+
+                console.log('✅ Marker对象创建成功');
+                console.log('➕ 添加标记到地图...');
+                
+                map.add(userMarker);
+                
+                console.log('✅ 标记已添加到地图');
+                console.log('📊 当前地图上的标记数:', map.getAllOverlays('marker').length);
+                
+                // 验证标记是否正确添加
+                const allMarkers = map.getAllOverlays('marker');
+                console.log('地图上的所有标记:', allMarkers);
+                
+                // 添加点击事件
+                userMarker.on('click', function() {
+                    console.log('👆 用户标记被点击');
+                    const infoWindow = new AMap.InfoWindow({
+                        content: `
+                            <div style="padding: 10px; text-align: center;">
+                                <div style="font-size: 1.5rem; margin-bottom: 5px;">📍 我的位置</div>
+                                <div style="color: #666; font-size: 0.9rem;">经度: ${userLocation[0].toFixed(6)}</div>
+                                <div style="color: #666; font-size: 0.9rem;">纬度: ${userLocation[1].toFixed(6)}</div>
+                            </div>
+                        `,
+                        anchor: 'bottom-center',
+                        offset: new AMap.Pixel(0, -5)
+                    });
+                    infoWindow.open(map, userLocation);
+                });
+                
+                console.log('========== 用户标记创建完成 ✅ ==========');
+                return true;
+                
+            } catch (error) {
+                console.error('❌ 创建用户标记失败:', error);
+                console.error('错误堆栈:', error.stack);
+                updateStatus('创建用户标记失败: ' + error.message, 'error');
+                return false;
+            }
         }
 
         // 生成周围的宝藏
@@ -1298,6 +1484,33 @@
             // 保存数据
             saveUserData();
             updateStats();
+        }
+
+        // 回到我的位置
+        function centerToUser() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+            
+            if (!userLocation) {
+                updateStatus('还没有获取到位置，请先点击"重新定位"', 'warning');
+                return;
+            }
+            
+            console.log('移动地图到用户位置:', userLocation);
+            map.setCenter(userLocation);
+            map.setZoom(17);
+            
+            // 如果用户标记存在，触发弹跳动画
+            if (userMarker) {
+                userMarker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                setTimeout(() => {
+                    userMarker.setAnimation('AMAP_ANIMATION_NONE');
+                }, 1000);
+            }
+            
+            updateStatus('🎯 已回到您的位置', 'success');
         }
 
         // 清空地图

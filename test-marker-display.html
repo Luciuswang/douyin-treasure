@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标记显示测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'PingFang SC', sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        button.secondary {
+            background: #2196F3;
+        }
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        #console {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-success { color: #4CAF50; }
+        .log-error { color: #f44336; }
+        .log-warning { color: #ff9800; }
+        .log-info { color: #2196F3; }
+        .status {
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #4CAF50; }
+        .status.error { background: #ffebee; color: #c62828; border: 1px solid #f44336; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+        .status.info { background: #e3f2fd; color: #1976d2; border: 1px solid #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ 用户标记显示测试工具</h1>
+        
+        <div class="card">
+            <h2>API配置</h2>
+            <div class="input-group">
+                <label for="api-key">高德地图API Key:</label>
+                <input type="text" id="api-key" placeholder="请输入高德地图API Key">
+            </div>
+            <button onclick="initMap()">初始化地图</button>
+        </div>
+
+        <div class="card">
+            <h2>定位测试</h2>
+            <div id="status" class="status info">等待初始化地图...</div>
+            <button onclick="testGPS()" disabled id="gps-btn">📍 测试GPS定位</button>
+            <button onclick="testShanghai()" disabled id="shanghai-btn" class="secondary">🗼 测试上海坐标</button>
+            <button onclick="testCustom()" disabled id="custom-btn" class="secondary">📌 测试自定义坐标</button>
+        </div>
+
+        <div class="card">
+            <div class="input-group">
+                <label>自定义坐标测试</label>
+                <input type="text" id="custom-lng" placeholder="经度 (例: 121.473701)" value="121.473701">
+                <input type="text" id="custom-lat" placeholder="纬度 (例: 31.230416)" value="31.230416">
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>地图显示</h2>
+            <div id="map"></div>
+        </div>
+
+        <div class="card">
+            <h2>调试日志</h2>
+            <button onclick="clearLog()">清空日志</button>
+            <div id="console"></div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+        let userMarker = null;
+        let testMarkers = [];
+
+        // 日志输出
+        function log(message, type = 'info') {
+            const console_el = document.getElementById('console');
+            const time = new Date().toLocaleTimeString();
+            const className = `log-${type}`;
+            console_el.innerHTML += `<div class="${className}">[${time}] ${message}</div>`;
+            console_el.scrollTop = console_el.scrollHeight;
+            
+            // 同时输出到浏览器控制台
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('console').innerHTML = '';
+        }
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        // 初始化地图
+        function initMap() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            
+            if (!apiKey) {
+                updateStatus('请输入API Key！', 'error');
+                log('错误: 未输入API Key', 'error');
+                return;
+            }
+
+            log('开始加载高德地图API...', 'info');
+            updateStatus('正在加载高德地图API...', 'info');
+            localStorage.setItem('amap-api-key', apiKey);
+
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+            
+            script.onload = function() {
+                log('✅ 高德地图API加载成功', 'success');
+                createMap();
+            };
+            
+            script.onerror = function() {
+                log('❌ 高德地图API加载失败', 'error');
+                updateStatus('高德地图API加载失败！请检查API Key', 'error');
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // 创建地图
+        function createMap() {
+            try {
+                log('开始创建地图实例...', 'info');
+                
+                map = new AMap.Map('map', {
+                    zoom: 15,
+                    center: [121.4737, 31.2304],
+                    viewMode: '2D',
+                    showLabel: true,
+                    mapStyle: 'amap://styles/normal'
+                });
+
+                map.on('complete', function() {
+                    log('✅ 地图加载完成', 'success');
+                    updateStatus('地图加载成功！可以开始测试', 'success');
+                    
+                    // 启用按钮
+                    document.getElementById('gps-btn').disabled = false;
+                    document.getElementById('shanghai-btn').disabled = false;
+                    document.getElementById('custom-btn').disabled = false;
+                });
+
+                map.on('click', function(e) {
+                    log(`地图点击: 经度=${e.lnglat.lng.toFixed(6)}, 纬度=${e.lnglat.lat.toFixed(6)}`, 'info');
+                });
+
+            } catch (error) {
+                log(`❌ 地图创建失败: ${error.message}`, 'error');
+                updateStatus('地图创建失败！', 'error');
+            }
+        }
+
+        // 测试GPS定位
+        function testGPS() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+
+            log('开始GPS定位...', 'info');
+            updateStatus('正在获取GPS位置...', 'info');
+
+            if (!navigator.geolocation) {
+                log('❌ 浏览器不支持GPS定位', 'error');
+                updateStatus('浏览器不支持GPS定位', 'error');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+                    
+                    log(`✅ GPS定位成功`, 'success');
+                    log(`原始坐标 (WGS84): lng=${lng.toFixed(6)}, lat=${lat.toFixed(6)}`, 'info');
+                    log(`精度: ${Math.round(accuracy)}米`, 'info');
+                    
+                    // 坐标转换
+                    if (AMap.convertFrom) {
+                        log('开始坐标转换 (WGS84 → GCJ-02)...', 'info');
+                        
+                        AMap.convertFrom([lng, lat], 'gps', function(status, result) {
+                            log(`转换状态: ${status}`, 'info');
+                            log(`转换结果: ${JSON.stringify(result)}`, 'info');
+                            
+                            if (result.info === 'ok' && result.locations && result.locations.length > 0) {
+                                const converted = result.locations[0];
+                                log(`✅ 坐标转换成功`, 'success');
+                                log(`转换后坐标 (GCJ-02): lng=${converted.lng.toFixed(6)}, lat=${converted.lat.toFixed(6)}`, 'success');
+                                
+                                // 创建标记
+                                createUserMarkerAt([converted.lng, converted.lat], '转换后的GPS位置');
+                                
+                                updateStatus('GPS定位和坐标转换成功！', 'success');
+                            } else {
+                                log(`⚠️ 坐标转换失败，使用原始坐标`, 'warning');
+                                createUserMarkerAt([lng, lat], 'GPS位置(未转换)');
+                                updateStatus('GPS定位成功，但坐标转换失败', 'warning');
+                            }
+                        });
+                    } else {
+                        log('⚠️ AMap.convertFrom 不可用', 'warning');
+                        createUserMarkerAt([lng, lat], 'GPS位置(未转换)');
+                    }
+                },
+                (error) => {
+                    log(`❌ GPS定位失败: ${error.message} (code: ${error.code})`, 'error');
+                    updateStatus('GPS定位失败！', 'error');
+                }
+            );
+        }
+
+        // 测试上海坐标
+        function testShanghai() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+
+            log('测试上海东方明珠坐标...', 'info');
+            const shanghai = [121.4994, 31.2397];
+            createUserMarkerAt(shanghai, '上海东方明珠');
+            updateStatus('已添加上海东方明珠标记', 'success');
+        }
+
+        // 测试自定义坐标
+        function testCustom() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+
+            const lng = parseFloat(document.getElementById('custom-lng').value);
+            const lat = parseFloat(document.getElementById('custom-lat').value);
+
+            if (isNaN(lng) || isNaN(lat)) {
+                updateStatus('请输入有效的经纬度！', 'error');
+                log('❌ 输入的经纬度无效', 'error');
+                return;
+            }
+
+            log(`测试自定义坐标: lng=${lng}, lat=${lat}`, 'info');
+            createUserMarkerAt([lng, lat], '自定义位置');
+            updateStatus('已添加自定义坐标标记', 'success');
+        }
+
+        // 创建用户标记
+        function createUserMarkerAt(position, label = '用户位置') {
+            log('========== 开始创建标记 ==========', 'info');
+            log(`位置: [${position[0]}, ${position[1]}]`, 'info');
+            log(`标签: ${label}`, 'info');
+
+            // 移除旧标记
+            if (userMarker) {
+                log('移除旧标记', 'info');
+                map.remove(userMarker);
+                userMarker = null;
+            }
+
+            try {
+                log('创建Marker对象...', 'info');
+                
+                const svgIcon = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+                        <circle cx="30" cy="30" r="25" fill="#4CAF50" stroke="white" stroke-width="5" opacity="0.9"/>
+                        <circle cx="30" cy="30" r="20" fill="#4CAF50" opacity="0.5"/>
+                        <circle cx="30" cy="30" r="8" fill="white"/>
+                        <text x="30" y="38" text-anchor="middle" fill="white" font-size="24">📍</text>
+                    </svg>
+                `;
+
+                userMarker = new AMap.Marker({
+                    position: new AMap.LngLat(position[0], position[1]),
+                    icon: new AMap.Icon({
+                        image: 'data:image/svg+xml;base64,' + btoa(svgIcon),
+                        size: new AMap.Size(60, 60),
+                        imageSize: new AMap.Size(60, 60),
+                        imageOffset: new AMap.Pixel(0, 0)
+                    }),
+                    title: label,
+                    zIndex: 1000,
+                    offset: new AMap.Pixel(-30, -30),
+                    animation: 'AMAP_ANIMATION_BOUNCE',
+                    clickable: true
+                });
+
+                log('✅ Marker对象创建成功', 'success');
+                log('添加标记到地图...', 'info');
+                
+                map.add(userMarker);
+                
+                log('✅ 标记已添加到地图', 'success');
+                
+                // 验证
+                const allMarkers = map.getAllOverlays('marker');
+                log(`当前地图上的标记数: ${allMarkers.length}`, 'info');
+                
+                // 移动地图中心
+                log('移动地图中心到标记位置...', 'info');
+                map.setCenter(position);
+                map.setZoom(17);
+                
+                // 添加点击事件
+                userMarker.on('click', function() {
+                    log('标记被点击', 'info');
+                    alert(`${label}\n经度: ${position[0]}\n纬度: ${position[1]}`);
+                });
+
+                log('========== 标记创建完成 ✅ ==========', 'success');
+                
+                // 等待一秒后停止动画
+                setTimeout(() => {
+                    if (userMarker) {
+                        userMarker.setAnimation('AMAP_ANIMATION_NONE');
+                        log('停止标记动画', 'info');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                log(`❌ 创建标记失败: ${error.message}`, 'error');
+                log(`错误堆栈: ${error.stack}`, 'error');
+            }
+        }
+
+        // 页面加载时恢复API Key
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedKey = localStorage.getItem('amap-api-key');
+            if (savedKey) {
+                document.getElementById('api-key').value = savedKey;
+                log('已从本地存储加载API Key', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
+

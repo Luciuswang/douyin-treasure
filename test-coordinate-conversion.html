@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>坐标转换测试 - GPS修复验证</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .result {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+        
+        .result strong {
+            color: #667eea;
+        }
+        
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .comparison { grid-template-columns: 1fr; }
+        }
+        
+        .coord-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e1e5e9;
+        }
+        
+        .coord-box h4 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 10px;
+            border: 3px solid #e1e5e9;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 坐标转换测试工具</h1>
+            <p>验证GPS定位修复效果</p>
+        </div>
+
+        <div class="card">
+            <h3>🔑 API配置</h3>
+            <div class="input-group">
+                <label for="api-key">高德地图API Key:</label>
+                <input type="text" id="api-key" class="input" placeholder="输入你的API Key">
+            </div>
+            <button class="btn" onclick="initMap()">初始化地图</button>
+            <div id="init-status" class="status info">等待初始化...</div>
+        </div>
+
+        <div class="card">
+            <h3>📍 测试坐标转换</h3>
+            
+            <div class="input-group">
+                <label>测试方法:</label>
+                <button class="btn" onclick="testCurrentGPS()">📡 使用当前GPS位置</button>
+                <button class="btn" onclick="testShanghaiCoords()">🗼 测试上海坐标</button>
+                <button class="btn" onclick="testBeijingCoords()">🏛️ 测试北京坐标</button>
+            </div>
+            
+            <div class="input-group">
+                <label>或手动输入WGS84坐标:</label>
+                <input type="number" id="manual-lng" class="input" placeholder="经度 (例: 121.473701)" step="0.000001" style="margin-bottom: 10px;">
+                <input type="number" id="manual-lat" class="input" placeholder="纬度 (例: 31.230416)" step="0.000001">
+                <button class="btn" onclick="testManualCoords()">🔄 转换</button>
+            </div>
+
+            <div id="test-result" class="result" style="display: none;">
+                <!-- 测试结果将显示在这里 -->
+            </div>
+
+            <div class="comparison" id="comparison" style="display: none;">
+                <div class="coord-box">
+                    <h4>🌍 原始坐标 (WGS84)</h4>
+                    <div id="wgs84-coords"></div>
+                </div>
+                <div class="coord-box">
+                    <h4>🗺️ 转换后坐标 (GCJ-02)</h4>
+                    <div id="gcj02-coords"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🗺️ 可视化对比</h3>
+            <div id="map"></div>
+        </div>
+
+        <div class="card">
+            <h3>📊 测试说明</h3>
+            <div style="line-height: 1.8;">
+                <p><strong>测试目的:</strong> 验证WGS84到GCJ-02的坐标转换是否正确</p>
+                <br>
+                <p><strong>期望结果:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>转换后的坐标应该与原始坐标有50-500米的偏移</li>
+                    <li>在地图上，红色标记(WGS84)和蓝色标记(GCJ-02)应该有明显间距</li>
+                    <li>蓝色标记(转换后)应该更接近地图上的真实位置</li>
+                </ul>
+                <br>
+                <p><strong>已知问题:</strong></p>
+                <ul style="margin-left: 20px;">
+                    <li>如果直接使用WGS84坐标，标记会偏离实际位置</li>
+                    <li>必须使用转换后的GCJ-02坐标才能准确定位</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = null;
+        let markers = [];
+
+        function showStatus(message, type = 'info', elementId = 'init-status') {
+            const status = document.getElementById(elementId);
+            status.textContent = message;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function initMap() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            
+            if (!apiKey) {
+                showStatus('请输入API Key！', 'error');
+                return;
+            }
+
+            showStatus('正在加载高德地图API...', 'info');
+            localStorage.setItem('amap-api-key', apiKey);
+
+            const script = document.createElement('script');
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+            script.onload = function() {
+                console.log('高德地图API加载成功');
+                createMap();
+            };
+            script.onerror = function() {
+                showStatus('API加载失败，请检查Key是否正确', 'error');
+            };
+            document.head.appendChild(script);
+        }
+
+        function createMap() {
+            try {
+                map = new AMap.Map('map', {
+                    zoom: 14,
+                    center: [121.4737, 31.2304],
+                    viewMode: '2D'
+                });
+
+                map.on('complete', function() {
+                    showStatus('✅ 地图初始化成功！可以开始测试', 'success');
+                });
+            } catch (error) {
+                showStatus('地图创建失败: ' + error.message, 'error');
+            }
+        }
+
+        function testCurrentGPS() {
+            if (!map) {
+                alert('请先初始化地图！');
+                return;
+            }
+
+            showStatus('正在获取GPS位置...', 'info', 'init-status');
+
+            if (!navigator.geolocation) {
+                showStatus('浏览器不支持GPS', 'error', 'init-status');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    testCoordinateConversion(lng, lat, `当前GPS位置 (精度: ${Math.round(position.coords.accuracy)}米)`);
+                },
+                (error) => {
+                    showStatus('GPS定位失败: ' + error.message, 'error', 'init-status');
+                    // 使用默认坐标
+                    testShanghaiCoords();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function testShanghaiCoords() {
+            testCoordinateConversion(121.473701, 31.230416, '上海东方明珠');
+        }
+
+        function testBeijingCoords() {
+            testCoordinateConversion(116.397428, 39.90923, '北京天安门');
+        }
+
+        function testManualCoords() {
+            const lng = parseFloat(document.getElementById('manual-lng').value);
+            const lat = parseFloat(document.getElementById('manual-lat').value);
+
+            if (isNaN(lng) || isNaN(lat)) {
+                alert('请输入有效的经纬度！');
+                return;
+            }
+
+            testCoordinateConversion(lng, lat, '手动输入坐标');
+        }
+
+        function testCoordinateConversion(lng, lat, sourceName) {
+            if (!map) {
+                alert('请先初始化地图！');
+                return;
+            }
+
+            console.log('开始测试坐标转换:', { lng, lat, sourceName });
+            
+            // 清除旧标记
+            if (markers.length > 0) {
+                map.remove(markers);
+                markers = [];
+            }
+
+            // 显示原始坐标
+            document.getElementById('wgs84-coords').innerHTML = `
+                经度: ${lng.toFixed(6)}<br>
+                纬度: ${lat.toFixed(6)}<br>
+                来源: ${sourceName}
+            `;
+            document.getElementById('comparison').style.display = 'grid';
+
+            // 创建原始坐标标记（红色）
+            const wgs84Marker = new AMap.Marker({
+                position: [lng, lat],
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                            <circle cx="20" cy="20" r="15" fill="#e74c3c" stroke="white" stroke-width="3"/>
+                            <text x="20" y="26" text-anchor="middle" fill="white" font-size="16">❌</text>
+                        </svg>
+                    `),
+                    size: new AMap.Size(40, 40)
+                }),
+                title: '原始WGS84坐标（错误位置）',
+                offset: new AMap.Pixel(-20, -20)
+            });
+            map.add(wgs84Marker);
+            markers.push(wgs84Marker);
+
+            // 使用高德API转换坐标
+            AMap.convertFrom([lng, lat], 'gps', function(status, result) {
+                console.log('坐标转换结果:', status, result);
+
+                if (result.info === 'ok' && result.locations && result.locations.length > 0) {
+                    const converted = result.locations[0];
+                    const convertedLng = converted.lng;
+                    const convertedLat = converted.lat;
+
+                    // 计算偏移距离
+                    const distance = calculateDistance(lat, lng, convertedLat, convertedLng);
+
+                    // 显示转换后坐标
+                    document.getElementById('gcj02-coords').innerHTML = `
+                        经度: ${convertedLng.toFixed(6)}<br>
+                        纬度: ${convertedLat.toFixed(6)}<br>
+                        偏移距离: ${Math.round(distance)}米
+                    `;
+
+                    // 显示详细结果
+                    const resultDiv = document.getElementById('test-result');
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `
+                        <strong>📊 转换结果:</strong><br>
+                        <br>
+                        <strong>原始坐标 (WGS84):</strong><br>
+                        经度: ${lng.toFixed(6)}<br>
+                        纬度: ${lat.toFixed(6)}<br>
+                        <br>
+                        <strong>转换后坐标 (GCJ-02):</strong><br>
+                        经度: ${convertedLng.toFixed(6)}<br>
+                        纬度: ${convertedLat.toFixed(6)}<br>
+                        <br>
+                        <strong>经度偏移:</strong> ${(convertedLng - lng).toFixed(6)}° (约${Math.round((convertedLng - lng) * 111000)}米)<br>
+                        <strong>纬度偏移:</strong> ${(convertedLat - lat).toFixed(6)}° (约${Math.round((convertedLat - lat) * 111000)}米)<br>
+                        <strong>总偏移距离:</strong> ${Math.round(distance)}米<br>
+                        <br>
+                        <strong>✅ 结论:</strong> ${distance > 30 && distance < 1000 ? '坐标转换正常，偏移符合预期' : '⚠️ 偏移异常，请检查'}
+                    `;
+
+                    // 创建转换后坐标标记（蓝色）
+                    const gcj02Marker = new AMap.Marker({
+                        position: [convertedLng, convertedLat],
+                        icon: new AMap.Icon({
+                            image: 'data:image/svg+xml;base64,' + btoa(`
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                                    <circle cx="20" cy="20" r="15" fill="#3498db" stroke="white" stroke-width="3"/>
+                                    <text x="20" y="26" text-anchor="middle" fill="white" font-size="16">✓</text>
+                                </svg>
+                            `),
+                            size: new AMap.Size(40, 40)
+                        }),
+                        title: '转换后GCJ-02坐标（正确位置）',
+                        offset: new AMap.Pixel(-20, -20)
+                    });
+                    map.add(gcj02Marker);
+                    markers.push(gcj02Marker);
+
+                    // 绘制连线
+                    const polyline = new AMap.Polyline({
+                        path: [[lng, lat], [convertedLng, convertedLat]],
+                        strokeColor: '#FF9800',
+                        strokeWeight: 3,
+                        strokeStyle: 'dashed'
+                    });
+                    map.add(polyline);
+                    markers.push(polyline);
+
+                    // 调整地图视野
+                    map.setFitView();
+
+                    showStatus(`✅ 坐标转换成功！偏移${Math.round(distance)}米`, 'success', 'init-status');
+                } else {
+                    showStatus('❌ 坐标转换失败', 'error', 'init-status');
+                    document.getElementById('test-result').style.display = 'block';
+                    document.getElementById('test-result').innerHTML = `
+                        <strong style="color: red;">❌ 转换失败</strong><br>
+                        状态: ${status}<br>
+                        信息: ${result.info || '未知错误'}
+                    `;
+                }
+            });
+        }
+
+        // 计算两点间距离（米）
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000; // 地球半径(米)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 页面加载时恢复API Key
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedKey = localStorage.getItem('amap-api-key');
+            if (savedKey) {
+                document.getElementById('api-key').value = savedKey;
+                showStatus('发现已保存的API Key', 'success');
+            }
+        });
+    </script>
+</body>
+</html>
+
+
