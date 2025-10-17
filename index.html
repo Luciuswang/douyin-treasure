@@ -1234,20 +1234,31 @@
 
             try {
                 console.log('🎨 创建标记图标...');
+                // 使用简单的SVG，不包含emoji（避免btoa编码错误）
                 const svgIcon = `
                     <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
-                        <circle cx="30" cy="30" r="25" fill="#4CAF50" stroke="white" stroke-width="5" opacity="0.9"/>
-                        <circle cx="30" cy="30" r="20" fill="#4CAF50" opacity="0.5"/>
-                        <circle cx="30" cy="30" r="8" fill="white"/>
-                        <text x="30" y="38" text-anchor="middle" fill="white" font-size="24">📍</text>
+                        <defs>
+                            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#4CAF50;stop-opacity:0.3" />
+                            </radialGradient>
+                        </defs>
+                        <circle cx="30" cy="30" r="25" fill="url(#glow)" opacity="0.6"/>
+                        <circle cx="30" cy="30" r="18" fill="#4CAF50" stroke="white" stroke-width="4"/>
+                        <circle cx="30" cy="30" r="12" fill="#81C784"/>
+                        <circle cx="30" cy="30" r="6" fill="white"/>
+                        <path d="M 30 10 L 28 20 L 32 20 Z" fill="white" opacity="0.8"/>
                     </svg>
                 `;
                 
                 console.log('📌 创建Marker对象...');
+                // 使用encodeURIComponent代替btoa，避免Unicode问题
+                const encodedSvg = encodeURIComponent(svgIcon);
+                
                 userMarker = new AMap.Marker({
                     position: new AMap.LngLat(userLocation[0], userLocation[1]),
                     icon: new AMap.Icon({
-                        image: 'data:image/svg+xml;base64,' + btoa(svgIcon),
+                        image: 'data:image/svg+xml;charset=utf-8,' + encodedSvg,
                         size: new AMap.Size(60, 60),
                         imageSize: new AMap.Size(60, 60),
                         imageOffset: new AMap.Pixel(0, 0)
@@ -1389,17 +1400,28 @@
             userData.createdTreasures.push(treasureData);
             userData.stats.treasuresCreated += 1;
 
-            // 创建地图标记
+            // 创建地图标记（使用简单图形代替emoji）
+            const treasureSvg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
+                    <defs>
+                        <radialGradient id="glow-${treasureType.name}" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" style="stop-color:${treasureType.color};stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:${treasureType.color};stop-opacity:0.2" />
+                        </radialGradient>
+                    </defs>
+                    <circle cx="25" cy="25" r="22" fill="url(#glow-${treasureType.name})" opacity="0.6"/>
+                    <circle cx="25" cy="25" r="18" fill="${treasureType.color}" stroke="white" stroke-width="3"/>
+                    <circle cx="25" cy="25" r="12" fill="${treasureType.color}" opacity="0.8"/>
+                    <circle cx="25" cy="25" r="6" fill="white" opacity="0.9"/>
+                    <text x="25" y="30" text-anchor="middle" fill="white" font-size="20" font-weight="bold">?</text>
+                </svg>
+            `;
+            const encodedTreasureSvg = encodeURIComponent(treasureSvg);
+            
             const treasureMarker = new AMap.Marker({
                 position: position,
                 icon: new AMap.Icon({
-                    image: 'data:image/svg+xml;base64,' + btoa(`
-                        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 50 50">
-                            <circle cx="25" cy="25" r="20" fill="${treasureType.color}" stroke="white" stroke-width="4"/>
-                            <circle cx="25" cy="25" r="15" fill="${treasureType.color}" opacity="0.3"/>
-                            <text x="25" y="33" text-anchor="middle" fill="white" font-size="18">${treasureType.icon}</text>
-                        </svg>
-                    `),
+                    image: 'data:image/svg+xml;charset=utf-8,' + encodedTreasureSvg,
                     size: new AMap.Size(50, 50),
                     imageOffset: new AMap.Pixel(-25, -25)
                 }),
