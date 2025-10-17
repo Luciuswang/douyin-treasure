@@ -377,12 +377,16 @@
             <p class="subtitle">基于GPS的实时寻宝游戏</p>
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-number" id="online-users">0</span>
-                    <span class="stat-label">在线用户</span>
+                    <span class="stat-number" id="user-name">游客</span>
+                    <span class="stat-label">玩家昵称</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="user-level">LV.1</span>
+                    <span class="stat-label">当前等级</span>
                 </div>
                 <div class="stat">
                     <span class="stat-number" id="total-treasures">0</span>
-                    <span class="stat-label">宝藏总数</span>
+                    <span class="stat-label">发现宝藏</span>
                 </div>
                 <div class="stat">
                     <span class="stat-number" id="accuracy">0m</span>
@@ -888,17 +892,15 @@
 
         // 更新统计数据显示
         function updateStats(accuracy = 0) {
-            document.getElementById('online-users').textContent = '1';
-            document.getElementById('total-treasures').textContent = treasureMarkers.length;
+            document.getElementById('total-treasures').textContent = userData.stats.treasuresDiscovered || 0;
             document.getElementById('accuracy').textContent = `${Math.round(accuracy)}m`;
             
-            // 更新用户等级信息
-            const levelInfo = userManager.getLevelInfo();
-            if (document.getElementById('user-level')) {
-                document.getElementById('user-level').textContent = `LV.${levelInfo.currentLevel}`;
+            // 更新用户信息
+            if (document.getElementById('user-name')) {
+                document.getElementById('user-name').textContent = userData.username || '游客';
             }
-            if (document.getElementById('user-exp')) {
-                document.getElementById('user-exp').textContent = `${userData.level.experience} EXP`;
+            if (document.getElementById('user-level')) {
+                document.getElementById('user-level').textContent = `LV.${userData.level.currentLevel}`;
             }
         }
 
@@ -1526,6 +1528,30 @@
             updateStats();
         }
 
+        // 首次使用检查
+        function checkFirstTimeUser() {
+            const isFirstTime = !localStorage.getItem('douyin-treasure-user');
+            if (isFirstTime) {
+                // 首次使用，显示欢迎和昵称设置
+                setTimeout(() => {
+                    const username = prompt('🎉 欢迎来到抖宝！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
+                    if (username && username.length >= 3 && username.length <= 10) {
+                        userData.username = username;
+                        saveUserData();
+                        updateStatus(`欢迎，${username}！开始你的寻宝之旅吧！`, 'success');
+                    } else if (username) {
+                        alert('昵称长度应该在3-10个字符之间');
+                        checkFirstTimeUser();
+                    }
+                }, 1000);
+            } else {
+                // 老用户，显示欢迎回来消息
+                if (userData.username) {
+                    updateStatus(`欢迎回来，${userData.username}！`, 'success');
+                }
+            }
+        }
+
         // 页面加载时的初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 加载用户数据
@@ -1537,9 +1563,14 @@
                 updateStatus('发现已保存的API Key，点击启动即可开始游戏', 'success');
             }
 
+            // 检查首次用户
+            checkFirstTimeUser();
+
             // 显示用户信息
             if (userData.stats.treasuresDiscovered > 0) {
-                updateStatus(`欢迎回来！您已发现 ${userData.stats.treasuresDiscovered} 个宝藏，当前等级 LV.${userData.level.currentLevel}`, 'success');
+                setTimeout(() => {
+                    updateStatus(`你已发现 ${userData.stats.treasuresDiscovered} 个宝藏，等级 LV.${userData.level.currentLevel}，继续加油！`, 'success');
+                }, 2000);
             }
 
             // 更新初始统计
