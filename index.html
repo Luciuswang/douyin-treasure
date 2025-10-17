@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝 - GPS寻宝游戏</title>
-    <meta name="description" content="基于GPS定位的实时寻宝游戏，支持高德地图">
-    <meta name="keywords" content="GPS寻宝,抖音,高德地图,定位游戏">
+    <title>豆宝 - GPS寻宝游戏</title>
+<meta name="description" content="基于GPS定位的实时寻宝游戏，探索身边的宝藏">
+    <meta name="keywords" content="GPS寻宝,豆宝,高德地图,定位游戏,寻宝游戏">
     
     <!-- PWA支持 -->
     <meta name="theme-color" content="#667eea">
@@ -373,8 +373,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">🗺️ 抖宝</h1>
-            <p class="subtitle">基于GPS的实时寻宝游戏</p>
+            <h1 class="title">🗺️ 豆宝</h1>
+            <p class="subtitle">基于GPS的实时寻宝游戏 - 探索身边的宝藏</p>
             <div class="hero-stats">
                 <div class="stat">
                     <span class="stat-number" id="user-name">游客</span>
@@ -396,14 +396,19 @@
         </div>
 
         <div class="card">
-            <h3>🔑 高德地图配置</h3>
-            <div class="input-group">
-                <label for="api-key">高德地图API Key:</label>
-                <input type="password" id="api-key" class="api-input" placeholder="请输入您的高德地图Web服务API Key">
-            </div>
+            <h3>🚀 快速开始</h3>
             <button class="btn" onclick="initMap()">
                 <span id="init-btn-text">🚀 启动寻宝之旅</span>
             </button>
+            
+            <!-- 高级选项：切换API Key -->
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; color: #666; font-size: 0.9rem;">🔧 高级选项</summary>
+                <div class="input-group" style="margin-top: 10px;">
+                    <label for="api-key">自定义高德地图API Key:</label>
+                    <input type="password" id="api-key" class="api-input" placeholder="留空使用默认Key">
+                </div>
+            </details>
             
             <div class="tutorial">
                 <h4>📋 快速开始指南:</h4>
@@ -904,12 +909,20 @@
             }
         }
 
+        // 默认API Key（你的高德地图Key）
+        const DEFAULT_AMAP_KEY = '你的高德地图API_Key'; // TODO: 替换成你的实际Key
+        
         // 初始化地图
         function initMap() {
-            const apiKey = document.getElementById('api-key').value.trim();
+            let apiKey = document.getElementById('api-key').value.trim();
             
+            // 如果用户没有输入，使用默认Key
             if (!apiKey) {
-                updateStatus('请输入高德地图API Key！', 'error');
+                apiKey = localStorage.getItem('amap-api-key') || DEFAULT_AMAP_KEY;
+            }
+            
+            if (!apiKey || apiKey === '你的高德地图API_Key') {
+                updateStatus('请先配置高德地图API Key！展开"高级选项"输入你的Key', 'error');
                 return;
             }
 
@@ -1006,7 +1019,7 @@
             }
         }
 
-        // 测试GPS定位（改进版本）
+        // 测试GPS定位（改进版本 - 针对PC和手机优化）
         function testGPS() {
             if (!map) {
                 updateStatus('请先初始化地图！', 'warning');
@@ -1016,33 +1029,122 @@
             updateStatus('正在获取GPS位置...', 'info', true);
             updateGPSData('<div class="loading"></div> 正在定位...');
 
-            if (navigator.geolocation) {
-                // 先尝试高精度定位
-                navigator.geolocation.getCurrentPosition(
-                    handleLocationSuccess,
-                    (error) => {
-                        // 如果高精度失败，尝试普通精度
-                        console.log('高精度定位失败，尝试普通精度定位...');
-                        navigator.geolocation.getCurrentPosition(
-                            handleLocationSuccess,
-                            handleLocationError,
-                            {
-                                enableHighAccuracy: false,
-                                timeout: 15000,
-                                maximumAge: 0
-                            }
-                        );
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 8000,
-                        maximumAge: 0
-                    }
-                );
-            } else {
+            // 检测设备类型
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('设备类型:', isMobile ? '移动设备' : 'PC设备');
+
+            if (!navigator.geolocation) {
                 updateStatus('浏览器不支持GPS定位功能', 'error');
                 handleLocationError({ code: 0, message: '不支持定位' });
+                return;
             }
+
+            // PC端使用IP定位作为备选
+            if (!isMobile) {
+                console.log('PC端检测到，将使用IP定位 + 高德定位服务');
+                useAmapGeolocation();
+                return;
+            }
+
+            // 移动端使用GPS定位
+            console.log('移动端检测到，使用GPS定位');
+            navigator.geolocation.getCurrentPosition(
+                handleLocationSuccess,
+                (error) => {
+                    console.log('高精度定位失败，尝试普通精度...');
+                    navigator.geolocation.getCurrentPosition(
+                        handleLocationSuccess,
+                        (error2) => {
+                            console.log('GPS定位失败，尝试使用高德定位服务');
+                            useAmapGeolocation();
+                        },
+                        {
+                            enableHighAccuracy: false,
+                            timeout: 15000,
+                            maximumAge: 30000
+                        }
+                    );
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // 使用高德定位服务（基于IP，适合PC端）
+        function useAmapGeolocation() {
+            console.log('使用高德定位服务...');
+            updateStatus('正在使用网络定位...', 'info', true);
+            
+            AMap.plugin('AMap.Geolocation', function() {
+                const geolocation = new AMap.Geolocation({
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    zoomToAccuracy: true,
+                    buttonPosition: 'RB'
+                });
+                
+                geolocation.getCurrentPosition(function(status, result) {
+                    console.log('高德定位结果:', status, result);
+                    if (status === 'complete') {
+                        const position = {
+                            coords: {
+                                latitude: result.position.lat,
+                                longitude: result.position.lng,
+                                accuracy: result.accuracy || 100
+                            },
+                            timestamp: Date.now()
+                        };
+                        // 高德返回的已经是GCJ-02坐标，直接使用
+                        handleAmapLocationSuccess(position);
+                    } else {
+                        console.log('高德定位失败，使用默认位置');
+                        handleLocationError({ code: 2, message: '网络定位失败' });
+                    }
+                });
+            });
+        }
+
+        // 处理高德定位成功（无需坐标转换）
+        function handleAmapLocationSuccess(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy || 100;
+            const timestamp = new Date(position.timestamp).toLocaleString();
+            
+            console.log('✅ 高德定位成功 (GCJ-02):', { lat, lng, accuracy });
+            
+            userLocation = [lng, lat];
+            
+            updateStatus(`定位成功！精度: ${Math.round(accuracy)}米 (网络定位)`, 'success');
+            updateGPSData(`
+                <strong>📍 位置信息</strong><br>
+                定位方式: 高德网络定位<br>
+                纬度: ${lat.toFixed(6)}<br>
+                经度: ${lng.toFixed(6)}<br>
+                精度: ${Math.round(accuracy)}米 ${accuracy < 200 ? '✅' : '⚠️'}<br>
+                时间: ${timestamp}<br>
+                <small style="color: #666;">
+                    坐标系: GCJ-02 (高德地图)<br>
+                    💡 PC端建议使用手机访问获得更精确的GPS定位
+                </small>
+            `);
+            
+            updateStats(accuracy);
+            console.log('📌 准备创建用户标记...');
+            createUserMarker();
+            console.log('🗺️ 设置地图中心到用户位置...');
+            map.setCenter(userLocation);
+            map.setZoom(17);
+            
+            setTimeout(() => {
+                if (treasureMarkers.length === 0) {
+                    console.log('🎁 开始生成宝藏...');
+                    generateNearbyTreasures();
+                }
+            }, 500);
         }
 
 
@@ -1556,7 +1658,7 @@
             if (isFirstTime) {
                 // 首次使用，显示欢迎和昵称设置
                 setTimeout(() => {
-                    const username = prompt('🎉 欢迎来到抖宝！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
+                    const username = prompt('🎉 欢迎来到豆宝！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
                     if (username && username.length >= 3 && username.length <= 10) {
                         userData.username = username;
                         saveUserData();

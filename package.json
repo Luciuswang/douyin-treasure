@@ -1,7 +1,7 @@
 {
-  "name": "douyin-treasure",
+  "name": "doubao-treasure",
   "version": "1.0.0",
-  "description": "基于GPS的真实世界寻宝游戏 - 使用高德地图API",
+  "description": "豆宝 - 基于GPS的真实世界寻宝游戏，探索身边的宝藏",
   "main": "index.html",
   "scripts": {
     "dev": "npx serve . --cors",
@@ -22,9 +22,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/douyin-treasure.git"
+    "url": "https://github.com/Luciuswang/doubao-treasure.git"
   },
-  "homepage": "https://your-username.github.io/douyin-treasure/",
+  "homepage": "https://luciuswang.github.io/doubao-treasure/",
   "devDependencies": {
     "serve": "^14.0.0"
   }
