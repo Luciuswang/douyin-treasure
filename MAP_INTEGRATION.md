@@ -1,4 +1,4 @@
-# 🗺️ 抖宝地图集成指南
+# 🗺️ Totofun 突突翻地图集成指南
 
 ## 📋 当前状态
 
@@ -18,7 +18,7 @@
 1. 登录后进入控制台
 2. 点击"创建新应用"
 3. 填写应用信息：
-   - 应用名称：抖宝寻宝游戏
+   - 应用名称：Totofun 突突翻寻宝游戏
    - 应用类型：Web端(JS API)
 
 ### 步骤3：获取Key
@@ -130,7 +130,7 @@ function addTreasureMarkerOnMap(treasureType, lat, lng) {
         content: `
             <div class="treasure-info">
                 <h4>${treasureType.name}</h4>
-                <div>奖励: ${treasureType.reward} 抖币</div>
+                <div>奖励: ${treasureType.reward} 金币</div>
                 <button onclick="discoverTreasure('${marker.getExtData().id}', '${treasureType.name}', ${treasureType.reward})" 
                         style="margin-top: 10px; padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
                     发现宝藏

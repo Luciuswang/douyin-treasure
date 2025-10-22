@@ -1,4 +1,4 @@
-# 🗺️ 豆宝 - 基于高德地图的GPS寻宝游戏
+# 🗺️ Totofun 突突翻 - 基于高德地图的GPS寻宝游戏
 
 一个创新的基于地理位置的寻宝游戏，使用高德地图API实现真实世界的虚拟寻宝体验。探索身边的宝藏，开启寻宝之旅！
 
@@ -7,7 +7,7 @@
 - **🗺️ 真实地图** - 基于高德地图API的高精度地图服务
 - **📍 精确定位** - 使用GPS定位获取用户真实位置
 - **🎯 随机宝藏** - 在用户周围随机生成各种类型的虚拟宝藏
-- **💰 奖励系统** - 发现宝藏获得抖币，解锁更多功能
+- **💰 奖励系统** - 发现宝藏获得金币，解锁更多功能
 - **🏆 等级系统** - 通过寻宝提升探险等级
 - **📱 移动优化** - 完全适配手机端，支持触摸操作
 
@@ -50,13 +50,13 @@
 - **🗑️ 清空所有宝藏** - 重新开始游戏
 
 ### 宝藏类型
-- 💎 **钻石** - 奖励100抖币
-- 👑 **皇冠** - 奖励200抖币  
-- 💰 **金币** - 奖励50抖币
-- 💍 **宝石** - 奖励150抖币
-- 🎁 **礼品** - 奖励75抖币
-- ⚔️ **神器** - 奖励300抖币
-- 🏆 **奖杯** - 奖励250抖币
+- 💎 **钻石** - 奖励100金币
+- 👑 **皇冠** - 奖励200金币  
+- 💰 **金币** - 奖励50金币
+- 💍 **宝石** - 奖励150金币
+- 🎁 **礼品** - 奖励75金币
+- ⚔️ **神器** - 奖励300金币
+- 🏆 **奖杯** - 奖励250金币
 
 ### 升级系统
 - 每发现3个宝藏升1级
@@ -81,7 +81,7 @@
 ## 🌐 在线演示
 
 ### 🚀 GitHub Pages部署
-[点击这里体验游戏](https://your-username.github.io/douyin-treasure/)
+[点击这里体验游戏](https://your-username.github.io/totofun-treasure/)
 
 ### 📱 移动端测试
 1. 用手机浏览器访问上述链接
@@ -95,7 +95,7 @@
 2. 在仓库设置(Settings)中找到Pages选项
 3. Source选择"Deploy from a branch"
 4. Branch选择"main"或"master"，文件夹选择"/ (root)"
-5. 点击Save，等待几分钟即可访问: `https://your-username.github.io/douyin-treasure/`
+5. 点击Save，等待几分钟即可访问: `https://your-username.github.io/totofun-treasure/`
 
 ### 自定义域名（可选）
 1. 在仓库根目录的CNAME文件中设置你的域名
@@ -106,10 +106,10 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/douyin-treasure.git
+git clone https://github.com/your-username/totofun-treasure.git
 
 # 进入目录
-cd douyin-treasure
+cd totofun-treasure
 
 # 直接打开HTML文件或使用本地服务器
 python -m http.server 8000

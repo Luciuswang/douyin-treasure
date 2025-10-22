@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>豆宝 - GPS寻宝游戏</title>
+    <title>Totofun 突突翻 - GPS寻宝游戏</title>
 <meta name="description" content="基于GPS定位的实时寻宝游戏，探索身边的宝藏">
-    <meta name="keywords" content="GPS寻宝,豆宝,高德地图,定位游戏,寻宝游戏">
+    <meta name="keywords" content="GPS寻宝,Totofun,突突翻,高德地图,定位游戏,寻宝游戏">
     
     <!-- PWA支持 -->
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#4FC3F7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="icon" type="image/png" href="assets/images/totofun-logo.png">
     
     <style>
         * { 
@@ -21,7 +22,7 @@
         
         body {
             font-family: system-ui, -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 50%, #FFA500 100%);
             min-height: 100vh;
             color: #333;
             padding: 10px;
@@ -40,11 +41,29 @@
             margin-bottom: 20px;
         }
         
+        .logo-container {
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            display: block;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
         .title {
             font-size: 2.5rem;
             font-weight: bold;
             margin-bottom: 10px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            color: #1E3A8A;
         }
         
         .subtitle {
@@ -92,7 +111,7 @@
         }
         
         .card h3 {
-            color: #667eea;
+            color: #1E3A8A;
             margin-bottom: 20px;
             font-size: 1.3rem;
             display: flex;
@@ -122,14 +141,14 @@
         }
         
         .api-input:focus {
-            border-color: #667eea;
+            border-color: #4FC3F7;
             outline: none;
             background: white;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
             color: white;
             border: none;
             padding: 15px 25px;
@@ -161,7 +180,7 @@
         
         .btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 25px rgba(79, 195, 247, 0.5);
         }
         
         .btn:disabled {
@@ -260,7 +279,7 @@
         }
         
         .gps-info h4 {
-            color: #667eea;
+            color: #1E3A8A;
             margin-bottom: 15px;
             font-size: 1.1rem;
         }
@@ -299,7 +318,7 @@
         }
         
         .tutorial a {
-            color: #667eea;
+            color: #4FC3F7;
             text-decoration: none;
             font-weight: 600;
         }
@@ -340,7 +359,7 @@
         }
         
         .feature h4 {
-            color: #667eea;
+            color: #1E3A8A;
             margin-bottom: 10px;
         }
         
@@ -349,7 +368,7 @@
             width: 20px;
             height: 20px;
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border-top: 3px solid #4FC3F7;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -373,7 +392,10 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="title">🗺️ 豆宝</h1>
+            <div class="logo-container">
+                <img src="assets/images/totofun-logo.png" alt="Totofun Logo" class="logo">
+            </div>
+            <h1 class="title">Totofun 突突翻</h1>
             <p class="subtitle">基于GPS的实时寻宝游戏 - 探索身边的宝藏</p>
             <div class="hero-stats">
                 <div class="stat">
@@ -881,11 +903,11 @@
         // 保存和加载用户数据
         function saveUserData() {
             userData.lastActiveAt = new Date();
-            storageManager.save('douyin-treasure-user', userData);
+            storageManager.save('totofun-treasure-user', userData);
         }
 
         function loadUserData() {
-            const saved = storageManager.load('douyin-treasure-user');
+            const saved = storageManager.load('totofun-treasure-user');
             if (saved) {
                 userData = { ...userData, ...saved };
                 // 确保日期字段正确解析
@@ -1585,7 +1607,7 @@
                                     <div style="font-size: 1.2rem; margin-bottom: 5px;">${treasureType.icon} ${treasureType.name}</div>
                                     <div style="color: #666; font-size: 0.9rem;">距离: ${Math.round(distance)}米</div>
                                     <div style="color: #666; font-size: 0.9rem;">需要: ${requiredDistance}米内</div>
-                                    <div style="color: #667eea; font-size: 0.8rem; margin-top: 5px;">
+                                    <div style="color: #4FC3F7; font-size: 0.8rem; margin-top: 5px;">
                                         💰 ${treasureType.rewards.coins} 金币 | ⭐ ${treasureType.rewards.experience} 经验
                                     </div>
                                 </div>
@@ -1654,11 +1676,11 @@
 
         // 首次使用检查
         function checkFirstTimeUser() {
-            const isFirstTime = !localStorage.getItem('douyin-treasure-user');
+            const isFirstTime = !localStorage.getItem('totofun-treasure-user');
             if (isFirstTime) {
                 // 首次使用，显示欢迎和昵称设置
                 setTimeout(() => {
-                    const username = prompt('🎉 欢迎来到豆宝！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
+                    const username = prompt('🎉 欢迎来到 Totofun 突突翻！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
                     if (username && username.length >= 3 && username.length <= 10) {
                         userData.username = username;
                         saveUserData();
@@ -1726,7 +1748,7 @@
             const url = URL.createObjectURL(dataBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'douyin-treasure-userdata.json';
+            a.download = 'totofun-treasure-userdata.json';
             a.click();
             URL.revokeObjectURL(url);
             updateStatus('用户数据已导出', 'success');
@@ -1735,7 +1757,7 @@
         // 重置用户数据
         function resetUserData() {
             if (confirm('确定要重置所有游戏数据吗？此操作不可撤销！')) {
-                storageManager.remove('douyin-treasure-user');
+                storageManager.remove('totofun-treasure-user');
                 location.reload();
             }
         }

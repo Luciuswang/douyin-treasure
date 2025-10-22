@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝简化地图 - 寻宝游戏</title>
+    <title>Totofun 突突翻简化地图 - 寻宝游戏</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -196,7 +196,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="logo">🗺️ 抖宝地图</h1>
+            <h1 class="logo">🗺️ Totofun 突突翻地图</h1>
             <p>简化版寻宝地图 - 点击按钮开始探险</p>
         </div>
 
@@ -212,7 +212,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="coins-earned">0</div>
-                    <div class="stat-label">获得抖币</div>
+                    <div class="stat-label">获得金币</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="user-level">1</div>
@@ -462,7 +462,7 @@
             marker.style.background = treasureType.color;
             marker.style.left = Math.random() * 80 + 10 + '%';
             marker.style.top = Math.random() * 80 + 10 + '%';
-            marker.title = `${treasureType.name}\n奖励: ${treasureType.reward} 抖币\n点击发现！`;
+            marker.title = `${treasureType.name}\n奖励: ${treasureType.reward} 金币\n点击发现！`;
             
             // 点击发现宝藏
             marker.addEventListener('click', () => {
@@ -497,7 +497,7 @@
                 treasures = treasures.filter(t => t.marker !== marker);
                 
                 updateStats();
-                showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 抖币！`, 'success');
+                showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 金币！`, 'success');
                 
                 // 创建特效
                 createEffect(marker);
@@ -656,7 +656,7 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             updateStats();
-            showNotification('🎉 欢迎来到抖宝！点击"开始寻宝"开始你的冒险！', 'success');
+            showNotification('🎉 欢迎来到 Totofun 突突翻！点击"开始寻宝"开始你的冒险！', 'success');
         });
     </script>
 </body>

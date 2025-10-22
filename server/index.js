@@ -29,7 +29,7 @@ const io = socketIo(server, {
 });
 
 // 数据库连接
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/douyin-treasure', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
@@ -106,7 +106,7 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`🚀 抖宝服务器运行在端口 ${PORT}`);
+    console.log(`🚀 Totofun 突突翻服务器运行在端口 ${PORT}`);
     console.log(`🌐 环境: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📱 客户端地址: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
 });

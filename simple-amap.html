@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝 - 简化版高德地图寻宝</title>
+    <title>Totofun 突突翻 - 简化版高德地图寻宝</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -153,7 +153,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="logo">🗺️ 抖宝 - 简化版</h1>
+            <h1 class="logo">🗺️ Totofun 突突翻 - 简化版</h1>
             <p>稳定可靠的高德地图寻宝游戏</p>
         </div>
 
@@ -176,7 +176,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="coins-earned">0</div>
-                    <div class="stat-label">获得抖币</div>
+                    <div class="stat-label">获得金币</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="user-level">1</div>
@@ -439,7 +439,7 @@
             }
             
             updateStats();
-            showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 抖币！`, 'success');
+            showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 金币！`, 'success');
         }
 
         // 清空地图
@@ -504,7 +504,7 @@
                 updateStatus('发现已保存的API Key，点击初始化地图即可开始', 'success');
             }
             
-            showNotification('🎉 欢迎来到抖宝！请配置API Key开始游戏！', 'info');
+            showNotification('🎉 欢迎来到 Totofun 突突翻！请配置API Key开始游戏！', 'info');
         });
     </script>
 </body>

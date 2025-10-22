@@ -19,8 +19,8 @@
 ### 1. 克隆项目到家里电脑
 ```bash
 # 使用GitHub Desktop或命令行
-git clone https://github.com/Luciuswang/douyin-treasure.git
-cd douyin-treasure
+git clone https://github.com/Luciuswang/totofun-treasure.git
+cd totofun-treasure
 ```
 
 ### 2. 安装项目依赖
@@ -59,10 +59,10 @@ JWT_SECRET=your_super_secret_jwt_key_here_make_it_very_long_and_random
 #### 🗄️ 数据库连接 (必需)
 ```env
 # 本地MongoDB
-MONGODB_URI=mongodb://localhost:27017/douyin-treasure
+MONGODB_URI=mongodb://localhost:27017/totofun-treasure
 
 # 或使用云数据库 (MongoDB Atlas)
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/douyin-treasure
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/totofun-treasure
 ```
 
 ### 5. 启动本地数据库
@@ -239,5 +239,5 @@ git commit -m "resolve merge conflicts"
 
 ---
 
-**🎯 准备好在家继续这个9.2分的项目了吗？按照这个指南，你就能在任何地方无缝继续开发！**
+**🎯 准备好在家继续这个精彩的 Totofun 突突翻项目了吗？按照这个指南，你就能在任何地方无缝继续开发！**
 

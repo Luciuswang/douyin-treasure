@@ -7,8 +7,8 @@
 2. 点击右上角 "+" → "New repository"
 3. 填写仓库信息：
    ```
-   Repository name: douyin-treasure
-   Description: 🎬 抖宝 - 基于LBS的短视频寻宝社交平台 | Video Treasure Hunt Social Platform
+   Repository name: totofun-treasure
+   Description: 🗺️ Totofun 突突翻 - 基于LBS的GPS寻宝游戏 | GPS Treasure Hunt Game
    Visibility: Public (推荐，便于展示和协作)
    ✅ Add a README file: 不勾选 (我们已经有了)
    ✅ Add .gitignore: 不勾选 (我们已经有了)
@@ -18,7 +18,7 @@
 ### 2. 连接本地仓库到GitHub
 ```bash
 # 添加远程仓库 (替换为你的GitHub用户名)
-git remote add origin https://github.com/你的用户名/douyin-treasure.git
+git remote add origin https://github.com/你的用户名/totofun-treasure.git
 
 # 设置主分支
 git branch -M main
@@ -47,7 +47,7 @@ git push -u origin main
 ## 🚀 推荐的GitHub仓库结构
 
 ```
-douyin-treasure/
+totofun-treasure/
 ├── .github/                    # GitHub配置
 │   ├── workflows/             # CI/CD工作流
 │   │   ├── ci.yml            # 持续集成
@@ -77,19 +77,19 @@ douyin-treasure/
 ### README.md徽章
 ```markdown
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/你的用户名/douyin-treasure/workflows/CI/badge.svg)](https://github.com/你的用户名/douyin-treasure/actions)
-[![codecov](https://codecov.io/gh/你的用户名/douyin-treasure/branch/main/graph/badge.svg)](https://codecov.io/gh/你的用户名/douyin-treasure)
-[![Version](https://img.shields.io/github/package-json/v/你的用户名/douyin-treasure)](https://github.com/你的用户名/douyin-treasure)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/你的用户名/douyin-treasure/pulls)
+[![Build Status](https://github.com/你的用户名/totofun-treasure/workflows/CI/badge.svg)](https://github.com/你的用户名/totofun-treasure/actions)
+[![codecov](https://codecov.io/gh/你的用户名/totofun-treasure/branch/main/graph/badge.svg)](https://codecov.io/gh/你的用户名/totofun-treasure)
+[![Version](https://img.shields.io/github/package-json/v/你的用户名/totofun-treasure)](https://github.com/你的用户名/totofun-treasure)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/你的用户名/totofun-treasure/pulls)
 ```
 
 ### 项目描述示例
 ```
-🎬 抖宝 - 基于地理位置服务(LBS)的短视频寻宝社交平台
+🗺️ Totofun 突突翻 - 基于地理位置服务(LBS)的GPS寻宝游戏
 
-✨ 核心特色：AI智能推荐 | 病毒式传播 | 游戏化体验 | 移动端优化
-🎯 目标评分：9.2/10 分的创新产品
-📱 技术栈：Node.js + React Native + MongoDB + Socket.IO + 高德地图
+✨ 核心特色：真实地图 | 精确定位 | 随机宝藏 | 游戏化体验 | 移动端优化
+🎯 创新的户外探险游戏体验
+📱 技术栈：高德地图 API + HTML5 + JavaScript + GPS定位
 ```
 
 ## 🤝 团队协作设置
@@ -169,5 +169,5 @@ douyin-treasure/
 
 ---
 
-**🎉 准备好创建你的GitHub仓库了吗？按照上面的步骤，让抖宝项目在GitHub上闪闪发光！**
+**🎉 准备好创建你的GitHub仓库了吗？按照上面的步骤，让 Totofun 突突翻项目在GitHub上闪闪发光！**
 

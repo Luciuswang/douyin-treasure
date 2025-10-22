@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
-        message: '🚀 抖宝服务器运行正常！',
+        message: '🚀 Totofun 突突翻服务器运行正常！',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: process.env.NODE_ENV || 'development',
@@ -132,7 +132,7 @@ app.get('/api/treasures/nearby', (req, res) => {
 // API文档
 app.get('/api/docs', (req, res) => {
     res.json({
-        title: '🎬 抖宝 API 文档',
+        title: '🎬 Totofun 突突翻 API 文档',
         version: '1.0.0',
         endpoints: {
             health: 'GET /health - 健康检查',
@@ -188,7 +188,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`🚀 抖宝测试服务器启动成功！`);
+    console.log(`🚀 Totofun 突突翻测试服务器启动成功！`);
     console.log(`🌐 服务器地址: http://localhost:${PORT}`);
     console.log(`📚 API文档: http://localhost:${PORT}/api/docs`);
     console.log(`🔧 健康检查: http://localhost:${PORT}/health`);

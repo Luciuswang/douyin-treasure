@@ -120,7 +120,7 @@ router.post('/register', async (req, res) => {
         const refreshToken = generateRefreshToken(newUser._id);
 
         // 添加新手徽章
-        newUser.addBadge('新手探险者', '🎯', '欢迎加入抖宝探险之旅！');
+        newUser.addBadge('新手探险者', '🎯', '欢迎加入 Totofun 突突翻探险之旅！');
         await newUser.save();
 
         // 返回用户信息（不包含密码）
@@ -128,7 +128,7 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: '注册成功！欢迎加入抖宝！',
+            message: '注册成功！欢迎加入 Totofun 突突翻！',
             data: {
                 user: userResponse,
                 tokens: {

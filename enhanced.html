@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝增强版 - AI社交寻宝游戏</title>
+    <title>Totofun 突突翻增强版 - AI社交寻宝游戏</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -159,7 +159,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="logo">🎯 抖宝增强版</h1>
+            <h1 class="logo">🎯 Totofun 突突翻增强版</h1>
             <p class="tagline">AI驱动的社交寻宝游戏 - 发现身边的惊喜，分享你的探险</p>
             
             <!-- 实时统计 -->
@@ -212,9 +212,9 @@
                 </div>
                 
                 <div class="api-card">
-                    <div style="font-weight: bold; margin-bottom: 10px;">💰 抖币余额</div>
+                    <div style="font-weight: bold; margin-bottom: 10px;">💰 金币余额</div>
                     <div id="user-coins" style="font-size: 2.5rem; color: #667eea; font-weight: bold;">1,250</div>
-                    <button class="test-btn" onclick="earnCoins()">💎 赚取抖币</button>
+                    <button class="test-btn" onclick="earnCoins()">💎 赚取金币</button>
                 </div>
                 
                 <div class="api-card">
@@ -378,7 +378,7 @@
                         lat: 39.9 + Math.random() * 0.01,
                         lng: 116.4 + Math.random() * 0.01,
                         type: 'test',
-                        reward: '100抖币',
+                        reward: '100金币',
                         description: '这是一个测试宝藏'
                     })
                 });
@@ -486,12 +486,12 @@
             showNotification('🗑️ 地图已清空');
         }
 
-        // 赚取抖币
+        // 赚取金币
         function earnCoins() {
             const coins = parseInt(document.getElementById('user-coins').textContent.replace(',', ''));
             const earned = Math.floor(Math.random() * 100) + 50;
             document.getElementById('user-coins').textContent = (coins + earned).toLocaleString();
-            showNotification(`💰 获得 ${earned} 抖币！`);
+            showNotification(`💰 获得 ${earned} 金币！`);
         }
 
         // 获取位置
@@ -531,7 +531,7 @@
             
             // 显示欢迎消息
             setTimeout(() => {
-                showNotification('🎉 欢迎来到抖宝增强版！');
+                showNotification('🎉 欢迎来到 Totofun 突突翻增强版！');
             }, 2000);
         });
     </script>

@@ -1,4 +1,4 @@
-# 🚀 抖宝项目快速启动指南
+# 🚀 Totofun 突突翻项目快速启动指南
 
 ## 📋 开发环境要求
 
@@ -12,8 +12,8 @@
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/你的用户名/douyin-treasure.git
-cd douyin-treasure
+git clone https://github.com/你的用户名/totofun-treasure.git
+cd totofun-treasure
 ```
 
 ### 2. 安装依赖
@@ -68,7 +68,7 @@ npm run client:dev  # 前端服务器 (端口3000)
 ```bash
 # 安装MongoDB Compass (图形界面)
 # 或使用命令行
-mongo douyin-treasure
+mongo totofun-treasure
 ```
 
 ### API测试
@@ -94,7 +94,7 @@ npm run test
 npm install -g @react-native-community/cli
 
 # 创建移动端项目
-npx react-native init DouyinTreasureApp
+npx react-native init TotofunTreasureApp
 
 # 开发iOS (需要Xcode)
 npx react-native run-ios
@@ -154,7 +154,7 @@ sudo apt install ffmpeg
 ## 📁 项目结构
 
 ```
-douyin-treasure/
+totofun-treasure/
 ├── client/                 # 前端项目
 │   ├── src/
 │   │   ├── components/    # 组件
@@ -238,17 +238,17 @@ npm start
 #### Docker部署
 ```bash
 # 构建镜像
-docker build -t douyin-treasure .
+docker build -t totofun-treasure .
 
 # 运行容器
-docker run -p 5000:5000 -e NODE_ENV=production douyin-treasure
+docker run -p 5000:5000 -e NODE_ENV=production totofun-treasure
 ```
 
 #### 云服务器部署
 ```bash
 # 使用PM2管理进程
 npm install -g pm2
-pm2 start server/index.js --name douyin-treasure
+pm2 start server/index.js --name totofun-treasure
 
 # 配置Nginx反向代理
 # 配置SSL证书
@@ -263,7 +263,7 @@ pm2 start server/index.js --name douyin-treasure
 sudo systemctl status mongod
 
 # 检查连接字符串
-MONGODB_URI=mongodb://localhost:27017/douyin-treasure
+MONGODB_URI=mongodb://localhost:27017/totofun-treasure
 ```
 
 ### Q: 视频上传失败
@@ -297,10 +297,10 @@ PORT=5001 npm start
 ## 📞 技术支持
 
 ### 开发团队联系方式
-- 📧 **邮箱**: dev@douyintreasure.com
+- 📧 **邮箱**: dev@totofun.com
 - 💬 **微信群**: 扫码加入开发者交流群
 - 🐛 **Bug反馈**: GitHub Issues
-- 📚 **文档**: https://docs.douyintreasure.com
+- 📚 **文档**: https://docs.totofun.com
 
 ### 学习资源
 - **Node.js**: https://nodejs.org/docs/
@@ -310,4 +310,4 @@ PORT=5001 npm start
 
 ---
 
-**🎉 开始你的抖宝开发之旅吧！如有问题随时联系我们！**
+**🎉 开始你的 Totofun 突突翻开发之旅吧！如有问题随时联系我们！**

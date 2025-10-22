@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抖宝 - 高德地图版寻宝游戏</title>
+    <title>Totofun 突突翻 - 高德地图版寻宝游戏</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -197,7 +197,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="logo">🗺️ 抖宝 - 高德地图版</h1>
+            <h1 class="logo">🗺️ Totofun 突突翻 - 高德地图版</h1>
             <p>基于高德地图API的专业寻宝游戏</p>
         </div>
 
@@ -231,7 +231,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="coins-earned">0</div>
-                    <div class="stat-label">获得抖币</div>
+                    <div class="stat-label">获得金币</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="user-level">1</div>
@@ -594,7 +594,7 @@
             }
             
             updateStats();
-            showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 抖币！`, 'success');
+            showNotification(`🎯 发现${treasureType.name}！\n获得 ${treasureType.reward} 金币！`, 'success');
         }
 
         // 清空所有宝藏
@@ -651,7 +651,7 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             updateStats();
-            showNotification('🎉 欢迎来到抖宝！请先配置高德地图API Key开始游戏！', 'info');
+            showNotification('🎉 欢迎来到 Totofun 突突翻！请先配置高德地图API Key开始游戏！', 'info');
             
             // 检查是否有保存的API Key
             const savedKey = localStorage.getItem('amap-api-key');
