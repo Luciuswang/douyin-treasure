@@ -1,0 +1,73 @@
+{
+  "name": "Totofun 突突翻",
+  "short_name": "Totofun",
+  "description": "基于GPS的实时寻宝游戏 - 探索身边的宝藏",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#4FC3F7",
+  "theme_color": "#4FC3F7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/images/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/images/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment", "lifestyle"],
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "开始寻宝",
+      "short_name": "寻宝",
+      "description": "立即开始寻宝游戏",
+      "url": "/",
+      "icons": [{ "src": "assets/images/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
