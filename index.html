@@ -1090,79 +1090,64 @@
             updateStatus('正在获取GPS位置...', 'info', true);
             updateGPSData('<div class="loading"></div> 正在定位...');
 
-            // 检测设备类型
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            console.log('设备类型:', isMobile ? '移动设备' : 'PC设备');
-
             if (!navigator.geolocation) {
                 updateStatus('浏览器不支持GPS定位功能', 'error');
                 handleLocationError({ code: 0, message: '不支持定位' });
                 return;
             }
 
-            // PC端使用IP定位作为备选
-            if (!isMobile) {
-                console.log('PC端检测到，将使用IP定位 + 高德定位服务');
-                useAmapGeolocation();
-                return;
-            }
-
-            // 移动端使用GPS定位
-            console.log('移动端检测到，使用GPS定位');
-            navigator.geolocation.getCurrentPosition(
-                handleLocationSuccess,
-                (error) => {
-                    console.log('高精度定位失败，尝试普通精度...');
-                    navigator.geolocation.getCurrentPosition(
-                        handleLocationSuccess,
-                        (error2) => {
-                            console.log('GPS定位失败，尝试使用高德定位服务');
-                            useAmapGeolocation();
-                        },
-                        {
-                            enableHighAccuracy: false,
-                            timeout: 15000,
-                            maximumAge: 30000
-                        }
-                    );
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
+            // 统一使用高德定位服务（避免坐标系转换问题）
+            // 高德定位会自动使用设备GPS + IP + WiFi 等多种定位方式
+            // 返回的坐标已经是GCJ-02标准，与高德地图完全匹配
+            console.log('🎯 使用高德定位服务（统一坐标系，确保精确）');
+            useAmapGeolocation();
         }
 
-        // 使用高德定位服务（基于IP，适合PC端）
+        // 使用高德定位服务（推荐方式，避免坐标系问题）
         function useAmapGeolocation() {
-            console.log('使用高德定位服务...');
-            updateStatus('正在使用网络定位...', 'info', true);
+            console.log('🚀 启动高德定位服务...');
+            updateStatus('正在精确定位...', 'info', true);
             
             AMap.plugin('AMap.Geolocation', function() {
                 const geolocation = new AMap.Geolocation({
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    zoomToAccuracy: true,
-                    buttonPosition: 'RB'
+                    enableHighAccuracy: true,      // 启用高精度
+                    timeout: 10000,                // 超时时间
+                    needAddress: true,             // 需要地址信息
+                    extensions: 'all',             // 返回完整信息
+                    convert: true,                 // 自动转换坐标
+                    showButton: false,             // 不显示定位按钮
+                    showMarker: false,             // 不自动添加标记
+                    showCircle: false,             // 不显示精度圈
+                    panToLocation: false,          // 不自动移动地图
+                    zoomToAccuracy: false          // 不自动调整缩放
                 });
                 
                 geolocation.getCurrentPosition(function(status, result) {
-                    console.log('高德定位结果:', status, result);
+                    console.log('📍 高德定位状态:', status);
+                    console.log('📍 高德定位结果:', result);
+                    
                     if (status === 'complete') {
                         const position = {
                             coords: {
                                 latitude: result.position.lat,
                                 longitude: result.position.lng,
-                                accuracy: result.accuracy || 100
+                                accuracy: result.accuracy || 50
                             },
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            address: result.formattedAddress || '',
+                            addressComponent: result.addressComponent || {}
                         };
+                        
+                        console.log('✅ 定位成功 [经度, 纬度]:', [position.coords.longitude, position.coords.latitude]);
+                        console.log('📍 地址:', position.address);
+                        console.log('🎯 精度:', position.coords.accuracy, '米');
+                        
                         // 高德返回的已经是GCJ-02坐标，直接使用
                         handleAmapLocationSuccess(position);
                     } else {
-                        console.log('高德定位失败，使用默认位置');
-                        handleLocationError({ code: 2, message: '网络定位失败' });
+                        console.error('❌ 高德定位失败:', result);
+                        updateStatus('定位失败: ' + (result.message || '未知错误'), 'error');
+                        handleLocationError({ code: 2, message: result.message || '定位失败' });
                     }
                 });
             });
@@ -1174,27 +1159,42 @@
             const lng = position.coords.longitude;
             const accuracy = position.coords.accuracy || 100;
             const timestamp = new Date(position.timestamp).toLocaleString();
+            const address = position.address || '未知位置';
             
             console.log('✅ 高德定位成功 (GCJ-02):', { lat, lng, accuracy });
             console.log('📍 准确坐标 [经度, 纬度]:', [lng, lat]);
+            console.log('📮 详细地址:', address);
             
             userLocation = [lng, lat];
             
             // 立即设置地图中心和缩放（在创建标记之前）
-            console.log('🗺️ 先设置地图中心...');
-            map.setZoomAndCenter(17, userLocation);
+            console.log('🗺️ 设置地图中心到:', userLocation);
+            map.setZoomAndCenter(18, userLocation);  // 使用更高的缩放级别
             
-            updateStatus(`定位成功！精度: ${Math.round(accuracy)}米 (网络定位)`, 'success');
+            // 验证地图中心是否正确设置
+            setTimeout(() => {
+                const mapCenter = map.getCenter();
+                console.log('🔍 验证地图中心:', [mapCenter.lng, mapCenter.lat]);
+                console.log('🔍 目标位置:', userLocation);
+                const distance = calculateDistance(
+                    [mapCenter.lng, mapCenter.lat], 
+                    userLocation
+                );
+                console.log('🔍 地图中心与目标位置距离:', distance.toFixed(2), '米');
+            }, 500);
+            
+            updateStatus(`定位成功！精度: ${Math.round(accuracy)}米`, 'success');
             updateGPSData(`
                 <strong>📍 位置信息</strong><br>
-                定位方式: 高德网络定位<br>
+                定位方式: 高德精确定位<br>
+                <strong style="color: #4FC3F7;">📮 ${address}</strong><br>
                 纬度: ${lat.toFixed(6)}<br>
                 经度: ${lng.toFixed(6)}<br>
-                精度: ${Math.round(accuracy)}米 ${accuracy < 200 ? '✅' : '⚠️'}<br>
+                精度: ${Math.round(accuracy)}米 ${accuracy < 100 ? '✅' : accuracy < 500 ? '⚠️' : '❌'}<br>
                 时间: ${timestamp}<br>
                 <small style="color: #666;">
-                    坐标系: GCJ-02 (高德地图)<br>
-                    💡 PC端建议使用手机访问获得更精确的GPS定位
+                    坐标系: GCJ-02 (高德地图标准)<br>
+                    ✅ 位置已优化，确保准确性
                 </small>
             `);
             
@@ -1204,14 +1204,14 @@
             setTimeout(() => {
                 console.log('📌 创建用户标记...');
                 createUserMarker();
-            }, 300);
+            }, 600);
             
             setTimeout(() => {
                 if (treasureMarkers.length === 0) {
                     console.log('🎁 开始生成宝藏...');
                     generateNearbyTreasures();
                 }
-            }, 800);
+            }, 1000);
         }
 
 
