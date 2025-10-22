@@ -1,13 +1,40 @@
 {
-  "name": "Totofun 突突翻",
+  "name": "Totofun 突突翻 - GPS寻宝游戏",
   "short_name": "Totofun",
-  "description": "基于GPS的实时寻宝游戏 - 探索身边的宝藏",
-  "start_url": "/",
+  "description": "基于GPS的真实世界寻宝游戏，探索身边的宝藏，收集金币和钻石！",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#4FC3F7",
   "theme_color": "#4FC3F7",
   "orientation": "portrait",
+  "scope": "./",
+  "lang": "zh-CN",
+  "dir": "ltr",
   "icons": [
+    {
+      "src": "assets/images/icon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-57x57.png",
+      "sizes": "57x57",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-60x60.png",
+      "sizes": "60x60",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "assets/images/icon-72x72.png",
       "sizes": "72x72",
@@ -15,8 +42,26 @@
       "purpose": "any"
     },
     {
+      "src": "assets/images/icon-76x76.png",
+      "sizes": "76x76",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "assets/images/icon-96x96.png",
       "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-114x114.png",
+      "sizes": "114x114",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-120x120.png",
+      "sizes": "120x120",
       "type": "image/png",
       "purpose": "any"
     },
@@ -35,6 +80,12 @@
     {
       "src": "assets/images/icon-152x152.png",
       "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icon-180x180.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
@@ -58,16 +109,22 @@
     }
   ],
   "categories": ["games", "entertainment", "lifestyle"],
-  "lang": "zh-CN",
-  "dir": "ltr",
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "开始寻宝",
       "short_name": "寻宝",
-      "description": "立即开始寻宝游戏",
-      "url": "/",
-      "icons": [{ "src": "assets/images/icon-192x192.png", "sizes": "192x192" }]
+      "description": "立即开始GPS寻宝之旅",
+      "url": "./index.html",
+      "icons": [
+        {
+          "src": "assets/images/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
-

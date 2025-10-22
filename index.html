@@ -16,6 +16,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/images/icon-16x16.png">
+    <link rel="shortcut icon" href="assets/images/icon-32x32.png">
     
     <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="assets/images/icon-180x180.png">
@@ -27,13 +28,15 @@
     <link rel="apple-touch-icon" sizes="72x72" href="assets/images/icon-72x72.png">
     <link rel="apple-touch-icon" sizes="60x60" href="assets/images/icon-60x60.png">
     <link rel="apple-touch-icon" sizes="57x57" href="assets/images/icon-57x57.png">
+    <link rel="apple-touch-icon" href="assets/images/icon-180x180.png">
     
-    <!-- Android Chrome -->
+    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileColor" content="#4FC3F7">
     <meta name="msapplication-TileImage" content="assets/images/icon-144x144.png">
+    <meta name="msapplication-config" content="browserconfig.xml">
     
     <style>
         * { 
@@ -1930,6 +1933,57 @@
 
         document.addEventListener('touchend', function() {
             clearTimeout(touchTimer);
+        });
+
+        // 注册 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('✅ Service Worker 注册成功:', registration.scope);
+                        
+                        // 检查更新
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('🔄 Service Worker 更新中...');
+                            
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('✨ 新版本可用！');
+                                    // 可以提示用户刷新页面
+                                    if (confirm('发现新版本，是否立即更新？')) {
+                                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('❌ Service Worker 注册失败:', error);
+                    });
+                
+                // 监听 Service Worker 控制权变化
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log('🔄 Service Worker 已更新');
+                });
+            });
+        }
+
+        // PWA 安装提示
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('📱 PWA 可安装');
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // 可以在这里显示自定义安装按钮
+            // 例如：showInstallButton();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('🎉 PWA 已安装！');
+            deferredPrompt = null;
         });
     </script>
 </body>
