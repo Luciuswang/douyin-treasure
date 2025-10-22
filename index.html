@@ -1289,22 +1289,34 @@
             
             // ！！！强制设置地图中心，多次尝试确保成功
             if (map) {
-                // 第一次设置
+                // 立即设置
                 map.setZoomAndCenter(18, userLocation);
                 console.log('✅ 地图中心已设置（第1次）');
                 
-                // 延迟再设置一次，确保生效
-                setTimeout(() => {
-                    map.setCenter(userLocation);
-                    map.setZoom(18);
-                    console.log('✅ 地图中心已设置（第2次，确认）');
-                }, 300);
+                // 延迟设置多次，对抗可能的地图重置
+                [100, 300, 600, 1000, 1500].forEach(delay => {
+                    setTimeout(() => {
+                        map.setCenter(userLocation);
+                        if (delay === 100) map.setZoom(18);
+                        console.log(`✅ 地图中心已设置（延迟${delay}ms）`);
+                    }, delay);
+                });
                 
-                // 再次确认
+                // 最终强制确认
                 setTimeout(() => {
-                    map.setCenter(userLocation);
-                    console.log('✅ 地图中心已设置（第3次，最终确认）');
-                }, 800);
+                    const currentCenter = map.getCenter();
+                    const distance = calculateDistance(
+                        [currentCenter.lng, currentCenter.lat],
+                        userLocation
+                    );
+                    console.log(`🔍 最终检查：地图中心距离用户位置 ${distance.toFixed(2)} 米`);
+                    
+                    if (distance > 50) {
+                        console.warn('⚠️ 地图中心偏移过大，强制重新设置');
+                        map.setCenter(userLocation);
+                        map.setZoom(18);
+                    }
+                }, 2000);
             } else {
                 console.error('❌ 地图对象不存在，无法设置中心！');
             }
