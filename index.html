@@ -1137,8 +1137,13 @@
             const timestamp = new Date(position.timestamp).toLocaleString();
             
             console.log('✅ 高德定位成功 (GCJ-02):', { lat, lng, accuracy });
+            console.log('📍 准确坐标 [经度, 纬度]:', [lng, lat]);
             
             userLocation = [lng, lat];
+            
+            // 立即设置地图中心和缩放（在创建标记之前）
+            console.log('🗺️ 先设置地图中心...');
+            map.setZoomAndCenter(17, userLocation);
             
             updateStatus(`定位成功！精度: ${Math.round(accuracy)}米 (网络定位)`, 'success');
             updateGPSData(`
@@ -1155,18 +1160,19 @@
             `);
             
             updateStats(accuracy);
-            console.log('📌 准备创建用户标记...');
-            createUserMarker();
-            console.log('🗺️ 设置地图中心到用户位置...');
-            map.setCenter(userLocation);
-            map.setZoom(17);
+            
+            // 延迟创建标记，确保地图已经移动到位
+            setTimeout(() => {
+                console.log('📌 创建用户标记...');
+                createUserMarker();
+            }, 300);
             
             setTimeout(() => {
                 if (treasureMarkers.length === 0) {
                     console.log('🎁 开始生成宝藏...');
                     generateNearbyTreasures();
                 }
-            }, 500);
+            }, 800);
         }
 
 
@@ -1220,11 +1226,16 @@
                         `);
                         
                         updateStats(accuracy);
-                        console.log('📌 准备创建用户标记...');
-                        createUserMarker();
-                        console.log('🗺️ 设置地图中心到用户位置...');
-                        map.setCenter(userLocation);
-                        map.setZoom(17);
+                        
+                        // 先设置地图中心和缩放
+                        console.log('🗺️ 先设置地图中心...');
+                        map.setZoomAndCenter(17, userLocation);
+                        
+                        // 延迟创建标记
+                        setTimeout(() => {
+                            console.log('📌 创建用户标记...');
+                            createUserMarker();
+                        }, 300);
                         
                         // 立即生成宝藏
                         setTimeout(() => {
@@ -1232,7 +1243,7 @@
                                 console.log('🎁 开始生成宝藏...');
                                 generateNearbyTreasures();
                             }
-                        }, 500);
+                        }, 800);
                     } else {
                         // 如果转换失败，直接使用原始坐标（可能会有偏移）
                         console.warn('⚠️ 坐标转换失败，使用原始坐标');
@@ -1266,18 +1277,23 @@
             `);
             
             updateStats(accuracy);
-            console.log('📌 准备创建用户标记...');
-            createUserMarker();
-            console.log('🗺️ 设置地图中心到用户位置...');
-            map.setCenter(userLocation);
-            map.setZoom(17);
+            
+            // 先设置地图中心和缩放
+            console.log('🗺️ 先设置地图中心...');
+            map.setZoomAndCenter(17, userLocation);
+            
+            // 延迟创建标记
+            setTimeout(() => {
+                console.log('📌 创建用户标记...');
+                createUserMarker();
+            }, 300);
             
             setTimeout(() => {
                 if (treasureMarkers.length === 0) {
                     console.log('🎁 开始生成宝藏...');
                     generateNearbyTreasures();
                 }
-            }, 500);
+            }, 800);
         }
 
         // 处理定位错误
@@ -1647,8 +1663,10 @@
             }
             
             console.log('移动地图到用户位置:', userLocation);
-            map.setCenter(userLocation);
-            map.setZoom(17);
+            console.log('当前地图中心:', map.getCenter());
+            
+            // 使用 setZoomAndCenter 确保同时设置缩放和中心
+            map.setZoomAndCenter(17, userLocation);
             
             // 如果用户标记存在，触发弹跳动画
             if (userMarker) {
