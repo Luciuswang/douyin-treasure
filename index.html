@@ -1688,11 +1688,25 @@
                 `;
                 
                 console.log('📌 创建Marker对象...');
+                console.log('🔍 userLocation详情:', userLocation);
+                console.log('🔍 经度(lng):', userLocation[0], '类型:', typeof userLocation[0]);
+                console.log('🔍 纬度(lat):', userLocation[1], '类型:', typeof userLocation[1]);
+                
+                // 确保坐标是数字
+                const markerLng = Number(userLocation[0]);
+                const markerLat = Number(userLocation[1]);
+                console.log('🔍 转换后经度:', markerLng);
+                console.log('🔍 转换后纬度:', markerLat);
+                
                 // 使用encodeURIComponent代替btoa，避免Unicode问题
                 const encodedSvg = encodeURIComponent(svgIcon);
                 
+                const markerPosition = new AMap.LngLat(markerLng, markerLat);
+                console.log('🔍 Marker位置对象:', markerPosition);
+                console.log('🔍 Marker位置 lng:', markerPosition.getLng(), 'lat:', markerPosition.getLat());
+                
                 userMarker = new AMap.Marker({
-                    position: new AMap.LngLat(userLocation[0], userLocation[1]),
+                    position: markerPosition,
                     icon: new AMap.Icon({
                         image: 'data:image/svg+xml;charset=utf-8,' + encodedSvg,
                         size: new AMap.Size(60, 60),
@@ -1707,12 +1721,20 @@
                 });
 
                 console.log('✅ Marker对象创建成功');
+                console.log('🔍 创建后验证 Marker位置:', userMarker.getPosition());
                 console.log('➕ 添加标记到地图...');
                 
                 map.add(userMarker);
                 
                 console.log('✅ 标记已添加到地图');
+                console.log('🔍 添加后验证 Marker位置:', userMarker.getPosition());
+                console.log('🔍 地图中心:', map.getCenter());
                 console.log('📊 当前地图上的标记数:', map.getAllOverlays('marker').length);
+                
+                // 在页面上显示对比信息
+                const markerPos = userMarker.getPosition();
+                const mapCenter = map.getCenter();
+                alert(`调试信息:\n\nuserLocation: [${userLocation[0].toFixed(6)}, ${userLocation[1].toFixed(6)}]\n\n标记位置: [${markerPos.lng.toFixed(6)}, ${markerPos.lat.toFixed(6)}]\n\n地图中心: [${mapCenter.lng.toFixed(6)}, ${mapCenter.lat.toFixed(6)}]`);
                 
                 // 验证标记是否正确添加
                 const allMarkers = map.getAllOverlays('marker');
