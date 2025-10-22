@@ -1130,21 +1130,114 @@
 
         // 使用高德定位服务（推荐方式，避免坐标系问题）
         function useAmapGeolocation() {
-            console.log('🚀 启动高德定位服务...');
-            updateStatus('正在精确定位...', 'info', true);
+            console.log('🚀 启动高德定位服务（强制使用浏览器GPS）...');
+            updateStatus('正在使用GPS精确定位（请在室外或窗边）...', 'info', true);
+            
+            // 先尝试使用浏览器原生GPS获取WGS84坐标
+            if (navigator.geolocation) {
+                console.log('🛰️ 使用浏览器原生GPS定位...');
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const wgs84Lat = position.coords.latitude;
+                        const wgs84Lng = position.coords.longitude;
+                        const accuracy = position.coords.accuracy;
+                        
+                        console.log('✅ GPS定位成功 (WGS84):', { lat: wgs84Lat, lng: wgs84Lng, accuracy });
+                        console.log('📡 定位方式:', position.coords.altitude ? 'GPS卫星' : '网络辅助');
+                        
+                        // 使用高德API转换坐标 WGS84 -> GCJ-02
+                        AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                            if (result.info === 'ok' && result.locations && result.locations.length > 0) {
+                                const gcj02Pos = result.locations[0];
+                                console.log('✅ 坐标转换成功 (GCJ-02):', { 
+                                    lng: gcj02Pos.lng, 
+                                    lat: gcj02Pos.lat 
+                                });
+                                
+                                const offset = calculateDistance(
+                                    [wgs84Lng, wgs84Lat],
+                                    [gcj02Pos.lng, gcj02Pos.lat]
+                                );
+                                console.log('📏 坐标系偏移:', offset.toFixed(2), '米');
+                                
+                                // 使用高德逆地理编码获取地址
+                                AMap.plugin('AMap.Geocoder', function() {
+                                    const geocoder = new AMap.Geocoder();
+                                    geocoder.getAddress([gcj02Pos.lng, gcj02Pos.lat], function(status, geoResult) {
+                                        let address = '获取地址中...';
+                                        if (status === 'complete' && geoResult.info === 'OK') {
+                                            address = geoResult.regeocode.formattedAddress;
+                                        }
+                                        
+                                        const positionData = {
+                                            coords: {
+                                                latitude: gcj02Pos.lat,
+                                                longitude: gcj02Pos.lng,
+                                                accuracy: accuracy
+                                            },
+                                            timestamp: position.timestamp,
+                                            address: address,
+                                            locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位',
+                                            wgs84: { lat: wgs84Lat, lng: wgs84Lng }
+                                        };
+                                        
+                                        handleAmapLocationSuccess(positionData);
+                                    });
+                                });
+                            } else {
+                                console.warn('⚠️ 坐标转换失败，使用原始GPS坐标');
+                                // 转换失败，直接使用WGS84（会有偏差）
+                                const positionData = {
+                                    coords: {
+                                        latitude: wgs84Lat,
+                                        longitude: wgs84Lng,
+                                        accuracy: accuracy
+                                    },
+                                    timestamp: position.timestamp,
+                                    address: '坐标转换失败',
+                                    locationType: 'GPS原始坐标（未转换）'
+                                };
+                                handleAmapLocationSuccess(positionData);
+                            }
+                        });
+                    },
+                    function(error) {
+                        console.error('❌ GPS定位失败:', error);
+                        // GPS失败，回退到高德定位
+                        console.log('🔄 回退到高德定位服务...');
+                        useAmapLocationFallback();
+                    },
+                    {
+                        enableHighAccuracy: true,  // 强制高精度GPS
+                        timeout: 15000,
+                        maximumAge: 0  // 不使用缓存
+                    }
+                );
+            } else {
+                console.warn('⚠️ 浏览器不支持GPS，使用高德定位');
+                useAmapLocationFallback();
+            }
+        }
+        
+        // 高德定位回退方案（当GPS不可用时）
+        function useAmapLocationFallback() {
+            console.log('📱 使用高德定位服务（可能使用IP/基站）...');
             
             AMap.plugin('AMap.Geolocation', function() {
                 const geolocation = new AMap.Geolocation({
-                    enableHighAccuracy: true,      // 启用高精度
-                    timeout: 10000,                // 超时时间
-                    needAddress: true,             // 需要地址信息
-                    extensions: 'all',             // 返回完整信息
-                    convert: true,                 // 自动转换坐标
-                    showButton: false,             // 不显示定位按钮
-                    showMarker: false,             // 不自动添加标记
-                    showCircle: false,             // 不显示精度圈
-                    panToLocation: false,          // 不自动移动地图
-                    zoomToAccuracy: false          // 不自动调整缩放
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    needAddress: true,
+                    extensions: 'all',
+                    convert: true,
+                    GeoLocationFirst: true,  // 优先使用H5定位
+                    noIpLocate: 0,  // 允许IP定位作为备选
+                    noGeoLocation: 0,  // 允许使用浏览器定位
+                    showButton: false,
+                    showMarker: false,
+                    showCircle: false,
+                    panToLocation: false,
+                    zoomToAccuracy: false
                 });
                 
                 geolocation.getCurrentPosition(function(status, result) {
@@ -1156,18 +1249,17 @@
                             coords: {
                                 latitude: result.position.lat,
                                 longitude: result.position.lng,
-                                accuracy: result.accuracy || 50
+                                accuracy: result.accuracy || 100
                             },
                             timestamp: Date.now(),
                             address: result.formattedAddress || '',
-                            addressComponent: result.addressComponent || {}
+                            addressComponent: result.addressComponent || {},
+                            locationType: result.location_type || '高德定位'
                         };
                         
-                        console.log('✅ 定位成功 [经度, 纬度]:', [position.coords.longitude, position.coords.latitude]);
-                        console.log('📍 地址:', position.address);
-                        console.log('🎯 精度:', position.coords.accuracy, '米');
+                        console.log('✅ 定位成功:', position);
+                        console.log('📍 定位方式:', result.location_type);
                         
-                        // 高德返回的已经是GCJ-02坐标，直接使用
                         handleAmapLocationSuccess(position);
                     } else {
                         console.error('❌ 高德定位失败:', result);
@@ -1209,19 +1301,53 @@
             }, 500);
             
             updateStatus(`定位成功！精度: ${Math.round(accuracy)}米`, 'success');
-            updateGPSData(`
+            
+            let locationInfo = `
                 <strong>📍 位置信息</strong><br>
-                定位方式: 高德精确定位<br>
+                定位方式: ${position.locationType || 'GPS定位'}<br>
                 <strong style="color: #4FC3F7;">📮 ${address}</strong><br>
+                <br>
+                <strong>当前位置 (GCJ-02):</strong><br>
                 纬度: ${lat.toFixed(6)}<br>
                 经度: ${lng.toFixed(6)}<br>
-                精度: ${Math.round(accuracy)}米 ${accuracy < 100 ? '✅' : accuracy < 500 ? '⚠️' : '❌'}<br>
+                精度: ${Math.round(accuracy)}米 ${accuracy < 50 ? '✅ 优秀' : accuracy < 100 ? '✅ 良好' : accuracy < 500 ? '⚠️ 一般' : '❌ 较差'}<br>
                 时间: ${timestamp}<br>
-                <small style="color: #666;">
-                    坐标系: GCJ-02 (高德地图标准)<br>
-                    ✅ 位置已优化，确保准确性
-                </small>
-            `);
+            `;
+            
+            // 如果有WGS84原始坐标，显示对比
+            if (position.wgs84) {
+                const wgs84 = position.wgs84;
+                const offset = calculateDistance([lng, lat], [wgs84.lng, wgs84.lat]);
+                locationInfo += `
+                    <br>
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor: pointer; color: #666;">🔍 查看坐标详情</summary>
+                        <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                            <strong>原始GPS (WGS84):</strong><br>
+                            纬度: ${wgs84.lat.toFixed(6)}<br>
+                            经度: ${wgs84.lng.toFixed(6)}<br>
+                            <br>
+                            <strong>地图坐标 (GCJ-02):</strong><br>
+                            纬度: ${lat.toFixed(6)}<br>
+                            经度: ${lng.toFixed(6)}<br>
+                            <br>
+                            <strong>坐标偏移:</strong> ${offset.toFixed(2)}米<br>
+                            <small style="color: #666;">
+                                中国GPS必须转换坐标系<br>
+                                WGS84 → GCJ-02 (火星坐标)
+                            </small>
+                        </div>
+                    </details>
+                `;
+            } else {
+                locationInfo += `
+                    <small style="color: #666;">
+                        坐标系: GCJ-02 (高德地图标准)
+                    </small>
+                `;
+            }
+            
+            updateGPSData(locationInfo);
             
             updateStats(accuracy);
             
