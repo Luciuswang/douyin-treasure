@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Totofun 宝藏 - 启动页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 50px;
+            max-width: 800px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 48px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 18px;
+        }
+        
+        .network-info {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            border: 3px solid #667eea;
+        }
+        
+        .network-label {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .network-address {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+        }
+        
+        .network-hint {
+            color: #999;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 30px;
+            border-radius: 16px;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+        
+        .btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        
+        .btn-diagnosis {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-diagnosis:hover {
+            border-color: #f5576c;
+        }
+        
+        .btn-main {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .btn-main:hover {
+            border-color: #00f2fe;
+        }
+        
+        .btn-mobile {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            grid-column: 1 / -1;
+        }
+        
+        .btn-mobile:hover {
+            border-color: #38f9d7;
+        }
+        
+        .btn-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .btn-desc {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .qr-section {
+            background: #fff3cd;
+            padding: 30px;
+            border-radius: 16px;
+            margin-top: 40px;
+            border: 3px solid #ffc107;
+        }
+        
+        .qr-title {
+            color: #856404;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin: 10px;
+        }
+        
+        .qr-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Totofun 宝藏</h1>
+        <p class="subtitle">欢迎来到真实世界寻宝游戏</p>
+        
+        <div class="network-info">
+            <div class="network-label">📡 本机网络地址</div>
+            <div class="network-address" id="networkAddress">http://localhost:3000</div>
+            <div class="network-hint">手机访问请使用上方地址（替换 localhost 为你的局域网IP）</div>
+        </div>
+        
+        <div class="buttons">
+            <a href="/location-diagnosis.html" class="btn btn-diagnosis">
+                <div class="btn-icon">🔍</div>
+                <div class="btn-title">定位诊断</div>
+                <div class="btn-desc">测试GPS定位精度</div>
+            </a>
+            
+            <a href="/index.html" class="btn btn-main">
+                <div class="btn-icon">🎯</div>
+                <div class="btn-title">开始游戏</div>
+                <div class="btn-desc">进入寻宝地图</div>
+            </a>
+            
+            <a href="/mobile-access.html" class="btn btn-mobile">
+                <div class="btn-icon">📱</div>
+                <div class="btn-title">手机访问指南</div>
+                <div class="btn-desc">获取二维码和访问地址</div>
+            </a>
+        </div>
+        
+        <div class="qr-section">
+            <div class="qr-title">📸 手机扫码访问（诊断工具）</div>
+            <div class="qr-container">
+                <canvas id="qrcode" width="200" height="200"></canvas>
+            </div>
+            <div class="qr-label">扫描二维码在手机上测试定位</div>
+        </div>
+    </div>
+
+    <script>
+        // 获取网络地址
+        function updateNetworkInfo() {
+            const hostname = window.location.hostname;
+            const port = window.location.port || '3000';
+            const protocol = window.location.protocol;
+            
+            const address = `${protocol}//${hostname}:${port}`;
+            document.getElementById('networkAddress').textContent = address;
+            
+            // 生成诊断工具的二维码
+            const diagnosisUrl = `${address}/location-diagnosis.html`;
+            generateQRCode(diagnosisUrl);
+        }
+        
+        // 生成二维码
+        function generateQRCode(url) {
+            const canvas = document.getElementById('qrcode');
+            const ctx = canvas.getContext('2d');
+            
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 200, 200);
+            };
+            img.onerror = function() {
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, 200, 200);
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('二维码加载中...', 100, 100);
+            };
+            img.src = qrUrl;
+        }
+        
+        window.onload = updateNetworkInfo;
+    </script>
+</body>
+</html>
+

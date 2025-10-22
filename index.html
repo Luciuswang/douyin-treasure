@@ -1231,7 +1231,7 @@
                     extensions: 'all',
                     convert: true,
                     GeoLocationFirst: true,  // 优先使用H5定位
-                    noIpLocate: 0,  // 允许IP定位作为备选
+                    noIpLocate: 3,  // 🔥 禁用IP定位（0=允许, 3=禁用）
                     noGeoLocation: 0,  // 允许使用浏览器定位
                     showButton: false,
                     showMarker: false,
@@ -1245,6 +1245,15 @@
                     console.log('📍 高德定位结果:', result);
                     
                     if (status === 'complete') {
+                        // 检查定位类型，警告如果是IP定位
+                        const locationType = result.location_type || '未知';
+                        console.log('📍 定位方式:', locationType);
+                        
+                        if (locationType.includes('IP')) {
+                            console.warn('⚠️ 警告：使用了IP定位，精度较低（误差可能达到1-2公里）');
+                            console.warn('💡 建议：请确保GPS已开启，并允许浏览器访问位置信息');
+                        }
+                        
                         const position = {
                             coords: {
                                 latitude: result.position.lat,
@@ -1254,11 +1263,10 @@
                             timestamp: Date.now(),
                             address: result.formattedAddress || '',
                             addressComponent: result.addressComponent || {},
-                            locationType: result.location_type || '高德定位'
+                            locationType: locationType
                         };
                         
                         console.log('✅ 定位成功:', position);
-                        console.log('📍 定位方式:', result.location_type);
                         
                         handleAmapLocationSuccess(position);
                     } else {
