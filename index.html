@@ -1146,30 +1146,47 @@
                         console.log('📡 定位方式:', position.coords.altitude ? 'GPS卫星' : '网络辅助');
                         console.log('📍 直接使用坐标（中国境内通常为GCJ-02）');
                         
-                        // 直接使用浏览器返回的坐标（在中国通常已经是GCJ-02）
-                        // 使用高德逆地理编码获取地址
-                        AMap.plugin('AMap.Geocoder', function() {
-                            const geocoder = new AMap.Geocoder();
-                            geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
-                                let address = '获取地址中...';
-                                if (status === 'complete' && geoResult.info === 'OK') {
-                                    address = geoResult.regeocode.formattedAddress;
-                                }
-                                
-                                const positionData = {
-                                    coords: {
-                                        latitude: wgs84Lat,
-                                        longitude: wgs84Lng,
-                                        accuracy: accuracy
-                                    },
-                                    timestamp: position.timestamp,
-                                    address: address,
-                                    locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
-                                };
-                                
-                                handleAmapLocationSuccess(positionData);
-                            });
-                        });
+                        // 直接使用坐标，先显示位置，异步获取地址
+                        const positionData = {
+                            coords: {
+                                latitude: wgs84Lat,
+                                longitude: wgs84Lng,
+                                accuracy: accuracy
+                            },
+                            timestamp: position.timestamp,
+                            address: '获取地址中...',
+                            locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
+                        };
+                        
+                        // 立即处理定位成功，不等待地址
+                        handleAmapLocationSuccess(positionData);
+                        
+                        // 异步获取地址（不阻塞主流程）
+                        setTimeout(() => {
+                            try {
+                                AMap.plugin('AMap.Geocoder', function() {
+                                    const geocoder = new AMap.Geocoder({
+                                        timeout: 3000  // 3秒超时
+                                    });
+                                    geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
+                                        let address = '地址未知';
+                                        if (status === 'complete' && geoResult.info === 'OK') {
+                                            address = geoResult.regeocode.formattedAddress;
+                                        }
+                                        console.log('📮 地址获取结果:', address);
+                                        
+                                        // 更新显示的地址
+                                        positionData.address = address;
+                                        const locationInfo = document.querySelector('.gps-data');
+                                        if (locationInfo) {
+                                            locationInfo.innerHTML = locationInfo.innerHTML.replace('获取地址中...', address);
+                                        }
+                                    });
+                                });
+                            } catch (error) {
+                                console.warn('⚠️ 获取地址失败:', error);
+                            }
+                        }, 100);
                     },
                     function(error) {
                         console.error('❌ GPS定位失败:', error);
@@ -1256,15 +1273,26 @@
             const timestamp = new Date(position.timestamp).toLocaleString();
             const address = position.address || '未知位置';
             
-            console.log('✅ 高德定位成功 (GCJ-02):', { lat, lng, accuracy });
+            console.log('========== 定位成功处理开始 ==========');
+            console.log('✅ 定位成功 (GCJ-02):', { lat, lng, accuracy });
             console.log('📍 准确坐标 [经度, 纬度]:', [lng, lat]);
             console.log('📮 详细地址:', address);
+            console.log('📍 坐标检查: 纬度在30-32之间?', lat > 30 && lat < 32, ', 经度在120-122之间?', lng > 120 && lng < 122);
             
             userLocation = [lng, lat];
+            console.log('✅ userLocation已设置为:', userLocation);
             
             // 立即设置地图中心和缩放（在创建标记之前）
+            console.log('🗺️ 准备设置地图中心...');
+            console.log('🗺️ 当前地图对象:', map ? '✅ 存在' : '❌ 不存在');
             console.log('🗺️ 设置地图中心到:', userLocation);
-            map.setZoomAndCenter(18, userLocation);  // 使用更高的缩放级别
+            
+            if (map) {
+                map.setZoomAndCenter(18, userLocation);  // 使用更高的缩放级别
+                console.log('✅ 地图中心已设置');
+            } else {
+                console.error('❌ 地图对象不存在，无法设置中心！');
+            }
             
             // 验证地图中心是否正确设置
             setTimeout(() => {
