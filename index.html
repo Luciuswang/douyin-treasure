@@ -1142,51 +1142,20 @@
                         const wgs84Lng = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
                         
-                        console.log('✅ GPS定位成功 (WGS84):', { lat: wgs84Lat, lng: wgs84Lng, accuracy });
+                        console.log('✅ GPS定位成功:', { lat: wgs84Lat, lng: wgs84Lng, accuracy });
                         console.log('📡 定位方式:', position.coords.altitude ? 'GPS卫星' : '网络辅助');
+                        console.log('📍 直接使用坐标（中国境内通常为GCJ-02）');
                         
-                        // 使用高德API转换坐标 WGS84 -> GCJ-02
-                        AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
-                            if (result.info === 'ok' && result.locations && result.locations.length > 0) {
-                                const gcj02Pos = result.locations[0];
-                                console.log('✅ 坐标转换成功 (GCJ-02):', { 
-                                    lng: gcj02Pos.lng, 
-                                    lat: gcj02Pos.lat 
-                                });
+                        // 直接使用浏览器返回的坐标（在中国通常已经是GCJ-02）
+                        // 使用高德逆地理编码获取地址
+                        AMap.plugin('AMap.Geocoder', function() {
+                            const geocoder = new AMap.Geocoder();
+                            geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
+                                let address = '获取地址中...';
+                                if (status === 'complete' && geoResult.info === 'OK') {
+                                    address = geoResult.regeocode.formattedAddress;
+                                }
                                 
-                                const offset = calculateDistance(
-                                    [wgs84Lng, wgs84Lat],
-                                    [gcj02Pos.lng, gcj02Pos.lat]
-                                );
-                                console.log('📏 坐标系偏移:', offset.toFixed(2), '米');
-                                
-                                // 使用高德逆地理编码获取地址
-                                AMap.plugin('AMap.Geocoder', function() {
-                                    const geocoder = new AMap.Geocoder();
-                                    geocoder.getAddress([gcj02Pos.lng, gcj02Pos.lat], function(status, geoResult) {
-                                        let address = '获取地址中...';
-                                        if (status === 'complete' && geoResult.info === 'OK') {
-                                            address = geoResult.regeocode.formattedAddress;
-                                        }
-                                        
-                                        const positionData = {
-                                            coords: {
-                                                latitude: gcj02Pos.lat,
-                                                longitude: gcj02Pos.lng,
-                                                accuracy: accuracy
-                                            },
-                                            timestamp: position.timestamp,
-                                            address: address,
-                                            locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位',
-                                            wgs84: { lat: wgs84Lat, lng: wgs84Lng }
-                                        };
-                                        
-                                        handleAmapLocationSuccess(positionData);
-                                    });
-                                });
-                            } else {
-                                console.warn('⚠️ 坐标转换失败，使用原始GPS坐标');
-                                // 转换失败，直接使用WGS84（会有偏差）
                                 const positionData = {
                                     coords: {
                                         latitude: wgs84Lat,
@@ -1194,11 +1163,12 @@
                                         accuracy: accuracy
                                     },
                                     timestamp: position.timestamp,
-                                    address: '坐标转换失败',
-                                    locationType: 'GPS原始坐标（未转换）'
+                                    address: address,
+                                    locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
                                 };
+                                
                                 handleAmapLocationSuccess(positionData);
-                            }
+                            });
                         });
                     },
                     function(error) {
