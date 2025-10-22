@@ -1381,18 +1381,50 @@
             const accuracy = position.coords.accuracy || 0;
             const timestamp = new Date(position.timestamp).toLocaleString();
             
-            console.log('✅ 原始GPS坐标 (WGS84):', { lat, lng, accuracy });
-            console.log('🔄 开始坐标转换...');
+            console.log('✅ GPS坐标:', { lat, lng, accuracy });
             
-            // 检查AMap.convertFrom是否可用
-            if (typeof AMap === 'undefined' || !AMap.convertFrom) {
-                console.warn('⚠️ AMap.convertFrom 不可用，直接使用原始坐标');
-                useRawCoordinates(lat, lng, accuracy, timestamp);
-                return;
-            }
+            // 在中国境内，浏览器通常直接返回GCJ-02坐标
+            // 直接使用，不进行转换（避免转换失败）
+            console.log('📍 直接使用坐标（中国境内浏览器通常返回GCJ-02）');
             
-            // 使用高德地图的坐标转换功能将WGS84转换为GCJ-02
-            try {
+            userLocation = [lng, lat];
+            
+            updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
+            updateGPSData(`
+                <strong>📍 位置信息 (GCJ-02)</strong><br>
+                纬度: ${lat.toFixed(6)}<br>
+                经度: ${lng.toFixed(6)}<br>
+                精度: ${Math.round(accuracy)}米 ${accuracy < 50 ? '✅ 优秀' : accuracy < 100 ? '✅' : '⚠️'}<br>
+                时间: ${timestamp}<br>
+                <small style="color: #666;">
+                    坐标系: GCJ-02 (高德地图标准)<br>
+                    ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '🎯 上海地区定位成功' : '🌍 其他地区'}
+                </small>
+            `);
+            
+            updateStats(accuracy);
+            
+            // 设置地图中心
+            console.log('🗺️ 设置地图中心到:', userLocation);
+            map.setZoomAndCenter(17, userLocation);
+            
+            // 创建用户标记
+            setTimeout(() => {
+                console.log('📌 创建用户标记...');
+                createUserMarker();
+            }, 300);
+            
+            // 生成宝藏
+            setTimeout(() => {
+                if (treasureMarkers.length === 0) {
+                    console.log('🎁 生成宝藏...');
+                    generateNearbyTreasures();
+                }
+            }, 800);
+            
+            // 下面的代码保留作为备用（如果需要转换）
+            if (false && typeof AMap !== 'undefined' && AMap.convertFrom) {
+                // 这段代码不再执行，仅保留作为参考
                 AMap.convertFrom([lng, lat], 'gps', function(status, result) {
                     console.log('📍 坐标转换状态:', status);
                     console.log('📍 坐标转换结果:', result);
@@ -1491,14 +1523,6 @@
                         }, 800);
                     }
                 });
-            } catch (error) {
-                console.error('❌ 坐标转换异常:', error);
-                // 发生异常时也直接使用坐标
-                userLocation = [lng, lat];
-                updateStatus(`GPS定位成功！精度: ${Math.round(accuracy)}米`, 'success');
-                map.setZoomAndCenter(17, userLocation);
-                setTimeout(() => createUserMarker(), 300);
-                setTimeout(() => { if (treasureMarkers.length === 0) generateNearbyTreasures(); }, 800);
             }
         }
 
