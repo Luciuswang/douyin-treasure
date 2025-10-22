@@ -1287,9 +1287,24 @@
             console.log('🗺️ 当前地图对象:', map ? '✅ 存在' : '❌ 不存在');
             console.log('🗺️ 设置地图中心到:', userLocation);
             
+            // ！！！强制设置地图中心，多次尝试确保成功
             if (map) {
-                map.setZoomAndCenter(18, userLocation);  // 使用更高的缩放级别
-                console.log('✅ 地图中心已设置');
+                // 第一次设置
+                map.setZoomAndCenter(18, userLocation);
+                console.log('✅ 地图中心已设置（第1次）');
+                
+                // 延迟再设置一次，确保生效
+                setTimeout(() => {
+                    map.setCenter(userLocation);
+                    map.setZoom(18);
+                    console.log('✅ 地图中心已设置（第2次，确认）');
+                }, 300);
+                
+                // 再次确认
+                setTimeout(() => {
+                    map.setCenter(userLocation);
+                    console.log('✅ 地图中心已设置（第3次，最终确认）');
+                }, 800);
             } else {
                 console.error('❌ 地图对象不存在，无法设置中心！');
             }
@@ -1308,7 +1323,20 @@
             
             updateStatus(`定位成功！精度: ${Math.round(accuracy)}米`, 'success');
             
-            let locationInfo = `
+            // 显示完整的调试信息
+            let debugInfo = `
+                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #ffc107;">
+                    <strong style="color: #856404;">🔍 调试信息</strong><br>
+                    <div style="font-family: monospace; font-size: 12px; margin-top: 10px;">
+                        定位坐标: [${lng.toFixed(6)}, ${lat.toFixed(6)}]<br>
+                        userLocation: [${userLocation[0].toFixed(6)}, ${userLocation[1].toFixed(6)}]<br>
+                        地图已初始化: ${map ? '✅ 是' : '❌ 否'}<br>
+                        坐标是否在上海: ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '✅ 是' : '❌ 否'}<br>
+                    </div>
+                </div>
+            `;
+            
+            let locationInfo = debugInfo + `
                 <strong>📍 位置信息</strong><br>
                 定位方式: ${position.locationType || 'GPS定位'}<br>
                 <strong style="color: #4FC3F7;">📮 ${address}</strong><br>
@@ -1930,11 +1958,28 @@
                 return;
             }
             
-            console.log('移动地图到用户位置:', userLocation);
+            console.log('🎯 强制移动地图到用户位置:', userLocation);
             console.log('当前地图中心:', map.getCenter());
             
-            // 使用 setZoomAndCenter 确保同时设置缩放和中心
-            map.setZoomAndCenter(17, userLocation);
+            // 多次强制设置，确保生效
+            map.setZoomAndCenter(18, userLocation);
+            
+            setTimeout(() => {
+                map.setCenter(userLocation);
+                map.setZoom(18);
+                console.log('✅ 地图中心已更新');
+            }, 200);
+            
+            setTimeout(() => {
+                map.setCenter(userLocation);
+                console.log('✅ 地图中心最终确认');
+                
+                const newCenter = map.getCenter();
+                console.log('验证新中心:', [newCenter.lng, newCenter.lat]);
+                
+                // 在页面上显示提示
+                alert(`地图已移动到:\n经度: ${newCenter.lng.toFixed(6)}\n纬度: ${newCenter.lat.toFixed(6)}\n\n你的位置:\n经度: ${userLocation[0].toFixed(6)}\n纬度: ${userLocation[1].toFixed(6)}`);
+            }, 500);
             
             // 如果用户标记存在，触发弹跳动画
             if (userMarker) {
@@ -1944,7 +1989,7 @@
                 }, 1000);
             }
             
-            updateStatus('🎯 已回到您的位置', 'success');
+            updateStatus('🎯 正在回到您的位置...', 'info');
         }
 
         // 清空地图
