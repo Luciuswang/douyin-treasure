@@ -1265,6 +1265,10 @@
             });
         }
 
+        // 定位完成标志
+        let isLocationSet = false;
+        let userLocationLocked = false;
+        
         // 处理高德定位成功（无需坐标转换）
         function handleAmapLocationSuccess(position) {
             const lat = position.coords.latitude;
@@ -1280,6 +1284,7 @@
             console.log('📍 坐标检查: 纬度在30-32之间?', lat > 30 && lat < 32, ', 经度在120-122之间?', lng > 120 && lng < 122);
             
             userLocation = [lng, lat];
+            isLocationSet = true;
             console.log('✅ userLocation已设置为:', userLocation);
             
             // 立即设置地图中心和缩放（在创建标记之前）
@@ -1316,7 +1321,28 @@
                         map.setCenter(userLocation);
                         map.setZoom(18);
                     }
+                    
+                    // 锁定用户位置，防止地图被移走
+                    userLocationLocked = true;
+                    console.log('🔒 用户位置已锁定');
                 }, 2000);
+                
+                // 监听地图移动结束事件，如果偏移过大则强制回到用户位置
+                map.on('moveend', function() {
+                    if (userLocationLocked && userLocation) {
+                        const currentCenter = map.getCenter();
+                        const distance = calculateDistance(
+                            [currentCenter.lng, currentCenter.lat],
+                            userLocation
+                        );
+                        
+                        // 如果偏移超过100米，强制回到用户位置
+                        if (distance > 100) {
+                            console.warn(`⚠️ 地图被移动了${distance.toFixed(2)}米，强制回到用户位置`);
+                            map.setCenter(userLocation);
+                        }
+                    }
+                });
             } else {
                 console.error('❌ 地图对象不存在，无法设置中心！');
             }
