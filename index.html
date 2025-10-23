@@ -1144,6 +1144,29 @@
                         
                         console.log('✅ GPS定位成功:', { lat: wgs84Lat, lng: wgs84Lng, accuracy });
                         console.log('📡 定位方式:', position.coords.altitude ? 'GPS卫星' : '网络辅助');
+                        console.log('📍 海拔:', position.coords.altitude);
+                        console.log('📍 精度:', accuracy, '米');
+                        
+                        // ⚠️ 检查定位质量
+                        const isGPSSatellite = position.coords.altitude !== null && position.coords.altitude !== undefined;
+                        const isHighAccuracy = accuracy < 50; // 精度要求小于50米
+                        
+                        console.log('🔍 GPS卫星定位?', isGPSSatellite);
+                        console.log('🔍 高精度?', isHighAccuracy, `(${accuracy}米)`);
+                        
+                        // 如果不是GPS卫星定位或精度太差，显示警告
+                        if (!isGPSSatellite || accuracy > 100) {
+                            console.warn('⚠️ 定位质量较差！');
+                            console.warn('   - GPS卫星:', isGPSSatellite ? '是' : '否（使用网络辅助）');
+                            console.warn('   - 精度:', accuracy, '米');
+                            
+                            if (!isGPSSatellite) {
+                                updateStatus('⚠️ 未使用GPS卫星定位，位置可能不准确！请到室外空旷处重新定位', 'warning');
+                            } else if (accuracy > 100) {
+                                updateStatus(`⚠️ GPS信号较弱（精度${Math.round(accuracy)}米），建议到室外重新定位`, 'warning');
+                            }
+                        }
+                        
                         console.log('📍 直接使用坐标（中国境内通常为GCJ-02）');
                         
                         // 直接使用坐标，先显示位置，异步获取地址
