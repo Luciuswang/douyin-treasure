@@ -1328,8 +1328,9 @@
                 }, 2000);
                 
                 // 监听地图移动结束事件，如果偏移过大则强制回到用户位置
+                let isResetting = false; // 防止无限循环
                 map.on('moveend', function() {
-                    if (userLocationLocked && userLocation) {
+                    if (userLocationLocked && userLocation && !isResetting) {
                         const currentCenter = map.getCenter();
                         const distance = calculateDistance(
                             [currentCenter.lng, currentCenter.lat],
@@ -1339,7 +1340,9 @@
                         // 如果偏移超过100米，强制回到用户位置
                         if (distance > 100) {
                             console.warn(`⚠️ 地图被移动了${distance.toFixed(2)}米，强制回到用户位置`);
+                            isResetting = true;
                             map.setCenter(userLocation);
+                            setTimeout(() => { isResetting = false; }, 500);
                         }
                     }
                 });
