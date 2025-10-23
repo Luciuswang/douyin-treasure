@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手机访问指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .ip-display {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            border: 3px solid #667eea;
+        }
+        
+        .ip-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .ip-address {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            margin-bottom: 20px;
+        }
+        
+        .qrcode-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        
+        .links {
+            display: grid;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .link-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: left;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s;
+        }
+        
+        .link-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        
+        .link-title {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        
+        .link-url {
+            color: #667eea;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            text-align: left;
+            border: 2px solid #ffc107;
+        }
+        
+        .instructions h3 {
+            color: #856404;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .instructions ol {
+            color: #856404;
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #28a745;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+        
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            color: #28a745;
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .status.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 手机访问指南</h1>
+        <p class="subtitle">在手机浏览器中访问以下地址</p>
+        
+        <div class="ip-display">
+            <div class="ip-label">🌐 你的局域网地址</div>
+            <div class="ip-address" id="ipAddress">正在获取...</div>
+            <button class="copy-btn" onclick="copyIP()">📋 复制地址</button>
+            <div class="status" id="copyStatus">✅ 已复制！</div>
+        </div>
+        
+        <!-- 二维码 -->
+        <div class="qrcode-container">
+            <canvas id="qrcode" width="200" height="200"></canvas>
+        </div>
+        <div style="color: #666; font-size: 14px;">📸 使用手机扫描二维码</div>
+        
+        <div class="links">
+            <div class="link-item" onclick="openLink('diagnosis')">
+                <div class="link-title">
+                    🔍 定位诊断工具 
+                    <span class="badge">推荐先测试</span>
+                </div>
+                <div class="link-url" id="diagnosisUrl">加载中...</div>
+            </div>
+            
+            <div class="link-item" onclick="openLink('main')">
+                <div class="link-title">🎮 主游戏页面</div>
+                <div class="link-url" id="mainUrl">加载中...</div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📝 使用步骤</h3>
+            <ol>
+                <li>确保手机和电脑连接<strong>同一个WiFi</strong></li>
+                <li>用手机浏览器扫描上方二维码，或手动输入地址</li>
+                <li>建议先测试<strong>定位诊断工具</strong>，查看定位精度</li>
+                <li>允许浏览器获取位置信息</li>
+                <li>最好在室外测试（GPS信号强）</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // 获取本机局域网IP
+        function getLocalIP() {
+            // 从当前URL获取hostname和port
+            const hostname = window.location.hostname;
+            const port = window.location.port || '3000';
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                document.getElementById('ipAddress').textContent = '请使用启动服务器后显示的 Network 地址';
+                return null;
+            }
+            
+            const baseUrl = `http://${hostname}:${port}`;
+            document.getElementById('ipAddress').textContent = baseUrl;
+            
+            // 更新链接
+            const diagnosisUrl = `${baseUrl}/location-diagnosis.html`;
+            const mainUrl = `${baseUrl}/index.html`;
+            
+            document.getElementById('diagnosisUrl').textContent = diagnosisUrl;
+            document.getElementById('mainUrl').textContent = mainUrl;
+            
+            // 生成二维码（诊断工具）
+            generateQRCode(diagnosisUrl);
+            
+            return baseUrl;
+        }
+        
+        // 简单的二维码生成（使用第三方API）
+        function generateQRCode(url) {
+            const canvas = document.getElementById('qrcode');
+            const ctx = canvas.getContext('2d');
+            
+            // 使用Google Chart API生成二维码
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 200, 200);
+            };
+            img.onerror = function() {
+                // 如果加载失败，显示文字
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, 200, 200);
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('二维码加载失败', 100, 90);
+                ctx.fillText('请手动输入地址', 100, 110);
+            };
+            img.src = qrUrl;
+        }
+        
+        // 复制IP地址
+        function copyIP() {
+            const ipText = document.getElementById('ipAddress').textContent;
+            
+            // 创建临时输入框
+            const tempInput = document.createElement('input');
+            tempInput.value = ipText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                const status = document.getElementById('copyStatus');
+                status.classList.add('show');
+                setTimeout(() => {
+                    status.classList.remove('show');
+                }, 2000);
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+            
+            document.body.removeChild(tempInput);
+        }
+        
+        // 打开链接
+        function openLink(type) {
+            const url = type === 'diagnosis' 
+                ? document.getElementById('diagnosisUrl').textContent
+                : document.getElementById('mainUrl').textContent;
+                
+            if (url && url !== '加载中...') {
+                window.open(url, '_blank');
+            }
+        }
+        
+        // 页面加载时获取IP
+        window.onload = function() {
+            getLocalIP();
+        };
+    </script>
+</body>
+</html>
+

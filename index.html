@@ -1316,7 +1316,48 @@
                     );
                     console.log(`🔍 最终检查：地图中心距离用户位置 ${distance.toFixed(2)} 米`);
                     
-                    if (distance > 50) {
+                    if (distance > 1000) {
+                        // 偏移超过1公里，重新创建地图！
+                        console.error('❌ 地图中心偏移超过1公里！准备重新创建地图...');
+                        console.log('🔄 销毁旧地图...');
+                        
+                        // 保存状态
+                        const oldZoom = map.getZoom();
+                        
+                        // 销毁地图
+                        map.destroy();
+                        
+                        // 用正确的中心重新创建
+                        console.log('🆕 使用正确中心重新创建地图:', userLocation);
+                        map = new AMap.Map('map-container', {
+                            zoom: 18,
+                            center: userLocation,  // 直接使用用户位置！
+                            viewMode: '2D',
+                            showLabel: true,
+                            mapStyle: 'amap://styles/normal',
+                            resizeEnable: true,
+                            rotateEnable: false,
+                            pitchEnable: false,
+                            dragEnable: true,
+                            zoomEnable: true,
+                            doubleClickZoom: true
+                        });
+                        
+                        map.on('complete', function() {
+                            console.log('✅ 新地图创建完成');
+                            const newCenter = map.getCenter();
+                            console.log('🔍 新地图中心:', [newCenter.lng, newCenter.lat]);
+                            
+                            // 重新创建用户标记
+                            setTimeout(() => {
+                                createUserMarker();
+                                // 重新生成宝藏
+                                if (treasureMarkers.length === 0) {
+                                    generateNearbyTreasures();
+                                }
+                            }, 500);
+                        });
+                    } else if (distance > 50) {
                         console.warn('⚠️ 地图中心偏移过大，强制重新设置');
                         map.setCenter(userLocation);
                         map.setZoom(18);
