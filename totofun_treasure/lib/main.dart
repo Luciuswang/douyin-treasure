@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'screens/map_screen.dart';
+import 'screens/home_screen.dart';
 import 'providers/user_provider.dart';
 import 'providers/treasure_provider.dart';
+import 'providers/task_provider.dart';
 
 void main() {
   runApp(const TotofunApp());
@@ -17,6 +18,7 @@ class TotofunApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => TreasureProvider()),
+        ChangeNotifierProvider(create: (_) => TaskProvider()),
       ],
       child: MaterialApp(
         title: 'Totofun 突突翻',
@@ -29,7 +31,7 @@ class TotofunApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
         ),
-        home: const MapScreen(),
+        home: const HomeScreen(),
       ),
     );
   }
