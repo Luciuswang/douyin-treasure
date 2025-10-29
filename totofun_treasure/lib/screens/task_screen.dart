@@ -5,6 +5,9 @@ import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/location_service.dart';
+import '../services/verification_service.dart';
+import 'qr_scan_screen.dart';
+import 'photo_verification_screen.dart';
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -16,6 +19,7 @@ class TaskScreen extends StatefulWidget {
 class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _locationService = LocationService();
+  final _verificationService = VerificationService();
   Position? _currentPosition;
 
   @override
@@ -450,6 +454,59 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
                         ),
                         child: const Text('接取任务', style: TextStyle(fontSize: 16)),
                       ),
+                    )
+                  else if (task.status == TaskStatus.inProgress)
+                    Column(
+                      children: [
+                        // 验证方式提示
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                task.verification == TaskVerification.qrCode
+                                    ? Icons.qr_code_scanner
+                                    : task.verification == TaskVerification.photo
+                                        ? Icons.camera_alt
+                                        : Icons.location_on,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  task.verification == TaskVerification.qrCode
+                                      ? '需要扫描商家二维码验证'
+                                      : task.verification == TaskVerification.photo
+                                          ? '需要拍照上传验证'
+                                          : 'GPS定位验证',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // 完成任务按钮
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _verifyAndCompleteTask(task);
+                            },
+                            icon: const Icon(Icons.check_circle),
+                            label: const Text('完成任务', style: TextStyle(fontSize: 16)),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: Colors.green,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -489,26 +546,117 @@ class _TaskScreenState extends State<TaskScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _completeTask(Task task) async {
-    // 检查是否在任务范围内
-    final taskProvider = context.read<TaskProvider>();
-    final inRange = taskProvider.isInTaskRange(
-      task.id,
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
-    );
-
-    if (!inRange) {
+  /// 验证并完成任务
+  Future<void> _verifyAndCompleteTask(Task task) async {
+    if (_currentPosition == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请先到达任务地点附近'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('正在获取位置...')),
       );
       return;
     }
 
+    bool verified = false;
+
+    // 根据不同的验证方式进行验证
+    switch (task.verification) {
+      case TaskVerification.location:
+        // GPS定位验证
+        final result = await _verificationService.verifyByGPS(
+          userPosition: _currentPosition!,
+          targetLat: task.latitude,
+          targetLon: task.longitude,
+          maxDistance: 50.0,
+        );
+        
+        if (result.success) {
+          verified = true;
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result.message)),
+            );
+          }
+        }
+        break;
+
+      case TaskVerification.qrCode:
+        // 二维码扫描验证
+        final qrData = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QRScanScreen(
+              taskId: task.id,
+              taskTitle: task.title,
+            ),
+          ),
+        );
+
+        if (qrData != null && qrData.isNotEmpty) {
+          final result = _verificationService.verifyByQRCode(
+            scannedData: qrData,
+            expectedData: task.id,
+          );
+          
+          if (result.success) {
+            verified = true;
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(result.message)),
+              );
+            }
+          }
+        }
+        break;
+
+      case TaskVerification.photo:
+        // 拍照上传验证
+        final photoResult = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotoVerificationScreen(
+              taskId: task.id,
+              taskTitle: task.title,
+              instructions: '请拍摄${task.merchantName}的门头或店内照片',
+            ),
+          ),
+        );
+
+        if (photoResult != null && photoResult['success'] == true) {
+          // 还需要验证GPS
+          final gpsResult = await _verificationService.verifyByGPS(
+            userPosition: _currentPosition!,
+            targetLat: task.latitude,
+            targetLon: task.longitude,
+            maxDistance: 100.0, // 拍照任务GPS范围放宽到100米
+          );
+          
+          if (gpsResult.success) {
+            verified = true;
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(gpsResult.message)),
+              );
+            }
+          }
+        }
+        break;
+
+      default:
+        // 其他验证方式（如receipt、manual）
+        verified = true; // 暂时默认通过
+    }
+
+    // 如果验证通过，完成任务
+    if (verified) {
+      await _completeTask(task);
+    }
+  }
+
+  Future<void> _completeTask(Task task) async {
     // 完成任务
+    final taskProvider = context.read<TaskProvider>();
     final success = await taskProvider.completeTask(task.id);
     
     if (success && mounted) {

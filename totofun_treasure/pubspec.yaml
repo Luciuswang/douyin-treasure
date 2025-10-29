@@ -31,6 +31,18 @@ dependencies:
   
   # 工具
   uuid: ^4.2.1
+  
+  # 二维码扫描
+  qr_code_scanner: ^1.0.1
+  
+  # 图片选择和相机
+  image_picker: ^1.0.5
+  
+  # 图片压缩
+  flutter_image_compress: ^2.1.0
+  
+  # 二维码生成
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
