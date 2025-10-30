@@ -83,10 +83,11 @@ class MerchantProvider with ChangeNotifier {
       experience: 50,
       coins: 10,
       coupon: '满30减5券',
-      totalSlots: 100,
-      availableSlots: 75,
+      maxCompletions: 100,
+      currentCompletions: 25,
+      startTime: DateTime.now().subtract(const Duration(days: 1)),
+      endTime: DateTime.now().add(const Duration(days: 7)),
       status: TaskStatus.available,
-      expiresAt: DateTime.now().add(const Duration(days: 7)),
     ));
     
     _merchantTasks.add(Task(
@@ -103,10 +104,11 @@ class MerchantProvider with ChangeNotifier {
       experience: 100,
       coins: 20,
       coupon: '满50减10券',
-      totalSlots: 50,
-      availableSlots: 30,
+      maxCompletions: 50,
+      currentCompletions: 20,
+      startTime: DateTime.now().subtract(const Duration(days: 2)),
+      endTime: DateTime.now().add(const Duration(days: 14)),
       status: TaskStatus.available,
-      expiresAt: DateTime.now().add(const Duration(days: 14)),
     ));
     
     // 已完成任务
@@ -124,11 +126,11 @@ class MerchantProvider with ChangeNotifier {
       experience: 150,
       coins: 30,
       coupon: '满100减20券',
-      totalSlots: 200,
-      availableSlots: 0,
+      maxCompletions: 200,
+      currentCompletions: 200,
+      startTime: DateTime.now().subtract(const Duration(days: 30)),
+      endTime: DateTime.now().subtract(const Duration(days: 1)),
       status: TaskStatus.completed,
-      createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      expiresAt: DateTime.now().subtract(const Duration(days: 1)),
     ));
     
     notifyListeners();

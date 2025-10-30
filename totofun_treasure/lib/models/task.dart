@@ -10,6 +10,43 @@ enum TaskType {
   chain,        // 连锁任务
 }
 
+/// TaskType扩展
+extension TaskTypeExtension on TaskType {
+  String get displayName {
+    switch (this) {
+      case TaskType.checkIn:
+        return '打卡任务';
+      case TaskType.purchase:
+        return '消费任务';
+      case TaskType.photo:
+        return '拍照任务';
+      case TaskType.review:
+        return '评价任务';
+      case TaskType.share:
+        return '分享任务';
+      case TaskType.chain:
+        return '连锁任务';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case TaskType.checkIn:
+        return Icons.location_on;
+      case TaskType.purchase:
+        return Icons.shopping_cart;
+      case TaskType.photo:
+        return Icons.camera_alt;
+      case TaskType.review:
+        return Icons.rate_review;
+      case TaskType.share:
+        return Icons.share;
+      case TaskType.chain:
+        return Icons.link;
+    }
+  }
+}
+
 /// 任务状态
 enum TaskStatus {
   available,    // 可接取
@@ -24,6 +61,20 @@ enum TaskDifficulty {
   easy,         // 简单
   medium,       // 中等
   hard,         // 困难
+}
+
+/// TaskDifficulty扩展
+extension TaskDifficultyExtension on TaskDifficulty {
+  String get displayName {
+    switch (this) {
+      case TaskDifficulty.easy:
+        return '简单';
+      case TaskDifficulty.medium:
+        return '中等';
+      case TaskDifficulty.hard:
+        return '困难';
+    }
+  }
 }
 
 /// 任务验证方式
@@ -180,6 +231,65 @@ class Task {
         return '分享任务';
       case TaskType.chain:
         return '连锁任务';
+    }
+  }
+
+  /// 兼容性：radius别名
+  double get radius => triggerRadius;
+
+  /// 兼容性：totalSlots别名
+  int get totalSlots => maxCompletions;
+
+  /// 兼容性：availableSlots别名
+  int get availableSlots => remainingSlots;
+
+  /// 兼容性：acceptedAt别名
+  DateTime? get acceptedAt => acceptedTime;
+
+  /// 兼容性：completedAt别名
+  DateTime? get completedAt => completedTime;
+
+  /// 兼容性：expiresAt别名
+  DateTime? get expiresAt => endTime;
+
+  /// 兼容性：createdAt别名
+  DateTime get createdAt => startTime;
+
+  /// 兼容性：isInProgress
+  bool get isInProgress => status == TaskStatus.inProgress;
+
+  /// 兼容性：isCompleted
+  bool get isCompleted => status == TaskStatus.completed;
+
+  /// 任务状态颜色
+  Color get statusColor {
+    switch (status) {
+      case TaskStatus.available:
+        return Colors.green;
+      case TaskStatus.inProgress:
+        return Colors.blue;
+      case TaskStatus.completed:
+        return Colors.grey;
+      case TaskStatus.expired:
+        return Colors.red;
+      case TaskStatus.failed:
+        return Colors.deepOrange;
+    }
+  }
+
+  /// 任务状态文本
+  String get statusText {
+    switch (status) {
+      case TaskStatus.available:
+        return '可接取';
+      case TaskStatus.inProgress:
+        return '进行中';
+      case TaskStatus.completed:
+        return '已完成';
+      case TaskStatus.expired:
+        return '已过期';
+      case TaskStatus.failed:
+        return '已失败';
     }
   }
 

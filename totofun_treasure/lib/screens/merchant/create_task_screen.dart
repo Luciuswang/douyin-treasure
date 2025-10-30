@@ -330,10 +330,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       experience: _experience,
       coins: _coins,
       coupon: _coupon,
-      totalSlots: _totalSlots,
-      availableSlots: _totalSlots,
+      maxCompletions: _totalSlots,
+      currentCompletions: 0,
+      startTime: DateTime.now(),
+      endTime: DateTime.now().add(Duration(days: _daysValid)),
       status: TaskStatus.available,
-      expiresAt: DateTime.now().add(Duration(days: _daysValid)),
     );
     
     final success = await merchantProvider.createTask(task);

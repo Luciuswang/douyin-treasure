@@ -22,6 +22,7 @@ class TotofunApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => TreasureProvider()),
         ChangeNotifierProvider(create: (_) => TaskProvider()),
+        ChangeNotifierProvider(create: (_) => MerchantProvider()),
       ],
       child: MaterialApp(
         title: 'Totofun 突突翻',
@@ -35,6 +36,10 @@ class TotofunApp extends StatelessWidget {
           ),
         ),
         home: const HomeScreen(),
+        routes: {
+          '/merchant/dashboard': (context) => const MerchantDashboardScreen(),
+          '/merchant/create-task': (context) => const CreateTaskScreen(),
+        },
       ),
     );
   }
