@@ -89,6 +89,23 @@ class PlaceholderScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            // 临时添加商家后台入口（用于测试）
+            if (title == '我的') ...[
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/merchant/dashboard');
+                },
+                icon: const Icon(Icons.store),
+                label: const Text('商家后台（测试）'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

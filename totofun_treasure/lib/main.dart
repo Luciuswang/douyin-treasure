@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/merchant/merchant_dashboard_screen.dart';
+import 'screens/merchant/create_task_screen.dart';
 import 'providers/user_provider.dart';
 import 'providers/treasure_provider.dart';
 import 'providers/task_provider.dart';
+import 'providers/merchant_provider.dart';
 
 void main() {
   runApp(const TotofunApp());
