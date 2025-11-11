@@ -1086,13 +1086,21 @@
         // 使用高德定位服务（推荐方式，避免坐标系问题）
         function useAmapGeolocation() {
             console.log('🚀 启动高德定位服务（强制使用浏览器GPS）...');
-            updateStatus('正在使用GPS精确定位（请在室外或窗边）...', 'info', true);
+            updateStatus('正在获取GPS位置，请允许位置权限...', 'info', true);
+            
+            // 设置超时保护（20秒后自动使用备用方案）
+            const timeoutId = setTimeout(() => {
+                console.warn('⏰ GPS定位超时，使用备用定位方案');
+                updateStatus('GPS定位超时，正在使用备用定位方案...', 'warning', true);
+                useAmapLocationFallback();
+            }, 20000);
             
             // 先尝试使用浏览器原生GPS获取WGS84坐标
             if (navigator.geolocation) {
                 console.log('🛰️ 使用浏览器原生GPS定位...');
                 navigator.geolocation.getCurrentPosition(
                     function(position) {
+                        clearTimeout(timeoutId); // 清除超时定时器
                         const wgs84Lat = position.coords.latitude;
                         const wgs84Lng = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
@@ -1167,7 +1175,18 @@
                         }, 100);
                     },
                     function(error) {
+                        clearTimeout(timeoutId); // 清除超时定时器
                         console.error('❌ GPS定位失败:', error);
+                        
+                        // 根据错误类型显示不同提示
+                        if (error.code === 1) {
+                            updateStatus('位置权限被拒绝，正在使用备用定位...', 'warning', true);
+                        } else if (error.code === 2) {
+                            updateStatus('位置信息不可用，正在使用备用定位...', 'warning', true);
+                        } else if (error.code === 3) {
+                            updateStatus('定位请求超时，正在使用备用定位...', 'warning', true);
+                        }
+                        
                         // GPS失败，回退到高德定位
                         console.log('🔄 回退到高德定位服务...');
                         useAmapLocationFallback();
@@ -1187,6 +1206,14 @@
         // 高德定位回退方案（当GPS不可用时）
         function useAmapLocationFallback() {
             console.log('📱 使用高德定位服务（可能使用IP/基站）...');
+            updateStatus('正在使用高德定位服务...', 'info', true);
+            
+            // 设置超时保护（15秒后使用默认位置）
+            const fallbackTimeoutId = setTimeout(() => {
+                console.warn('⏰ 高德定位也超时了，使用默认位置（上海）');
+                updateStatus('定位服务超时，使用默认位置（上海）', 'warning');
+                useDefaultLocation();
+            }, 15000);
             
             AMap.plugin('AMap.Geolocation', function() {
                 const geolocation = new AMap.Geolocation({
@@ -1206,6 +1233,7 @@
                 });
                 
                 geolocation.getCurrentPosition(function(status, result) {
+                    clearTimeout(fallbackTimeoutId); // 清除超时定时器
                     console.log('📍 高德定位状态:', status);
                     console.log('📍 高德定位结果:', result);
                     
@@ -1236,11 +1264,28 @@
                         handleAmapLocationSuccess(position);
                     } else {
                         console.error('❌ 高德定位失败:', result);
-                        updateStatus('定位失败: ' + (result.message || '未知错误'), 'error');
-                        handleLocationError({ code: 2, message: result.message || '定位失败' });
+                        updateStatus('高德定位失败，使用默认位置（上海）', 'warning');
+                        useDefaultLocation();
                     }
                 });
             });
+        }
+        
+        // 使用默认位置（上海）
+        function useDefaultLocation() {
+            console.log('📍 使用默认位置：上海市中心');
+            const defaultPosition = {
+                coords: {
+                    latitude: 31.230416,
+                    longitude: 121.473701,
+                    accuracy: 1000
+                },
+                timestamp: Date.now(),
+                address: '上海市黄浦区人民广场',
+                locationType: '默认位置'
+            };
+            handleAmapLocationSuccess(defaultPosition);
+            updateStatus('已使用默认位置（上海），您可以点击"重新定位"获取真实位置', 'warning');
         }
 
         // 定位完成标志
