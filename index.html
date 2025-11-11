@@ -487,23 +487,15 @@
                 <span id="init-btn-text">🚀 启动寻宝之旅</span>
             </button>
             
-            <!-- 高级选项：切换API Key -->
-            <details style="margin-top: 15px;">
-                <summary style="cursor: pointer; color: #666; font-size: 0.9rem;">🔧 高级选项</summary>
-                <div class="input-group" style="margin-top: 10px;">
-                    <label for="api-key">自定义高德地图API Key:</label>
-                    <input type="password" id="api-key" class="api-input" placeholder="留空使用默认Key">
-                </div>
-            </details>
             
             <div class="tutorial">
                 <h4>📋 快速开始指南:</h4>
                 <ol>
-                    <li>申请<a href="https://console.amap.com/" target="_blank">高德地图API Key</a></li>
-                    <li>输入API Key并点击启动</li>
+                    <li>点击"启动寻宝之旅"按钮</li>
                     <li>允许浏览器获取位置权限</li>
-                    <li>在户外环境中获得最佳GPS体验</li>
-                    <li>开始寻找附近的宝藏！</li>
+                    <li>查看地图上的宝藏和任务</li>
+                    <li>点击💬按钮添加好友聊天</li>
+                    <li>开始你的寻宝冒险！</li>
                 </ol>
                 
                 <h4>🔧 移动端调试:</h4>
@@ -517,7 +509,7 @@
             
             <div class="status info" id="status">
                 <span>🔄</span>
-                <span>等待配置API Key启动地图服务...</span>
+                <span>点击"启动寻宝之旅"开始游戏...</span>
             </div>
         </div>
 
@@ -560,7 +552,7 @@
                     <div class="map-placeholder-icon pulse">🗺️</div>
                     <div style="text-align: center;">
                         <div style="font-size: 1.2rem; margin-bottom: 10px;">地图即将加载</div>
-                        <div style="color: #888;">配置API Key后即可显示高德地图</div>
+                        <div style="color: #888;">点击启动按钮开始寻宝</div>
                     </div>
                 </div>
             </div>
@@ -995,25 +987,21 @@
             }
         }
 
-        // 默认API Key（你的高德地图Key）
-        const DEFAULT_AMAP_KEY = '你的高德地图API_Key'; // TODO: 替换成你的实际Key
+        // 默认API Key（高德地图Key）
+        // 如果需要更换，请修改下面这行
+        const DEFAULT_AMAP_KEY = 'c3e0c33e45ad805025e9ccffbb4e9f37'; // 默认测试Key
         
         // 初始化地图
         function initMap() {
-            let apiKey = document.getElementById('api-key').value.trim();
+            // 直接使用默认Key
+            const apiKey = DEFAULT_AMAP_KEY;
             
-            // 如果用户没有输入，使用默认Key
             if (!apiKey) {
-                apiKey = localStorage.getItem('amap-api-key') || DEFAULT_AMAP_KEY;
-            }
-            
-            if (!apiKey || apiKey === '你的高德地图API_Key') {
-                updateStatus('请先配置高德地图API Key！展开"高级选项"输入你的Key', 'error');
+                updateStatus('地图配置错误，请检查API Key设置', 'error');
                 return;
             }
 
             updateStatus('正在加载高德地图...', 'info', true);
-            localStorage.setItem('amap-api-key', apiKey);
 
             // 更新按钮状态
             const initBtn = document.getElementById('init-btn-text');
@@ -2160,15 +2148,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 加载用户数据
             loadUserData();
-            
-            const savedKey = localStorage.getItem('amap-api-key');
-            if (savedKey) {
-                document.getElementById('api-key').value = savedKey;
-                updateStatus('发现已保存的API Key，点击启动即可开始游戏', 'success');
-            }
 
             // 检查首次用户
             checkFirstTimeUser();
+            
+            // 自动启动地图（延迟1秒，让页面先渲染）
+            setTimeout(() => {
+                initMap();
+            }, 1000);
 
             // 显示用户信息
             if (userData.stats.treasuresDiscovered > 0) {
