@@ -723,10 +723,10 @@
             console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
-        // 更新GPS数据显示
+        // 更新GPS数据显示（已废弃，保留空函数避免错误）
         function updateGPSData(data) {
-            const gpsData = document.getElementById('gps-data');
-            gpsData.innerHTML = data;
+            // GPS数据面板已移除到游戏说明页面
+            console.log('GPS数据:', data);
         }
 
         // 宝藏管理系统
@@ -1067,12 +1067,11 @@
                 return;
             }
 
-            updateStatus('正在获取GPS位置...', 'info', true);
-            updateGPSData('<div class="loading"></div> 正在定位...');
+            console.log('🎯 开始GPS定位...');
 
             if (!navigator.geolocation) {
                 updateStatus('浏览器不支持GPS定位功能', 'error');
-                handleLocationError({ code: 0, message: '不支持定位' });
+                useDefaultLocation();
                 return;
             }
 
@@ -3447,6 +3446,33 @@
                 max-width: 100%;
                 max-height: 100%;
             }
+            
+            /* 添加好友面板移动端适配 */
+            #add-friend-panel {
+                width: 100vw !important;
+                height: 100vh !important;
+                bottom: 0 !important;
+                right: 0 !important;
+                left: 0 !important;
+                top: 0 !important;
+                border-radius: 0 !important;
+                max-width: 100%;
+                max-height: 100%;
+            }
+            
+            /* 我的信息面板移动端适配 */
+            #my-profile-panel {
+                width: 100vw !important;
+                height: 100vh !important;
+                bottom: 0 !important;
+                right: 0 !important;
+                left: 0 !important;
+                top: 0 !important;
+                border-radius: 0 !important;
+                max-width: 100%;
+                max-height: 100%;
+            }
+            
             #chat-fab {
                 bottom: 20px;
                 right: 20px;
