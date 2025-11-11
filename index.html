@@ -481,68 +481,34 @@
             </div>
         </div>
 
-        <div class="card">
-            <h3>🚀 快速开始</h3>
-            <button class="btn" onclick="initMap()">
+        <!-- 游戏说明入口 -->
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="guide.html" style="
+                display: inline-block;
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(10px);
+                color: white;
+                padding: 12px 30px;
+                border-radius: 25px;
+                text-decoration: none;
+                font-weight: 600;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                transition: all 0.3s ease;
+                font-size: 1rem;
+            " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+               onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                📖 游戏说明
+            </a>
+        </div>
+
+        <!-- 启动按钮 -->
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn" onclick="initMap()" style="max-width: 400px; margin: 0 auto;">
                 <span id="init-btn-text">🚀 启动寻宝之旅</span>
             </button>
-            
-            
-            <div class="tutorial">
-                <h4>📋 快速开始指南:</h4>
-                <ol>
-                    <li>点击"启动寻宝之旅"按钮</li>
-                    <li>允许浏览器获取位置权限</li>
-                    <li>查看地图上的宝藏和任务</li>
-                    <li>点击💬按钮添加好友聊天</li>
-                    <li>开始你的寻宝冒险！</li>
-                </ol>
-                
-                <h4>🔧 移动端调试:</h4>
-                <p style="font-size: 0.85rem; color: #666;">
-                    • 长按GPS信息区域查看详细调试信息<br>
-                    • 如果定位失败，会自动使用上海位置<br>
-                    • 确保在HTTPS环境下使用（GitHub Pages自动支持）<br>
-                    • 键盘快捷键: Ctrl+S 切换到上海位置，Ctrl+D 显示调试信息
-                </p>
-            </div>
-            
-            <div class="status info" id="status">
+            <div class="status info" id="status" style="max-width: 400px; margin: 15px auto;">
                 <span>🔄</span>
                 <span>点击"启动寻宝之旅"开始游戏...</span>
-            </div>
-        </div>
-
-        <div class="features">
-            <div class="feature">
-                <div class="feature-icon">📱</div>
-                <h4>移动端优化</h4>
-                <p>专为手机端设计，支持触摸操作和响应式布局</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🎯</div>
-                <h4>精准定位</h4>
-                <p>使用高精度GPS定位，支持室外精确寻宝</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🏆</div>
-                <h4>多种宝藏</h4>
-                <p>钻石、皇冠、金币等多种宝藏类型等你发现</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🌍</div>
-                <h4>实时地图</h4>
-                <p>基于高德地图的实时位置显示和导航</p>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>📍 GPS状态信息</h3>
-            <div class="gps-info">
-                <h4>当前位置信息:</h4>
-                <div class="gps-data" id="gps-data">
-                    等待获取GPS数据...
-                </div>
             </div>
         </div>
 
@@ -557,12 +523,13 @@
                 </div>
             </div>
             
+            <!-- 地图控制按钮 -->
             <div class="controls">
                 <button class="btn" onclick="testGPS()" disabled id="gps-btn">
                     📍 重新定位
                 </button>
                 <button class="btn" onclick="centerToUser()" disabled id="center-btn">
-                    🎯 回到我的位置
+                    🎯 回到位置
                 </button>
                 <button class="btn" onclick="generateNearbyTreasures()" disabled id="generate-btn">
                     🗺️ 生成宝藏
@@ -571,7 +538,7 @@
                     ✨ 添加宝藏
                 </button>
                 <button class="btn" onclick="clearMap()" disabled id="clear-btn">
-                    🗑️ 清空地图
+                    🗑️ 删除宝藏
                 </button>
             </div>
         </div>
@@ -3425,11 +3392,15 @@
         /* 移动端适配 */
         @media (max-width: 768px) {
             #chat-container {
-                width: 100%;
-                height: 100%;
+                width: 100vw;
+                height: 100vh;
                 bottom: 0;
                 right: 0;
+                left: 0;
+                top: 0;
                 border-radius: 0;
+                max-width: 100%;
+                max-height: 100%;
             }
             #chat-fab {
                 bottom: 20px;
@@ -3437,6 +3408,41 @@
                 width: 56px;
                 height: 56px;
                 font-size: 24px;
+                z-index: 10000;
+            }
+            
+            /* 移动端地图控制按钮优化 */
+            .controls {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px;
+            }
+            
+            /* 移动端卡片优化 */
+            .card {
+                padding: 15px;
+                margin: 15px 0;
+            }
+            
+            /* 移动端头部优化 */
+            .header {
+                padding: 20px 0;
+            }
+            
+            .logo {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .title {
+                font-size: 1.8rem;
+            }
+            
+            .hero-stats {
+                gap: 15px;
+            }
+            
+            .stat {
+                padding: 10px 15px;
             }
         }
     </style>
