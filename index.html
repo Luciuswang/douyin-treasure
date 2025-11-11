@@ -2361,6 +2361,645 @@
             console.log('🎉 PWA 已安装！');
             deferredPrompt = null;
         });
+
+        // ==================== 聊天功能 ====================
+        
+        // 聊天数据管理
+        const chatManager = {
+            currentUser: null,
+            friends: [],
+            conversations: {},
+            unreadCount: 0,
+
+            // 初始化当前用户
+            init() {
+                this.currentUser = storageManager.load('chatUser') || {
+                    id: 'user_' + Date.now(),
+                    name: '游客' + Math.floor(Math.random() * 1000),
+                    avatar: '👤',
+                    online: true
+                };
+                storageManager.save('chatUser', this.currentUser);
+                
+                // 加载好友列表
+                this.friends = storageManager.load('chatFriends') || this.getDefaultFriends();
+                storageManager.save('chatFriends', this.friends);
+                
+                // 加载对话记录
+                this.conversations = storageManager.load('chatConversations') || {};
+                
+                this.updateUnreadCount();
+            },
+
+            // 获取默认好友（演示用）
+            getDefaultFriends() {
+                return [
+                    { id: 'friend_1', name: '小明', avatar: '👨', online: true, lastMessage: '一起去找宝藏吧！', lastTime: new Date(Date.now() - 3600000).toISOString() },
+                    { id: 'friend_2', name: '小红', avatar: '👩', online: false, lastMessage: '我发现了一个好地方', lastTime: new Date(Date.now() - 7200000).toISOString() },
+                    { id: 'friend_3', name: '探险家', avatar: '🧑‍🚀', online: true, lastMessage: '今天收获不错', lastTime: new Date(Date.now() - 86400000).toISOString() }
+                ];
+            },
+
+            // 发送消息
+            sendMessage(friendId, content, type = 'text') {
+                const message = {
+                    id: 'msg_' + Date.now(),
+                    from: this.currentUser.id,
+                    to: friendId,
+                    content: content,
+                    type: type,
+                    timestamp: new Date().toISOString(),
+                    read: false
+                };
+
+                if (!this.conversations[friendId]) {
+                    this.conversations[friendId] = [];
+                }
+                this.conversations[friendId].push(message);
+                
+                // 更新好友最后消息
+                const friend = this.friends.find(f => f.id === friendId);
+                if (friend) {
+                    friend.lastMessage = type === 'text' ? content : '📍 位置';
+                    friend.lastTime = message.timestamp;
+                }
+
+                this.saveData();
+                return message;
+            },
+
+            // 接收模拟回复（演示用）
+            simulateReply(friendId) {
+                setTimeout(() => {
+                    const replies = [
+                        '收到！马上过去',
+                        '这个地方我知道',
+                        '太棒了！',
+                        '我们一起组队吧',
+                        '好的，等我一下'
+                    ];
+                    const reply = {
+                        id: 'msg_' + Date.now(),
+                        from: friendId,
+                        to: this.currentUser.id,
+                        content: replies[Math.floor(Math.random() * replies.length)],
+                        type: 'text',
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    };
+
+                    if (!this.conversations[friendId]) {
+                        this.conversations[friendId] = [];
+                    }
+                    this.conversations[friendId].push(reply);
+                    
+                    const friend = this.friends.find(f => f.id === friendId);
+                    if (friend) {
+                        friend.lastMessage = reply.content;
+                        friend.lastTime = reply.timestamp;
+                    }
+
+                    this.updateUnreadCount();
+                    this.saveData();
+                    
+                    // 如果聊天窗口打开，更新显示
+                    if (document.getElementById('chat-panel').style.display !== 'none') {
+                        const activeFriendId = document.getElementById('chat-panel').dataset.friendId;
+                        if (activeFriendId === friendId) {
+                            this.openChat(friendId);
+                        } else {
+                            this.updateFriendsList();
+                        }
+                    }
+                }, 1000 + Math.random() * 2000);
+            },
+
+            // 更新未读消息数
+            updateUnreadCount() {
+                this.unreadCount = 0;
+                Object.keys(this.conversations).forEach(friendId => {
+                    const messages = this.conversations[friendId];
+                    this.unreadCount += messages.filter(m => m.from !== this.currentUser.id && !m.read).length;
+                });
+                
+                const badge = document.getElementById('chat-badge');
+                if (this.unreadCount > 0) {
+                    badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            },
+
+            // 标记消息为已读
+            markAsRead(friendId) {
+                if (this.conversations[friendId]) {
+                    this.conversations[friendId].forEach(m => {
+                        if (m.from === friendId) {
+                            m.read = true;
+                        }
+                    });
+                    this.updateUnreadCount();
+                    this.saveData();
+                }
+            },
+
+            // 保存数据
+            saveData() {
+                storageManager.save('chatConversations', this.conversations);
+                storageManager.save('chatFriends', this.friends);
+            },
+
+            // 打开聊天窗口
+            openChat(friendId) {
+                const friend = this.friends.find(f => f.id === friendId);
+                if (!friend) return;
+
+                this.markAsRead(friendId);
+
+                const chatPanel = document.getElementById('chat-panel');
+                chatPanel.dataset.friendId = friendId;
+                chatPanel.style.display = 'flex';
+
+                // 更新聊天头部
+                document.getElementById('chat-friend-name').textContent = friend.name;
+                document.getElementById('chat-friend-avatar').textContent = friend.avatar;
+                document.getElementById('chat-friend-status').textContent = friend.online ? '在线' : '离线';
+                document.getElementById('chat-friend-status').style.color = friend.online ? '#22C55E' : '#999';
+
+                // 显示消息列表
+                const messagesList = document.getElementById('chat-messages-list');
+                messagesList.innerHTML = '';
+
+                const messages = this.conversations[friendId] || [];
+                messages.forEach(msg => {
+                    const isMe = msg.from === this.currentUser.id;
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'chat-message ' + (isMe ? 'chat-message-me' : 'chat-message-other');
+                    
+                    if (msg.type === 'text') {
+                        messageDiv.innerHTML = `
+                            <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                            <div class="chat-message-content">
+                                <div class="chat-message-bubble">${this.escapeHtml(msg.content)}</div>
+                                <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                            </div>
+                        `;
+                    } else if (msg.type === 'location') {
+                        messageDiv.innerHTML = `
+                            <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                            <div class="chat-message-content">
+                                <div class="chat-message-bubble chat-location-message">
+                                    <div style="font-size: 24px; margin-bottom: 5px;">📍</div>
+                                    <div><strong>位置分享</strong></div>
+                                    <div style="font-size: 0.9em; opacity: 0.8;">${msg.content}</div>
+                                    <button onclick="chatManager.viewLocation(${msg.content})" class="chat-location-btn">查看位置</button>
+                                </div>
+                                <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    messagesList.appendChild(messageDiv);
+                });
+
+                // 滚动到底部
+                messagesList.scrollTop = messagesList.scrollHeight;
+
+                // 隐藏好友列表
+                document.getElementById('friends-panel').style.display = 'none';
+            },
+
+            // 关闭聊天窗口
+            closeChat() {
+                document.getElementById('chat-panel').style.display = 'none';
+                document.getElementById('friends-panel').style.display = 'block';
+            },
+
+            // 发送文本消息
+            sendTextMessage() {
+                const input = document.getElementById('chat-input');
+                const content = input.value.trim();
+                if (!content) return;
+
+                const friendId = document.getElementById('chat-panel').dataset.friendId;
+                this.sendMessage(friendId, content, 'text');
+                input.value = '';
+
+                // 重新渲染聊天界面
+                this.openChat(friendId);
+
+                // 模拟回复
+                this.simulateReply(friendId);
+            },
+
+            // 分享当前位置
+            shareLocation() {
+                const friendId = document.getElementById('chat-panel').dataset.friendId;
+                if (!currentPosition) {
+                    alert('请先获取GPS定位');
+                    return;
+                }
+
+                const locationText = `${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
+                this.sendMessage(friendId, locationText, 'location');
+                this.openChat(friendId);
+                this.simulateReply(friendId);
+            },
+
+            // 查看位置
+            viewLocation(coords) {
+                alert('查看位置：' + coords + '\n（将在地图上显示）');
+                // 这里可以关闭聊天窗口并在地图上显示位置
+                this.toggleChat();
+            },
+
+            // 更新好友列表
+            updateFriendsList() {
+                const friendsList = document.getElementById('friends-list');
+                friendsList.innerHTML = '';
+
+                // 按最后消息时间排序
+                const sortedFriends = [...this.friends].sort((a, b) => {
+                    return new Date(b.lastTime || 0) - new Date(a.lastTime || 0);
+                });
+
+                sortedFriends.forEach(friend => {
+                    const unread = this.conversations[friend.id] ? 
+                        this.conversations[friend.id].filter(m => m.from === friend.id && !m.read).length : 0;
+
+                    const friendDiv = document.createElement('div');
+                    friendDiv.className = 'friend-item';
+                    friendDiv.onclick = () => this.openChat(friend.id);
+                    friendDiv.innerHTML = `
+                        <div class="friend-avatar">${friend.avatar}</div>
+                        <div class="friend-info">
+                            <div class="friend-name">
+                                ${friend.name}
+                                <span class="friend-status" style="color: ${friend.online ? '#22C55E' : '#999'}">
+                                    ${friend.online ? '●' : '○'}
+                                </span>
+                            </div>
+                            <div class="friend-last-message">${friend.lastMessage || '暂无消息'}</div>
+                        </div>
+                        <div class="friend-meta">
+                            <div class="friend-time">${this.formatTime(friend.lastTime)}</div>
+                            ${unread > 0 ? `<div class="friend-unread">${unread}</div>` : ''}
+                        </div>
+                    `;
+                    friendsList.appendChild(friendDiv);
+                });
+            },
+
+            // 切换聊天面板显示
+            toggleChat() {
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
+                    chatContainer.style.display = 'block';
+                    this.updateFriendsList();
+                } else {
+                    chatContainer.style.display = 'none';
+                    document.getElementById('chat-panel').style.display = 'none';
+                    document.getElementById('friends-panel').style.display = 'block';
+                }
+            },
+
+            // 格式化时间
+            formatTime(timestamp) {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diff = now - date;
+
+                if (diff < 60000) return '刚刚';
+                if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+                if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+                if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+                
+                return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+            },
+
+            // HTML转义
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        };
+
+        // 初始化聊天系统
+        chatManager.init();
     </script>
+
+    <!-- 聊天浮动按钮 -->
+    <div id="chat-fab" onclick="chatManager.toggleChat()" style="
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(79, 195, 247, 0.5);
+        z-index: 9999;
+        transition: all 0.3s ease;
+        font-size: 28px;
+    " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+        💬
+        <div id="chat-badge" style="
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #f44336;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            display: none;
+            min-width: 20px;
+            text-align: center;
+        "></div>
+    </div>
+
+    <!-- 聊天容器 -->
+    <div id="chat-container" style="
+        display: none;
+        position: fixed;
+        bottom: 100px;
+        right: 30px;
+        width: 380px;
+        height: 600px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+        z-index: 9998;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    ">
+        <!-- 好友列表面板 -->
+        <div id="friends-panel" style="
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        ">
+            <div style="
+                background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                color: white;
+                padding: 20px;
+                font-weight: bold;
+                font-size: 18px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <span>💬 好友聊天</span>
+                <button onclick="chatManager.toggleChat()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: none;
+                    color: white;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 20px;
+                    line-height: 1;
+                ">×</button>
+            </div>
+            <div id="friends-list" style="
+                flex: 1;
+                overflow-y: auto;
+                padding: 10px;
+            "></div>
+        </div>
+
+        <!-- 聊天面板 -->
+        <div id="chat-panel" style="
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        ">
+            <!-- 聊天头部 -->
+            <div style="
+                background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                color: white;
+                padding: 15px 20px;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            ">
+                <button onclick="chatManager.closeChat()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: none;
+                    color: white;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 18px;
+                    line-height: 1;
+                ">←</button>
+                <div id="chat-friend-avatar" style="font-size: 24px;"></div>
+                <div style="flex: 1;">
+                    <div id="chat-friend-name" style="font-weight: bold; font-size: 16px;"></div>
+                    <div id="chat-friend-status" style="font-size: 12px; opacity: 0.9;"></div>
+                </div>
+            </div>
+
+            <!-- 消息列表 -->
+            <div id="chat-messages-list" style="
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px;
+                background: #f5f5f5;
+            "></div>
+
+            <!-- 输入区域 -->
+            <div style="
+                padding: 15px;
+                background: white;
+                border-top: 1px solid #e0e0e0;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            ">
+                <button onclick="chatManager.shareLocation()" style="
+                    background: #4FC3F7;
+                    border: none;
+                    color: white;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 20px;
+                    flex-shrink: 0;
+                ">📍</button>
+                <input id="chat-input" type="text" placeholder="输入消息..." style="
+                    flex: 1;
+                    padding: 10px 15px;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 20px;
+                    outline: none;
+                    font-size: 14px;
+                " onkeypress="if(event.key==='Enter') chatManager.sendTextMessage()">
+                <button onclick="chatManager.sendTextMessage()" style="
+                    background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                    border: none;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    flex-shrink: 0;
+                ">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* 好友列表项样式 */
+        .friend-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background 0.2s;
+            gap: 12px;
+        }
+        .friend-item:hover {
+            background: #f5f5f5;
+        }
+        .friend-avatar {
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+        .friend-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .friend-name {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .friend-status {
+            font-size: 12px;
+        }
+        .friend-last-message {
+            font-size: 13px;
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .friend-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        .friend-time {
+            font-size: 11px;
+            color: #999;
+        }
+        .friend-unread {
+            background: #f44336;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* 聊天消息样式 */
+        .chat-message {
+            display: flex;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+        .chat-message-me {
+            flex-direction: row-reverse;
+        }
+        .chat-message-avatar {
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+        .chat-message-content {
+            max-width: 70%;
+        }
+        .chat-message-me .chat-message-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .chat-message-bubble {
+            padding: 10px 15px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .chat-message-other .chat-message-bubble {
+            background: white;
+            color: #333;
+        }
+        .chat-message-me .chat-message-bubble {
+            background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+            color: white;
+        }
+        .chat-message-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 5px;
+        }
+        .chat-location-message {
+            text-align: center;
+            padding: 15px !important;
+        }
+        .chat-location-btn {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: inherit;
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .chat-location-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            #chat-container {
+                width: 100%;
+                height: 100%;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+            #chat-fab {
+                bottom: 20px;
+                right: 20px;
+                width: 56px;
+                height: 56px;
+                font-size: 24px;
+            }
+        }
+    </style>
 </body>
 </html>
