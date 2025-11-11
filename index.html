@@ -2391,13 +2391,191 @@
                 this.updateUnreadCount();
             },
 
-            // 获取默认好友（演示用）
+            // 获取默认好友（演示用）- 现在返回空数组，让用户自己添加
             getDefaultFriends() {
-                return [
-                    { id: 'friend_1', name: '小明', avatar: '👨', online: true, lastMessage: '一起去找宝藏吧！', lastTime: new Date(Date.now() - 3600000).toISOString() },
-                    { id: 'friend_2', name: '小红', avatar: '👩', online: false, lastMessage: '我发现了一个好地方', lastTime: new Date(Date.now() - 7200000).toISOString() },
-                    { id: 'friend_3', name: '探险家', avatar: '🧑‍🚀', online: true, lastMessage: '今天收获不错', lastTime: new Date(Date.now() - 86400000).toISOString() }
-                ];
+                return [];
+            },
+
+            // 显示添加好友面板
+            showAddFriend() {
+                document.getElementById('add-friend-panel').style.display = 'flex';
+                document.getElementById('my-profile-panel').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'none';
+                document.getElementById('my-id-display').value = this.currentUser.id;
+            },
+
+            // 关闭添加好友面板
+            closeAddFriend() {
+                document.getElementById('add-friend-panel').style.display = 'none';
+            },
+
+            // 通过ID添加好友
+            addFriendById() {
+                const friendId = document.getElementById('friend-id-input').value.trim();
+                if (!friendId) {
+                    alert('请输入好友ID');
+                    return;
+                }
+
+                if (friendId === this.currentUser.id) {
+                    alert('不能添加自己为好友');
+                    return;
+                }
+
+                // 检查是否已经是好友
+                if (this.friends.find(f => f.id === friendId)) {
+                    alert('该用户已经是你的好友了');
+                    return;
+                }
+
+                // 创建新好友（实际应用中应该从服务器获取用户信息）
+                const newFriend = {
+                    id: friendId,
+                    name: '新好友',
+                    avatar: '👤',
+                    online: true,
+                    lastMessage: '',
+                    lastTime: new Date().toISOString()
+                };
+
+                this.friends.push(newFriend);
+                this.saveData();
+                
+                alert('✅ 添加好友成功！\n\n请让你的朋友也添加你的ID：\n' + this.currentUser.id);
+                
+                document.getElementById('friend-id-input').value = '';
+                this.closeAddFriend();
+                this.toggleChat();
+                this.updateFriendsList();
+            },
+
+            // 复制我的ID
+            copyMyId() {
+                const idInput = document.getElementById('my-id-display');
+                idInput.select();
+                document.execCommand('copy');
+                
+                // 显示提示
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ 已复制';
+                btn.style.background = '#22C55E';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#4FC3F7';
+                }, 2000);
+            },
+
+            // 生成分享链接
+            generateShareLink() {
+                const baseUrl = window.location.href.split('?')[0];
+                const shareUrl = `${baseUrl}?addFriend=${this.currentUser.id}`;
+                
+                // 复制到剪贴板
+                const tempInput = document.createElement('input');
+                tempInput.value = shareUrl;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                
+                alert('🔗 分享链接已复制到剪贴板！\n\n' + shareUrl + '\n\n将此链接发送给朋友，他们点击后会自动添加你为好友。');
+            },
+
+            // 显示我的信息面板
+            showMyProfile() {
+                document.getElementById('my-profile-panel').style.display = 'flex';
+                document.getElementById('add-friend-panel').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'none';
+                
+                // 填充信息
+                document.getElementById('profile-avatar').textContent = this.currentUser.avatar;
+                document.getElementById('profile-name-input').value = this.currentUser.name;
+                document.getElementById('profile-my-id').textContent = this.currentUser.id;
+                document.getElementById('profile-friends-count').textContent = this.friends.length;
+                
+                // 计算消息总数
+                let totalMessages = 0;
+                Object.values(this.conversations).forEach(conv => {
+                    totalMessages += conv.length;
+                });
+                document.getElementById('profile-messages-count').textContent = totalMessages;
+                
+                // 生成头像选择器
+                this.generateAvatarSelector();
+            },
+
+            // 关闭我的信息面板
+            closeMyProfile() {
+                document.getElementById('my-profile-panel').style.display = 'none';
+            },
+
+            // 更新个人资料
+            updateProfile() {
+                const newName = document.getElementById('profile-name-input').value.trim();
+                if (newName) {
+                    this.currentUser.name = newName;
+                    storageManager.save('chatUser', this.currentUser);
+                    alert('✅ 个人信息已更新');
+                }
+            },
+
+            // 生成头像选择器
+            generateAvatarSelector() {
+                const avatars = ['👤', '👨', '👩', '🧑', '👨‍💼', '👩‍💼', '👨‍🎓', '👩‍🎓', '👨‍🚀', '👩‍🚀', 
+                                '🧑‍🚀', '👨‍🎨', '👩‍🎨', '👨‍🔧', '👩‍🔧', '😀', '😎', '🤓', '🥳', '🤠'];
+                
+                const selector = document.getElementById('avatar-selector');
+                selector.innerHTML = '';
+                
+                avatars.forEach(avatar => {
+                    const btn = document.createElement('button');
+                    btn.textContent = avatar;
+                    btn.style.cssText = `
+                        font-size: 32px;
+                        padding: 10px;
+                        border: 2px solid ${this.currentUser.avatar === avatar ? '#4FC3F7' : '#e0e0e0'};
+                        border-radius: 10px;
+                        background: ${this.currentUser.avatar === avatar ? '#e3f2fd' : 'white'};
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    `;
+                    btn.onclick = () => {
+                        this.currentUser.avatar = avatar;
+                        storageManager.save('chatUser', this.currentUser);
+                        document.getElementById('profile-avatar').textContent = avatar;
+                        this.generateAvatarSelector();
+                    };
+                    selector.appendChild(btn);
+                });
+            },
+
+            // 检查URL参数，自动添加好友
+            checkUrlParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const friendId = urlParams.get('addFriend');
+                
+                if (friendId && friendId !== this.currentUser.id) {
+                    // 检查是否已经是好友
+                    if (!this.friends.find(f => f.id === friendId)) {
+                        const newFriend = {
+                            id: friendId,
+                            name: '新好友',
+                            avatar: '👤',
+                            online: true,
+                            lastMessage: '',
+                            lastTime: new Date().toISOString()
+                        };
+                        this.friends.push(newFriend);
+                        this.saveData();
+                        
+                        // 清除URL参数
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        
+                        alert('🎉 已自动添加好友！\n\n请分享你的ID给对方：\n' + this.currentUser.id);
+                        this.toggleChat();
+                    }
+                }
             },
 
             // 发送消息
@@ -2689,6 +2867,7 @@
 
         // 初始化聊天系统
         chatManager.init();
+        chatManager.checkUrlParams();
     </script>
 
     <!-- 聊天浮动按钮 -->
@@ -2759,17 +2938,41 @@
                 align-items: center;
             ">
                 <span>💬 好友聊天</span>
-                <button onclick="chatManager.toggleChat()" style="
-                    background: rgba(255, 255, 255, 0.2);
-                    border: none;
-                    color: white;
-                    width: 30px;
-                    height: 30px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                    font-size: 20px;
-                    line-height: 1;
-                ">×</button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="chatManager.showAddFriend()" style="
+                        background: rgba(255, 255, 255, 0.2);
+                        border: none;
+                        color: white;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        font-size: 18px;
+                        line-height: 1;
+                    " title="添加好友">+</button>
+                    <button onclick="chatManager.showMyProfile()" style="
+                        background: rgba(255, 255, 255, 0.2);
+                        border: none;
+                        color: white;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        font-size: 16px;
+                        line-height: 1;
+                    " title="我的信息">👤</button>
+                    <button onclick="chatManager.toggleChat()" style="
+                        background: rgba(255, 255, 255, 0.2);
+                        border: none;
+                        color: white;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        font-size: 20px;
+                        line-height: 1;
+                    ">×</button>
+                </div>
             </div>
             <div id="friends-list" style="
                 flex: 1;
@@ -2857,6 +3060,255 @@
                     font-weight: bold;
                     flex-shrink: 0;
                 ">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加好友面板 -->
+    <div id="add-friend-panel" style="
+        display: none;
+        position: fixed;
+        bottom: 100px;
+        right: 30px;
+        width: 380px;
+        height: 500px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        overflow: hidden;
+        flex-direction: column;
+    ">
+        <div style="
+            background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+            color: white;
+            padding: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <span>➕ 添加好友</span>
+            <button onclick="chatManager.closeAddFriend()" style="
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: white;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 20px;
+                line-height: 1;
+            ">×</button>
+        </div>
+        
+        <div style="padding: 20px; flex: 1; overflow-y: auto;">
+            <!-- 输入好友ID -->
+            <div style="margin-bottom: 25px;">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 16px;">通过ID添加</h3>
+                <input id="friend-id-input" type="text" placeholder="输入好友ID" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    margin-bottom: 10px;
+                    box-sizing: border-box;
+                ">
+                <button onclick="chatManager.addFriendById()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 14px;
+                ">添加好友</button>
+            </div>
+
+            <!-- 分享我的ID -->
+            <div style="margin-bottom: 25px;">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 16px;">分享我的ID</h3>
+                <div style="
+                    background: #f5f5f5;
+                    padding: 15px;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                ">
+                    <input id="my-id-display" type="text" readonly style="
+                        flex: 1;
+                        padding: 10px;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 8px;
+                        font-family: monospace;
+                        font-size: 13px;
+                        background: white;
+                    ">
+                    <button onclick="chatManager.copyMyId()" style="
+                        padding: 10px 15px;
+                        background: #4FC3F7;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 13px;
+                        white-space: nowrap;
+                    ">复制</button>
+                </div>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                    💡 将此ID发送给朋友，让他们添加你
+                </p>
+            </div>
+
+            <!-- 生成分享链接 -->
+            <div style="margin-bottom: 25px;">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 16px;">生成分享链接</h3>
+                <button onclick="chatManager.generateShareLink()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #22C55E 0%, #4FC3F7 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 14px;
+                ">🔗 生成分享链接</button>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                    💡 生成一个链接，朋友点击后自动添加你为好友
+                </p>
+            </div>
+
+            <!-- 扫描二维码（未来功能） -->
+            <div style="
+                background: #f9f9f9;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                border: 2px dashed #ddd;
+            ">
+                <div style="font-size: 40px; margin-bottom: 10px;">📱</div>
+                <p style="color: #999; font-size: 13px;">扫描二维码添加好友</p>
+                <p style="color: #999; font-size: 12px; margin-top: 5px;">（即将推出）</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 我的信息面板 -->
+    <div id="my-profile-panel" style="
+        display: none;
+        position: fixed;
+        bottom: 100px;
+        right: 30px;
+        width: 380px;
+        height: 500px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        overflow: hidden;
+        flex-direction: column;
+    ">
+        <div style="
+            background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+            color: white;
+            padding: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <span>👤 我的信息</span>
+            <button onclick="chatManager.closeMyProfile()" style="
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: white;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 20px;
+                line-height: 1;
+            ">×</button>
+        </div>
+        
+        <div style="padding: 20px; flex: 1; overflow-y: auto;">
+            <!-- 头像和昵称 -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div id="profile-avatar" style="
+                    font-size: 80px;
+                    margin-bottom: 15px;
+                ">👤</div>
+                <input id="profile-name-input" type="text" placeholder="输入昵称" style="
+                    width: 200px;
+                    padding: 10px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    text-align: center;
+                    font-weight: bold;
+                ">
+                <button onclick="chatManager.updateProfile()" style="
+                    display: block;
+                    margin: 10px auto 0;
+                    padding: 8px 20px;
+                    background: #4FC3F7;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 13px;
+                ">保存</button>
+            </div>
+
+            <!-- 我的ID -->
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 14px;">我的ID</h3>
+                <div style="
+                    background: #f5f5f5;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-family: monospace;
+                    font-size: 13px;
+                    word-break: break-all;
+                " id="profile-my-id"></div>
+            </div>
+
+            <!-- 选择头像 -->
+            <div style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 14px;">选择头像</h3>
+                <div id="avatar-selector" style="
+                    display: grid;
+                    grid-template-columns: repeat(5, 1fr);
+                    gap: 10px;
+                ">
+                    <!-- 头像选项会动态生成 -->
+                </div>
+            </div>
+
+            <!-- 统计信息 -->
+            <div style="
+                background: linear-gradient(135deg, #f5f5f5 0%, #e9ecef 100%);
+                padding: 15px;
+                border-radius: 10px;
+            ">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 14px;">统计</h3>
+                <div style="display: flex; justify-content: space-around; text-align: center;">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #4FC3F7;" id="profile-friends-count">0</div>
+                        <div style="font-size: 12px; color: #666;">好友</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #22C55E;" id="profile-messages-count">0</div>
+                        <div style="font-size: 12px; color: #666;">消息</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
