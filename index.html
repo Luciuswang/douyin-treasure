@@ -2514,7 +2514,81 @@
                     });
                 }, 30000); // 每30秒更新一次
                 
+                // 5. 从Firebase加载好友列表
+                this.loadFriendsFromFirebase();
+                
+                // 6. 监听好友在线状态变化
+                this.watchFriendsOnlineStatus();
+                
                 console.log('✅ Firebase实时通信已启动');
+            },
+            
+            // 从Firebase加载好友列表
+            loadFriendsFromFirebase() {
+                if (!firebaseEnabled || !database) return;
+                
+                const userId = this.currentUser.id;
+                const friendshipsRef = database.ref(`friendships/${userId}`);
+                
+                friendshipsRef.once('value', (snapshot) => {
+                    const friendships = snapshot.val();
+                    if (friendships) {
+                        Object.keys(friendships).forEach(friendId => {
+                            const friendship = friendships[friendId];
+                            // 检查是否已经是好友
+                            if (!this.friends.find(f => f.id === friendId)) {
+                                // 获取好友的详细信息
+                                const friendUserRef = database.ref(`users/${friendId}`);
+                                friendUserRef.once('value', (friendSnapshot) => {
+                                    const friendUserData = friendSnapshot.val();
+                                    if (friendUserData) {
+                                        const newFriend = {
+                                            id: friendId,
+                                            name: friendUserData.name || friendship.friendName || '新好友',
+                                            avatar: friendUserData.avatar || friendship.friendAvatar || '👤',
+                                            online: friendUserData.online || false,
+                                            lastMessage: '',
+                                            lastTime: new Date().toISOString()
+                                        };
+                                        
+                                        this.friends.push(newFriend);
+                                        this.saveData();
+                                        this.updateFriendsList();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            },
+            
+            // 监听好友在线状态变化
+            watchFriendsOnlineStatus() {
+                if (!firebaseEnabled || !database) return;
+                
+                this.friends.forEach(friend => {
+                    this.watchFriendOnlineStatus(friend.id);
+                });
+            },
+            
+            // 监听单个好友的在线状态
+            watchFriendOnlineStatus(friendId) {
+                if (!firebaseEnabled || !database) return;
+                
+                const friendOnlineRef = database.ref(`users/${friendId}/online`);
+                friendOnlineRef.on('value', (snapshot) => {
+                    const isOnline = snapshot.val();
+                    const friendIndex = this.friends.findIndex(f => f.id === friendId);
+                    if (friendIndex !== -1) {
+                        this.friends[friendIndex].online = isOnline || false;
+                        this.updateFriendsList();
+                        
+                        // 如果用户信息面板打开，也更新显示
+                        if (document.getElementById('my-profile-panel').style.display === 'flex') {
+                            this.updateProfileFriendsList();
+                        }
+                    }
+                });
             },
             
             // 处理从Firebase接收的消息
@@ -2662,25 +2736,90 @@
                     return;
                 }
 
-                // 创建新好友（实际应用中应该从服务器获取用户信息）
-                const newFriend = {
-                    id: friendId,
-                    name: '新好友',
-                    avatar: '👤',
-                    online: true,
-                    lastMessage: '',
-                    lastTime: new Date().toISOString()
-                };
+                // 如果Firebase已启用，从Firebase获取用户信息
+                if (firebaseEnabled && database) {
+                    const userRef = database.ref(`users/${friendId}`);
+                    userRef.once('value', (snapshot) => {
+                        const userData = snapshot.val();
+                        if (userData) {
+                            // 从Firebase获取用户信息
+                            const newFriend = {
+                                id: friendId,
+                                name: userData.name || '新好友',
+                                avatar: userData.avatar || '👤',
+                                online: userData.online || false,
+                                lastMessage: '',
+                                lastTime: new Date().toISOString()
+                            };
 
-                this.friends.push(newFriend);
-                this.saveData();
+                            this.friends.push(newFriend);
+                            this.saveData();
+                            
+                            // 同步到Firebase
+                            this.syncFriendshipToFirebase(friendId, newFriend);
+                            
+                            // 开始监听新好友的在线状态
+                            if (firebaseEnabled && database) {
+                                this.watchFriendOnlineStatus(friendId);
+                            }
+                            
+                            alert(`✅ 添加好友成功！\n\n好友名称：${newFriend.name}\n\n请让你的朋友也添加你的ID：\n${this.currentUser.id}`);
+                            
+                            document.getElementById('friend-id-input').value = '';
+                            this.closeAddFriend();
+                            this.toggleChat();
+                            this.updateFriendsList();
+                            
+                            // 如果用户信息面板打开，更新好友列表
+                            if (document.getElementById('my-profile-panel').style.display === 'flex') {
+                                this.updateProfileFriendsList();
+                                document.getElementById('profile-friends-count').textContent = this.friends.length;
+                            }
+                        } else {
+                            alert('❌ 未找到该用户！\n\n请确认：\n1. 用户ID是否正确\n2. 该用户是否已登录过游戏\n3. 该用户是否在Firebase中注册');
+                        }
+                    }, (error) => {
+                        console.error('获取用户信息失败:', error);
+                        alert('❌ 获取用户信息失败，请稍后重试');
+                    });
+                } else {
+                    // Firebase未启用，使用本地模式
+                    const newFriend = {
+                        id: friendId,
+                        name: '新好友',
+                        avatar: '👤',
+                        online: true,
+                        lastMessage: '',
+                        lastTime: new Date().toISOString()
+                    };
+
+                    this.friends.push(newFriend);
+                    this.saveData();
+                    
+                    alert('✅ 添加好友成功！\n\n请让你的朋友也添加你的ID：\n' + this.currentUser.id);
+                    
+                    document.getElementById('friend-id-input').value = '';
+                    this.closeAddFriend();
+                    this.toggleChat();
+                    this.updateFriendsList();
+                }
+            },
+            
+            // 同步好友关系到Firebase
+            syncFriendshipToFirebase(friendId, friendData) {
+                if (!firebaseEnabled || !database) return;
                 
-                alert('✅ 添加好友成功！\n\n请让你的朋友也添加你的ID：\n' + this.currentUser.id);
-                
-                document.getElementById('friend-id-input').value = '';
-                this.closeAddFriend();
-                this.toggleChat();
-                this.updateFriendsList();
+                try {
+                    const friendshipRef = database.ref(`friendships/${this.currentUser.id}/${friendId}`);
+                    friendshipRef.set({
+                        friendId: friendId,
+                        friendName: friendData.name,
+                        friendAvatar: friendData.avatar,
+                        addedAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+                } catch (error) {
+                    console.error('同步好友关系失败:', error);
+                }
             },
 
             // 复制我的ID
@@ -2735,8 +2874,72 @@
                 });
                 document.getElementById('profile-messages-count').textContent = totalMessages;
                 
+                // 更新好友列表显示
+                this.updateProfileFriendsList();
+                
                 // 生成头像选择器
                 this.generateAvatarSelector();
+            },
+            
+            // 更新用户信息面板中的好友列表
+            updateProfileFriendsList() {
+                const friendsList = document.getElementById('profile-friends-list');
+                if (!friendsList) return;
+                
+                friendsList.innerHTML = '';
+                
+                if (this.friends.length === 0) {
+                    friendsList.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无好友<br><small>点击💬按钮添加好友</small></div>';
+                    return;
+                }
+                
+                // 按最后消息时间排序
+                const sortedFriends = [...this.friends].sort((a, b) => {
+                    return new Date(b.lastTime || 0) - new Date(a.lastTime || 0);
+                });
+                
+                sortedFriends.forEach(friend => {
+                    const friendDiv = document.createElement('div');
+                    friendDiv.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        padding: 10px;
+                        margin-bottom: 8px;
+                        background: white;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        gap: 10px;
+                    `;
+                    friendDiv.onmouseover = function() { this.style.background = '#f0f0f0'; };
+                    friendDiv.onmouseout = function() { this.style.background = 'white'; };
+                    friendDiv.onclick = () => {
+                        // 关闭用户信息面板，打开聊天
+                        this.closeMyProfile();
+                        this.toggleChat();
+                        this.openChat(friend.id);
+                    };
+                    
+                    friendDiv.innerHTML = `
+                        <div style="font-size: 28px; flex-shrink: 0;">${friend.avatar}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 2px;">
+                                ${friend.name}
+                                <span style="color: ${friend.online ? '#22C55E' : '#999'}; font-size: 10px;">
+                                    ${friend.online ? '●' : '○'}
+                                </span>
+                            </div>
+                            <div style="font-size: 12px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${friend.lastMessage || '暂无消息'}
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #999; flex-shrink: 0;">
+                            ${this.formatTime(friend.lastTime)}
+                        </div>
+                    `;
+                    
+                    friendsList.appendChild(friendDiv);
+                });
             },
 
             // 关闭我的信息面板
@@ -3655,6 +3858,22 @@
                         <div style="font-size: 24px; font-weight: bold; color: #22C55E;" id="profile-messages-count">0</div>
                         <div style="font-size: 12px; color: #666;">消息</div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- 好友列表 -->
+            <div style="
+                background: linear-gradient(135deg, #f5f5f5 0%, #e9ecef 100%);
+                padding: 15px;
+                border-radius: 10px;
+                margin-top: 15px;
+            ">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 14px;">我的好友</h3>
+                <div id="profile-friends-list" style="
+                    max-height: 200px;
+                    overflow-y: auto;
+                ">
+                    <!-- 好友列表将在这里动态生成 -->
                 </div>
             </div>
         </div>
