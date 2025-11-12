@@ -973,6 +973,20 @@
             if (userData.username && chatManager.currentUser) {
                 chatManager.currentUser.name = userData.username;
                 storageManager.save('chatUser', chatManager.currentUser);
+                
+                // 同步到Firebase
+                if (firebaseEnabled && database && chatManager.currentUser.id) {
+                    try {
+                        const userRef = database.ref(`users/${chatManager.currentUser.id}`);
+                        userRef.update({
+                            name: userData.username,
+                            updatedAt: firebase.database.ServerValue.TIMESTAMP
+                        });
+                        console.log('✅ 昵称已同步到Firebase:', userData.username);
+                    } catch (error) {
+                        console.error('❌ Firebase同步昵称失败:', error);
+                    }
+                }
             }
         }
 
@@ -2180,10 +2194,23 @@
 
         // 首次使用检查
         function checkFirstTimeUser() {
-            const isFirstTime = !localStorage.getItem('totofun-treasure-user');
+            // 检查是否有游戏数据（更可靠的检查方式）
+            const gameData = storageManager.load('totofun-treasure-user');
+            const isFirstTime = !gameData || !gameData.username;
+            
             if (isFirstTime) {
                 // 首次使用，显示欢迎和昵称设置
                 setTimeout(() => {
+                    // 确保聊天系统已初始化（获取用户ID）
+                    if (!chatManager.currentUser) {
+                        console.warn('⚠️ 聊天系统未初始化，等待初始化...');
+                        setTimeout(() => checkFirstTimeUser(), 500);
+                        return;
+                    }
+                    
+                    const currentUserId = chatManager.currentUser.id;
+                    console.log('📝 首次使用，当前用户ID:', currentUserId);
+                    
                     const username = prompt('🎉 欢迎来到 Totofun 突突翻！\n\n请输入你的游戏昵称（3-10个字符）:\n\n💡 提示：昵称会自动保存，下次访问时无需重新输入', '寻宝探险家');
                     if (username && username.length >= 3 && username.length <= 10) {
                         userData.username = username;
@@ -2192,6 +2219,31 @@
                         
                         // 更新显示
                         document.getElementById('user-name').textContent = username;
+                        
+                        // 确保用户ID一致性（重要！）
+                        if (chatManager.currentUser.id !== currentUserId) {
+                            console.warn('⚠️ 用户ID不一致，修复中...');
+                            chatManager.currentUser.id = currentUserId;
+                            storageManager.save('chatUser', chatManager.currentUser);
+                        }
+                        
+                        // 同步到Firebase
+                        if (firebaseEnabled && database) {
+                            try {
+                                const userRef = database.ref(`users/${currentUserId}`);
+                                userRef.set({
+                                    id: currentUserId,
+                                    name: username,
+                                    avatar: chatManager.currentUser.avatar || '👤',
+                                    online: true,
+                                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                                    updatedAt: firebase.database.ServerValue.TIMESTAMP
+                                });
+                                console.log('✅ 用户信息已同步到Firebase');
+                            } catch (error) {
+                                console.error('❌ Firebase同步失败:', error);
+                            }
+                        }
                         
                         // 显示用户ID提示
                         setTimeout(() => {
@@ -2209,6 +2261,29 @@
                 if (userData.username) {
                     updateStatus(`欢迎回来，${userData.username}！`, 'success');
                     document.getElementById('user-name').textContent = userData.username;
+                    
+                    // 确保用户ID一致性
+                    if (chatManager.currentUser) {
+                        const currentUserId = chatManager.currentUser.id;
+                        console.log('✅ 老用户，用户ID:', currentUserId);
+                        
+                        // 同步到Firebase（确保Firebase中有最新信息）
+                        if (firebaseEnabled && database) {
+                            try {
+                                const userRef = database.ref(`users/${currentUserId}`);
+                                userRef.update({
+                                    name: userData.username,
+                                    avatar: chatManager.currentUser.avatar || '👤',
+                                    online: true,
+                                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                                    updatedAt: firebase.database.ServerValue.TIMESTAMP
+                                });
+                                console.log('✅ 用户信息已同步到Firebase');
+                            } catch (error) {
+                                console.error('❌ Firebase同步失败:', error);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2217,9 +2292,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 加载用户数据
             loadUserData();
-
-            // 检查首次用户
-            checkFirstTimeUser();
+            
+            // 等待聊天系统初始化完成后再检查首次用户
+            // chatManager.init()在页面底部执行，需要延迟检查
+            setTimeout(() => {
+                checkFirstTimeUser();
+            }, 500);
             
             // 自动启动地图（延迟1秒，让页面先渲染）
             setTimeout(() => {
@@ -2429,10 +2507,13 @@
 
             // 初始化当前用户
             init() {
+                console.log('🔧 开始初始化聊天系统...');
+                
                 // 尝试加载已有的聊天用户
                 let savedChatUser = storageManager.load('chatUser');
                 
                 if (!savedChatUser) {
+                    console.log('📝 未找到已有用户，创建新用户...');
                     // 如果没有聊天用户，创建一个持久的ID
                     // 使用固定的ID生成方式，确保用户ID不会改变
                     const userId = this.generatePersistentUserId();
@@ -2450,16 +2531,20 @@
                     };
                     
                     storageManager.save('chatUser', savedChatUser);
+                    console.log('✅ 新用户已创建:', userId, '昵称:', username);
                 } else {
+                    console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
                     // 同步游戏昵称到聊天昵称
                     const gameUserData = storageManager.load('totofun-treasure-user');
                     if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
                         savedChatUser.name = gameUserData.username;
                         storageManager.save('chatUser', savedChatUser);
+                        console.log('✅ 昵称已同步:', gameUserData.username);
                     }
                 }
                 
                 this.currentUser = savedChatUser;
+                console.log('👤 当前用户:', this.currentUser.id, this.currentUser.name);
                 
                 // 加载好友列表
                 this.friends = storageManager.load('chatFriends') || this.getDefaultFriends();
@@ -2681,8 +2766,36 @@
             
             // 生成持久的用户ID（基于浏览器指纹）
             generatePersistentUserId() {
-                // 尝试从localStorage获取已存在的ID
+                // 尝试从多个地方获取已存在的ID（增强持久性）
                 let userId = localStorage.getItem('totofun-user-id');
+                
+                // 如果localStorage中没有，尝试从sessionStorage获取（作为备份）
+                if (!userId) {
+                    userId = sessionStorage.getItem('totofun-user-id');
+                    if (userId) {
+                        // 如果sessionStorage中有，同步到localStorage
+                        try {
+                            localStorage.setItem('totofun-user-id', userId);
+                        } catch (e) {
+                            console.warn('localStorage写入失败，使用sessionStorage:', e);
+                        }
+                    }
+                }
+                
+                // 如果还是没有，尝试从已有的聊天用户数据中恢复
+                if (!userId) {
+                    const savedChatUser = storageManager.load('chatUser');
+                    if (savedChatUser && savedChatUser.id) {
+                        userId = savedChatUser.id;
+                        // 保存到localStorage和sessionStorage
+                        try {
+                            localStorage.setItem('totofun-user-id', userId);
+                            sessionStorage.setItem('totofun-user-id', userId);
+                        } catch (e) {
+                            console.warn('保存用户ID失败:', e);
+                        }
+                    }
+                }
                 
                 if (!userId) {
                     // 生成新的持久ID
@@ -2692,8 +2805,22 @@
                     const browserInfo = navigator.userAgent.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
                     userId = `user_${timestamp}_${random}_${browserInfo}`.substring(0, 50);
                     
-                    // 永久保存
-                    localStorage.setItem('totofun-user-id', userId);
+                    // 永久保存到多个位置
+                    try {
+                        localStorage.setItem('totofun-user-id', userId);
+                        sessionStorage.setItem('totofun-user-id', userId);
+                        console.log('✅ 新用户ID已生成:', userId);
+                    } catch (e) {
+                        console.error('❌ 保存用户ID失败:', e);
+                        // 如果localStorage失败，至少保存到sessionStorage
+                        try {
+                            sessionStorage.setItem('totofun-user-id', userId);
+                        } catch (e2) {
+                            console.error('❌ sessionStorage也失败:', e2);
+                        }
+                    }
+                } else {
+                    console.log('✅ 恢复用户ID:', userId);
                 }
                 
                 return userId;
