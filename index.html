@@ -38,6 +38,10 @@
     <meta name="msapplication-TileImage" content="assets/images/icon-144x144.png">
     <meta name="msapplication-config" content="browserconfig.xml">
     
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * { 
             margin: 0; 
@@ -545,7 +549,44 @@
     </div>
 
     <script>
-        // 全局变量
+        // ==================== Firebase配置 ====================
+        // ⚠️ 重要：请先按照 FIREBASE_SETUP.md 中的说明配置Firebase
+        // 然后在这里填入你的Firebase配置信息
+        
+        const firebaseConfig = {
+            // 🔧 请替换为你的Firebase配置信息
+            // 获取方式：Firebase控制台 → 项目设置 → 你的应用 → 配置
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-east1.firebasedatabase.app",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Firebase初始化
+        let firebaseApp = null;
+        let database = null;
+        let firebaseEnabled = false;
+        
+        try {
+            // 检查是否配置了Firebase
+            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                firebaseEnabled = true;
+                console.log('✅ Firebase连接成功！实时通信已启用');
+            } else {
+                console.warn('⚠️ Firebase未配置，将使用本地存储模式（需要手动分享消息链接）');
+                console.log('💡 请按照 FIREBASE_SETUP.md 中的说明配置Firebase以启用实时通信');
+            }
+        } catch (error) {
+            console.error('❌ Firebase初始化失败:', error);
+            console.log('💡 将使用本地存储模式（需要手动分享消息链接）');
+        }
+        
+        // ==================== 全局变量 ====================
         let map = null;
         let userMarker = null;
         let treasureMarkers = [];
@@ -2428,6 +2469,140 @@
                 this.conversations = storageManager.load('chatConversations') || {};
                 
                 this.updateUnreadCount();
+                
+                // 初始化Firebase实时通信
+                if (firebaseEnabled && database) {
+                    this.initFirebaseRealtime();
+                }
+            },
+            
+            // 初始化Firebase实时通信
+            initFirebaseRealtime() {
+                if (!firebaseEnabled || !database) return;
+                
+                const userId = this.currentUser.id;
+                
+                // 1. 将用户信息同步到Firebase
+                const userRef = database.ref(`users/${userId}`);
+                userRef.set({
+                    id: userId,
+                    name: this.currentUser.name,
+                    avatar: this.currentUser.avatar,
+                    online: true,
+                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                    updatedAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                // 2. 监听发送给当前用户的消息
+                const messagesRef = database.ref(`messages/${userId}`);
+                messagesRef.on('child_added', (snapshot) => {
+                    const messageData = snapshot.val();
+                    if (messageData && messageData.from !== userId) {
+                        this.handleFirebaseMessage(messageData);
+                    }
+                });
+                
+                // 3. 监听用户在线状态
+                const onlineRef = database.ref(`users/${userId}/online`);
+                onlineRef.onDisconnect().set(false);
+                onlineRef.set(true);
+                
+                // 4. 定期更新最后在线时间
+                setInterval(() => {
+                    userRef.update({
+                        lastSeen: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }, 30000); // 每30秒更新一次
+                
+                console.log('✅ Firebase实时通信已启动');
+            },
+            
+            // 处理从Firebase接收的消息
+            handleFirebaseMessage(messageData) {
+                const friendId = messageData.from;
+                
+                // 确保发送者是好友
+                let friend = this.friends.find(f => f.id === friendId);
+                if (!friend) {
+                    // 如果不是好友，先添加为好友
+                    friend = {
+                        id: friendId,
+                        name: messageData.fromName || '新好友',
+                        avatar: messageData.fromAvatar || '👤',
+                        online: true,
+                        lastMessage: '',
+                        lastTime: new Date().toISOString()
+                    };
+                    this.friends.push(friend);
+                    this.saveData();
+                }
+                
+                // 保存消息
+                if (!this.conversations[friendId]) {
+                    this.conversations[friendId] = [];
+                }
+                
+                // 检查消息是否已存在（避免重复）
+                const messageExists = this.conversations[friendId].some(
+                    m => m.id === messageData.id || (m.timestamp === messageData.timestamp && m.content === messageData.content)
+                );
+                
+                if (!messageExists) {
+                    const receivedMessage = {
+                        id: messageData.id || 'msg_' + Date.now(),
+                        from: friendId,
+                        to: this.currentUser.id,
+                        content: messageData.content,
+                        type: messageData.type || 'text',
+                        timestamp: messageData.timestamp || new Date().toISOString(),
+                        read: false
+                    };
+                    
+                    this.conversations[friendId].push(receivedMessage);
+                    
+                    // 更新好友最后消息
+                    friend.lastMessage = messageData.type === 'location' ? '📍 位置' : messageData.content;
+                    friend.lastTime = receivedMessage.timestamp;
+                    
+                    this.updateUnreadCount();
+                    this.saveData();
+                    
+                    // 显示通知
+                    if (document.getElementById('chat-container').style.display === 'none') {
+                        // 如果聊天窗口未打开，显示通知
+                        this.showNotification(friend.name, messageData.content);
+                    }
+                    
+                    // 如果聊天窗口已打开，更新显示
+                    if (document.getElementById('chat-container').style.display !== 'none') {
+                        const activeFriendId = document.getElementById('chat-panel').dataset.friendId;
+                        if (activeFriendId === friendId) {
+                            this.openChat(friendId);
+                        } else {
+                            this.updateFriendsList();
+                        }
+                    }
+                }
+            },
+            
+            // 显示消息通知
+            showNotification(friendName, message) {
+                // 检查浏览器是否支持通知
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(`来自 ${friendName} 的消息`, {
+                        body: message,
+                        icon: '/assets/images/icon-32x32.png'
+                    });
+                } else if ('Notification' in window && Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            new Notification(`来自 ${friendName} 的消息`, {
+                                body: message,
+                                icon: '/assets/images/icon-32x32.png'
+                            });
+                        }
+                    });
+                }
             },
             
             // 生成持久的用户ID（基于浏览器指纹）
@@ -2735,6 +2910,7 @@
                     read: false
                 };
 
+                // 保存到本地对话记录
                 if (!this.conversations[friendId]) {
                     this.conversations[friendId] = [];
                 }
@@ -2749,7 +2925,37 @@
 
                 this.saveData();
                 
+                // 如果Firebase已启用，通过Firebase发送实时消息
+                if (firebaseEnabled && database) {
+                    this.sendFirebaseMessage(friendId, message);
+                }
+                
                 return message;
+            },
+            
+            // 通过Firebase发送消息
+            sendFirebaseMessage(friendId, message) {
+                if (!firebaseEnabled || !database) return;
+                
+                try {
+                    // 将消息发送到接收者的消息队列
+                    const messageRef = database.ref(`messages/${friendId}`).push();
+                    messageRef.set({
+                        id: message.id,
+                        from: message.from,
+                        fromName: this.currentUser.name,
+                        fromAvatar: this.currentUser.avatar,
+                        to: friendId,
+                        content: message.content,
+                        type: message.type,
+                        timestamp: message.timestamp,
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    
+                    console.log('✅ 消息已通过Firebase发送:', message.id);
+                } catch (error) {
+                    console.error('❌ Firebase发送消息失败:', error);
+                }
             },
             
             // 生成消息分享链接（用于跨设备通信）
@@ -2897,16 +3103,19 @@
                 // 重新渲染聊天界面
                 this.openChat(friendId);
                 
-                // 提示用户如何分享消息（只在第一次发送时显示）
-                if (!localStorage.getItem('messageShareTipShown')) {
+                // 如果Firebase未启用，提示用户如何分享消息（只在第一次发送时显示）
+                if (!firebaseEnabled && !localStorage.getItem('messageShareTipShown')) {
                     setTimeout(() => {
-                        const share = confirm('💬 消息已发送到本地！\n\n📱 由于是纯前端应用，好友需要打开你发送的消息链接才能看到。\n\n是否生成消息分享链接？\n\n（点击"确定"生成链接，点击"取消"跳过）');
+                        const share = confirm('💬 消息已发送到本地！\n\n📱 由于Firebase未配置，好友需要打开你发送的消息链接才能看到。\n\n是否生成消息分享链接？\n\n💡 提示：配置Firebase后可实现实时通信，无需手动分享链接！\n\n（点击"确定"生成链接，点击"取消"跳过）');
                         if (share) {
                             const messageUrl = this.generateMessageLink(friendId, message);
-                            alert('✅ 消息链接已复制到剪贴板！\n\n📋 链接：' + messageUrl.substring(0, 80) + '...\n\n💡 使用方法：\n1. 将链接通过微信/QQ等发送给好友\n2. 好友点击链接后会自动接收消息\n3. 好友需要先添加你为好友（通过你的ID）');
+                            alert('✅ 消息链接已复制到剪贴板！\n\n📋 链接：' + messageUrl.substring(0, 80) + '...\n\n💡 使用方法：\n1. 将链接通过微信/QQ等发送给好友\n2. 好友点击链接后会自动接收消息\n3. 好友需要先添加你为好友（通过你的ID）\n\n💡 建议：配置Firebase后可实现实时通信，无需手动分享链接！');
                         }
                         localStorage.setItem('messageShareTipShown', 'true');
                     }, 300);
+                } else if (firebaseEnabled) {
+                    // Firebase已启用，消息会实时发送
+                    console.log('✅ 消息已通过Firebase实时发送');
                 }
             },
 
