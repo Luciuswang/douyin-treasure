@@ -2580,10 +2580,21 @@
                 
                 // 2. 监听发送给当前用户的消息
                 const messagesRef = database.ref(`messages/${userId}`);
+                
+                // 监听新消息
                 messagesRef.on('child_added', (snapshot) => {
                     const messageData = snapshot.val();
+                    console.log('📨 收到新消息:', messageData);
                     if (messageData && messageData.from !== userId) {
                         this.handleFirebaseMessage(messageData);
+                    }
+                });
+                
+                // 监听消息变化（确保实时更新）
+                messagesRef.on('value', (snapshot) => {
+                    const allMessages = snapshot.val();
+                    if (allMessages) {
+                        console.log('📬 消息列表更新，共', Object.keys(allMessages).length, '条消息');
                     }
                 });
                 
@@ -2678,11 +2689,13 @@
             
             // 处理从Firebase接收的消息
             handleFirebaseMessage(messageData) {
+                console.log('💬 处理Firebase消息:', messageData);
                 const friendId = messageData.from;
                 
                 // 确保发送者是好友
                 let friend = this.friends.find(f => f.id === friendId);
                 if (!friend) {
+                    console.log('➕ 自动添加新好友:', friendId);
                     // 如果不是好友，先添加为好友
                     friend = {
                         id: friendId,
@@ -2707,6 +2720,7 @@
                 );
                 
                 if (!messageExists) {
+                    console.log('✅ 添加新消息到对话:', messageData.content);
                     const receivedMessage = {
                         id: messageData.id || 'msg_' + Date.now(),
                         from: friendId,
@@ -2726,21 +2740,34 @@
                     this.updateUnreadCount();
                     this.saveData();
                     
-                    // 显示通知
-                    if (document.getElementById('chat-container').style.display === 'none') {
+                    // 检查聊天窗口状态
+                    const chatContainer = document.getElementById('chat-container');
+                    const chatPanel = document.getElementById('chat-panel');
+                    const isChatOpen = chatContainer && chatContainer.style.display !== 'none' && chatContainer.style.display !== '';
+                    const activeFriendId = chatPanel ? chatPanel.dataset.friendId : null;
+                    
+                    console.log('💬 聊天状态:', { isChatOpen, activeFriendId, friendId });
+                    
+                    if (isChatOpen && activeFriendId === friendId) {
+                        // 如果正在和这个好友聊天，立即更新聊天界面
+                        console.log('🔄 实时更新聊天界面');
+                        this.openChat(friendId);
+                    } else if (isChatOpen) {
+                        // 如果聊天窗口打开但不是这个好友，更新好友列表
+                        console.log('🔄 更新好友列表');
+                        this.updateFriendsList();
+                    } else {
                         // 如果聊天窗口未打开，显示通知
+                        console.log('🔔 显示通知');
                         this.showNotification(friend.name, messageData.content);
                     }
                     
-                    // 如果聊天窗口已打开，更新显示
-                    if (document.getElementById('chat-container').style.display !== 'none') {
-                        const activeFriendId = document.getElementById('chat-panel').dataset.friendId;
-                        if (activeFriendId === friendId) {
-                            this.openChat(friendId);
-                        } else {
-                            this.updateFriendsList();
-                        }
+                    // 如果用户信息面板打开，也更新好友列表
+                    if (document.getElementById('my-profile-panel') && document.getElementById('my-profile-panel').style.display === 'flex') {
+                        this.updateProfileFriendsList();
                     }
+                } else {
+                    console.log('⚠️ 消息已存在，跳过:', messageData.id);
                 }
             },
             
@@ -3268,6 +3295,7 @@
                 if (!firebaseEnabled || !database) return;
                 
                 try {
+                    console.log('📤 通过Firebase发送消息:', { to: friendId, content: message.content });
                     // 将消息发送到接收者的消息队列
                     const messageRef = database.ref(`messages/${friendId}`).push();
                     messageRef.set({
@@ -3280,11 +3308,15 @@
                         type: message.type,
                         timestamp: message.timestamp,
                         createdAt: firebase.database.ServerValue.TIMESTAMP
+                    }, (error) => {
+                        if (error) {
+                            console.error('❌ Firebase发送消息失败:', error);
+                        } else {
+                            console.log('✅ 消息已成功发送到Firebase:', message.id);
+                        }
                     });
-                    
-                    console.log('✅ 消息已通过Firebase发送:', message.id);
                 } catch (error) {
-                    console.error('❌ Firebase发送消息失败:', error);
+                    console.error('❌ Firebase发送消息异常:', error);
                 }
             },
             
