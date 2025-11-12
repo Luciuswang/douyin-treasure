@@ -927,6 +927,12 @@
         function saveUserData() {
             userData.lastActiveAt = new Date();
             storageManager.save('totofun-treasure-user', userData);
+            
+            // 同步昵称到聊天系统
+            if (userData.username && chatManager.currentUser) {
+                chatManager.currentUser.name = userData.username;
+                storageManager.save('chatUser', chatManager.currentUser);
+            }
         }
 
         function loadUserData() {
@@ -2137,11 +2143,21 @@
             if (isFirstTime) {
                 // 首次使用，显示欢迎和昵称设置
                 setTimeout(() => {
-                    const username = prompt('🎉 欢迎来到 Totofun 突突翻！\n\n请输入你的游戏昵称（3-10个字符）:', '寻宝探险家');
+                    const username = prompt('🎉 欢迎来到 Totofun 突突翻！\n\n请输入你的游戏昵称（3-10个字符）:\n\n💡 提示：昵称会自动保存，下次访问时无需重新输入', '寻宝探险家');
                     if (username && username.length >= 3 && username.length <= 10) {
                         userData.username = username;
                         saveUserData();
-                        updateStatus(`欢迎，${username}！开始你的寻宝之旅吧！`, 'success');
+                        updateStatus(`欢迎，${username}！你的昵称已保存`, 'success');
+                        
+                        // 更新显示
+                        document.getElementById('user-name').textContent = username;
+                        
+                        // 显示用户ID提示
+                        setTimeout(() => {
+                            if (chatManager.currentUser) {
+                                alert(`✅ 你的游戏昵称：${username}\n🆔 你的用户ID：${chatManager.currentUser.id}\n\n💡 用户ID是永久的，好友可以通过这个ID添加你！\n\n你可以在"我的信息"中查看和分享你的ID。`);
+                            }
+                        }, 1000);
                     } else if (username) {
                         alert('昵称长度应该在3-10个字符之间');
                         checkFirstTimeUser();
@@ -2151,6 +2167,7 @@
                 // 老用户，显示欢迎回来消息
                 if (userData.username) {
                     updateStatus(`欢迎回来，${userData.username}！`, 'success');
+                    document.getElementById('user-name').textContent = userData.username;
                 }
             }
         }
@@ -2371,13 +2388,37 @@
 
             // 初始化当前用户
             init() {
-                this.currentUser = storageManager.load('chatUser') || {
-                    id: 'user_' + Date.now(),
-                    name: '游客' + Math.floor(Math.random() * 1000),
-                    avatar: '👤',
-                    online: true
-                };
-                storageManager.save('chatUser', this.currentUser);
+                // 尝试加载已有的聊天用户
+                let savedChatUser = storageManager.load('chatUser');
+                
+                if (!savedChatUser) {
+                    // 如果没有聊天用户，创建一个持久的ID
+                    // 使用固定的ID生成方式，确保用户ID不会改变
+                    const userId = this.generatePersistentUserId();
+                    
+                    // 尝试从游戏数据中获取昵称
+                    const gameUserData = storageManager.load('totofun-treasure-user');
+                    const username = gameUserData?.username || '游客';
+                    
+                    savedChatUser = {
+                        id: userId,
+                        name: username,
+                        avatar: '👤',
+                        online: true,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    storageManager.save('chatUser', savedChatUser);
+                } else {
+                    // 同步游戏昵称到聊天昵称
+                    const gameUserData = storageManager.load('totofun-treasure-user');
+                    if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
+                        savedChatUser.name = gameUserData.username;
+                        storageManager.save('chatUser', savedChatUser);
+                    }
+                }
+                
+                this.currentUser = savedChatUser;
                 
                 // 加载好友列表
                 this.friends = storageManager.load('chatFriends') || this.getDefaultFriends();
@@ -2387,6 +2428,26 @@
                 this.conversations = storageManager.load('chatConversations') || {};
                 
                 this.updateUnreadCount();
+            },
+            
+            // 生成持久的用户ID（基于浏览器指纹）
+            generatePersistentUserId() {
+                // 尝试从localStorage获取已存在的ID
+                let userId = localStorage.getItem('totofun-user-id');
+                
+                if (!userId) {
+                    // 生成新的持久ID
+                    // 使用时间戳 + 随机数 + 浏览器信息
+                    const timestamp = Date.now();
+                    const random = Math.random().toString(36).substring(2, 15);
+                    const browserInfo = navigator.userAgent.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
+                    userId = `user_${timestamp}_${random}_${browserInfo}`.substring(0, 50);
+                    
+                    // 永久保存
+                    localStorage.setItem('totofun-user-id', userId);
+                }
+                
+                return userId;
             },
 
             // 获取默认好友（演示用）- 现在返回空数组，让用户自己添加
@@ -2511,10 +2572,20 @@
             // 更新个人资料
             updateProfile() {
                 const newName = document.getElementById('profile-name-input').value.trim();
-                if (newName) {
+                if (newName && newName.length >= 3 && newName.length <= 10) {
                     this.currentUser.name = newName;
                     storageManager.save('chatUser', this.currentUser);
-                    alert('✅ 个人信息已更新');
+                    
+                    // 同步到游戏昵称
+                    userData.username = newName;
+                    saveUserData();
+                    
+                    // 更新主页显示
+                    document.getElementById('user-name').textContent = newName;
+                    
+                    alert('✅ 个人信息已更新！\n\n昵称已同步到游戏和聊天系统。');
+                } else if (newName) {
+                    alert('❌ 昵称长度应该在3-10个字符之间');
                 }
             },
 
