@@ -2619,11 +2619,12 @@
                 });
             },
 
-            // 检查URL参数，自动添加好友
+            // 检查URL参数，自动添加好友和接收消息
             checkUrlParams() {
                 const urlParams = new URLSearchParams(window.location.search);
-                const friendId = urlParams.get('addFriend');
                 
+                // 1. 处理添加好友
+                const friendId = urlParams.get('addFriend');
                 if (friendId && friendId !== this.currentUser.id) {
                     // 检查是否已经是好友
                     if (!this.friends.find(f => f.id === friendId)) {
@@ -2638,11 +2639,86 @@
                         this.friends.push(newFriend);
                         this.saveData();
                         
-                        // 清除URL参数
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                        
                         alert('🎉 已自动添加好友！\n\n请分享你的ID给对方：\n' + this.currentUser.id);
                         this.toggleChat();
+                    }
+                }
+                
+                // 2. 处理接收消息
+                const receiveMessage = urlParams.get('receiveMessage');
+                if (receiveMessage) {
+                    try {
+                        // 解码消息数据
+                        const messageData = JSON.parse(atob(receiveMessage));
+                        
+                        // 检查消息是否是发给当前用户的
+                        if (messageData.to === this.currentUser.id) {
+                            // 确保发送者是好友
+                            let sender = this.friends.find(f => f.id === messageData.from);
+                            if (!sender) {
+                                // 如果不是好友，先添加为好友
+                                sender = {
+                                    id: messageData.from,
+                                    name: messageData.fromName || '新好友',
+                                    avatar: '👤',
+                                    online: true,
+                                    lastMessage: '',
+                                    lastTime: new Date().toISOString()
+                                };
+                                this.friends.push(sender);
+                                this.saveData();
+                            }
+                            
+                            // 保存消息
+                            if (!this.conversations[messageData.from]) {
+                                this.conversations[messageData.from] = [];
+                            }
+                            
+                            // 检查消息是否已存在（避免重复）
+                            const messageExists = this.conversations[messageData.from].some(
+                                m => m.timestamp === messageData.timestamp && m.content === messageData.content
+                            );
+                            
+                            if (!messageExists) {
+                                const receivedMessage = {
+                                    id: 'msg_' + Date.now(),
+                                    from: messageData.from,
+                                    to: this.currentUser.id,
+                                    content: messageData.content,
+                                    type: messageData.type || 'text',
+                                    timestamp: messageData.timestamp,
+                                    read: false
+                                };
+                                
+                                this.conversations[messageData.from].push(receivedMessage);
+                                
+                                // 更新好友最后消息
+                                sender.lastMessage = messageData.type === 'location' ? '📍 位置' : messageData.content;
+                                sender.lastTime = messageData.timestamp;
+                                
+                                this.updateUnreadCount();
+                                this.saveData();
+                                
+                                // 清除URL参数
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                                
+                                // 显示通知
+                                alert(`💬 收到来自 ${sender.name} 的消息！\n\n消息内容：${messageData.content}\n\n点击💬按钮查看消息`);
+                                
+                                // 如果聊天窗口已打开，更新显示
+                                if (document.getElementById('chat-container').style.display !== 'none') {
+                                    this.updateFriendsList();
+                                }
+                            }
+                        } else {
+                            // 消息不是发给当前用户的
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            alert('⚠️ 这条消息不是发给你的，请确认链接是否正确。');
+                        }
+                    } catch (error) {
+                        console.error('解析消息失败:', error);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        alert('❌ 消息格式错误，无法接收。');
                     }
                 }
             },
@@ -2672,54 +2748,39 @@
                 }
 
                 this.saveData();
+                
                 return message;
             },
-
-            // 接收模拟回复（演示用）
-            simulateReply(friendId) {
-                setTimeout(() => {
-                    const replies = [
-                        '收到！马上过去',
-                        '这个地方我知道',
-                        '太棒了！',
-                        '我们一起组队吧',
-                        '好的，等我一下'
-                    ];
-                    const reply = {
-                        id: 'msg_' + Date.now(),
-                        from: friendId,
-                        to: this.currentUser.id,
-                        content: replies[Math.floor(Math.random() * replies.length)],
-                        type: 'text',
-                        timestamp: new Date().toISOString(),
-                        read: false
-                    };
-
-                    if (!this.conversations[friendId]) {
-                        this.conversations[friendId] = [];
-                    }
-                    this.conversations[friendId].push(reply);
-                    
-                    const friend = this.friends.find(f => f.id === friendId);
-                    if (friend) {
-                        friend.lastMessage = reply.content;
-                        friend.lastTime = reply.timestamp;
-                    }
-
-                    this.updateUnreadCount();
-                    this.saveData();
-                    
-                    // 如果聊天窗口打开，更新显示
-                    if (document.getElementById('chat-panel').style.display !== 'none') {
-                        const activeFriendId = document.getElementById('chat-panel').dataset.friendId;
-                        if (activeFriendId === friendId) {
-                            this.openChat(friendId);
-                        } else {
-                            this.updateFriendsList();
-                        }
-                    }
-                }, 1000 + Math.random() * 2000);
+            
+            // 生成消息分享链接（用于跨设备通信）
+            generateMessageLink(friendId, message) {
+                // 将消息编码到URL中
+                const messageData = {
+                    from: message.from,
+                    fromName: this.currentUser.name,
+                    to: friendId,
+                    content: message.content,
+                    type: message.type,
+                    timestamp: message.timestamp
+                };
+                
+                // 使用Base64编码消息数据
+                const encodedData = btoa(JSON.stringify(messageData));
+                const baseUrl = window.location.href.split('?')[0];
+                const messageUrl = `${baseUrl}?receiveMessage=${encodedData}`;
+                
+                // 复制到剪贴板
+                const tempInput = document.createElement('input');
+                tempInput.value = messageUrl;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                
+                return messageUrl;
             },
+
+            // 已移除机器人回复功能 - 现在只支持真人之间的通信
 
             // 更新未读消息数
             updateUnreadCount() {
@@ -2830,14 +2891,23 @@
                 if (!content) return;
 
                 const friendId = document.getElementById('chat-panel').dataset.friendId;
-                this.sendMessage(friendId, content, 'text');
+                const message = this.sendMessage(friendId, content, 'text');
                 input.value = '';
 
                 // 重新渲染聊天界面
                 this.openChat(friendId);
-
-                // 模拟回复
-                this.simulateReply(friendId);
+                
+                // 提示用户如何分享消息（只在第一次发送时显示）
+                if (!localStorage.getItem('messageShareTipShown')) {
+                    setTimeout(() => {
+                        const share = confirm('💬 消息已发送到本地！\n\n📱 由于是纯前端应用，好友需要打开你发送的消息链接才能看到。\n\n是否生成消息分享链接？\n\n（点击"确定"生成链接，点击"取消"跳过）');
+                        if (share) {
+                            const messageUrl = this.generateMessageLink(friendId, message);
+                            alert('✅ 消息链接已复制到剪贴板！\n\n📋 链接：' + messageUrl.substring(0, 80) + '...\n\n💡 使用方法：\n1. 将链接通过微信/QQ等发送给好友\n2. 好友点击链接后会自动接收消息\n3. 好友需要先添加你为好友（通过你的ID）');
+                        }
+                        localStorage.setItem('messageShareTipShown', 'true');
+                    }, 300);
+                }
             },
 
             // 分享当前位置
@@ -2851,7 +2921,6 @@
                 const locationText = `${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
                 this.sendMessage(friendId, locationText, 'location');
                 this.openChat(friendId);
-                this.simulateReply(friendId);
             },
 
             // 查看位置
