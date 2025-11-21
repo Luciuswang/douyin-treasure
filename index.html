@@ -2585,6 +2585,18 @@
                 const messagesRef = database.ref(`messages/${userId}`);
                 console.log('🔔 设置消息监听器，路径:', `messages/${userId}`);
                 
+                // 2.1 监听自己发送的消息状态变化（已读状态）
+                // 当接收方标记消息为已读时，会更新发送方消息记录中的状态
+                messagesRef.on('child_changed', (snapshot) => {
+                    const messageData = snapshot.val();
+                    if (messageData && messageData.from === userId && messageData.status === 'read') {
+                        // 这是自己发送的消息，状态被更新为已读
+                        const receiverId = messageData.to;
+                        console.log('📖 消息已被对方读取:', messageData.id, '接收方:', receiverId);
+                        this.updateMessageStatus(receiverId, messageData.id, 'read');
+                    }
+                });
+                
                 // 先加载历史消息（只加载一次）
                 messagesRef.once('value', (snapshot) => {
                     const allMessages = snapshot.val();
@@ -3513,7 +3525,8 @@
                         fromName: this.friends.find(f => f.id === friendId)?.name || '好友',
                         fromAvatar: this.friends.find(f => f.id === friendId)?.avatar || '👤',
                         to: this.currentUser.id,
-                        isSent: true // 标记为已发送的消息
+                        isSent: true, // 标记为已发送的消息
+                        status: 'sent' // 初始状态为已发送
                     }, (error) => {
                         if (error) {
                             console.error('❌ Firebase保存发送者消息失败:', error);
@@ -3602,27 +3615,26 @@
             },
             
             // 通知发送方消息已读
-            notifyMessagesRead(receiverId, messageIds) {
+            notifyMessagesRead(senderId, messageIds) {
                 if (!firebaseEnabled || !database) return;
                 
                 try {
-                    // 通知发送方（接收方是发送方的好友）
-                    const friend = this.friends.find(f => f.id === receiverId);
-                    if (friend) {
-                        // 在发送方的消息记录中标记这些消息为已读
-                        messageIds.forEach(messageId => {
-                            const readRef = database.ref(`messages/${this.currentUser.id}/${messageId}/status`);
-                            readRef.set('read', (error) => {
-                                if (error) {
-                                    console.error('❌ 通知消息已读失败:', error);
-                                } else {
-                                    console.log('✅ 消息已读状态已更新:', messageId);
-                                    // 更新本地消息状态
-                                    this.updateMessageStatus(receiverId, messageId, 'read');
-                                }
-                            });
+                    // senderId 是发送方的ID（当前用户是接收方）
+                    // 需要在发送方的消息记录中更新这些消息的状态为已读
+                    console.log('📖 通知发送方消息已读:', { senderId, messageIds });
+                    
+                    messageIds.forEach(messageId => {
+                        // 在发送方的消息记录中更新状态
+                        // 发送方的消息存储在 messages/${senderId}/${messageId}
+                        const readRef = database.ref(`messages/${senderId}/${messageId}/status`);
+                        readRef.set('read', (error) => {
+                            if (error) {
+                                console.error('❌ 通知消息已读失败:', error);
+                            } else {
+                                console.log('✅ 消息已读状态已更新到发送方:', messageId);
+                            }
                         });
-                    }
+                    });
                 } catch (error) {
                     console.error('❌ 通知消息已读异常:', error);
                 }
