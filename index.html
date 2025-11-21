@@ -2792,21 +2792,65 @@
                 });
             },
             
-            // 监听单个好友的在线状态
+            // 监听单个好友的在线状态和用户信息（包括头像）
             watchFriendOnlineStatus(friendId) {
                 if (!firebaseEnabled || !database) return;
                 
-                const friendOnlineRef = database.ref(`users/${friendId}/online`);
-                friendOnlineRef.on('value', (snapshot) => {
-                    const isOnline = snapshot.val();
-                    const friendIndex = this.friends.findIndex(f => f.id === friendId);
-                    if (friendIndex !== -1) {
-                        this.friends[friendIndex].online = isOnline || false;
-                        this.updateFriendsList();
-                        
-                        // 如果用户信息面板打开，也更新显示
-                        if (document.getElementById('my-profile-panel').style.display === 'flex') {
-                            this.updateProfileFriendsList();
+                // 监听好友的完整用户信息变化（包括头像、昵称等）
+                const friendUserRef = database.ref(`users/${friendId}`);
+                friendUserRef.on('value', (snapshot) => {
+                    const userData = snapshot.val();
+                    if (userData) {
+                        const friendIndex = this.friends.findIndex(f => f.id === friendId);
+                        if (friendIndex !== -1) {
+                            // 更新好友信息
+                            const oldAvatar = this.friends[friendIndex].avatar;
+                            const oldName = this.friends[friendIndex].name;
+                            
+                            this.friends[friendIndex].online = userData.online || false;
+                            this.friends[friendIndex].name = userData.name || this.friends[friendIndex].name;
+                            this.friends[friendIndex].avatar = userData.avatar || this.friends[friendIndex].avatar;
+                            
+                            // 如果头像或名称发生变化，更新显示
+                            if (oldAvatar !== this.friends[friendIndex].avatar || oldName !== this.friends[friendIndex].name) {
+                                console.log('🔄 好友信息已更新:', {
+                                    friendId,
+                                    oldAvatar,
+                                    newAvatar: this.friends[friendIndex].avatar,
+                                    oldName,
+                                    newName: this.friends[friendIndex].name
+                                });
+                                this.saveData();
+                                this.updateFriendsList();
+                                
+                                // 如果正在和该好友聊天，更新聊天窗口头部
+                                const chatPanel = document.getElementById('chat-panel');
+                                if (chatPanel && chatPanel.dataset.friendId === friendId) {
+                                    document.getElementById('chat-friend-name').textContent = this.friends[friendIndex].name;
+                                    document.getElementById('chat-friend-avatar').textContent = this.friends[friendIndex].avatar;
+                                    
+                                    // 更新聊天消息中的头像
+                                    const messagesList = document.getElementById('chat-messages-list');
+                                    if (messagesList) {
+                                        const messageAvatars = messagesList.querySelectorAll('.chat-message-avatar');
+                                        messageAvatars.forEach(avatarEl => {
+                                            // 只更新对方消息的头像（不是自己的）
+                                            const messageDiv = avatarEl.closest('.chat-message');
+                                            if (messageDiv && messageDiv.classList.contains('chat-message-other')) {
+                                                avatarEl.textContent = this.friends[friendIndex].avatar;
+                                            }
+                                        });
+                                    }
+                                }
+                                
+                                // 如果用户信息面板打开，也更新显示
+                                if (document.getElementById('my-profile-panel').style.display === 'flex') {
+                                    this.updateProfileFriendsList();
+                                }
+                            } else {
+                                // 只更新在线状态
+                                this.updateFriendsList();
+                            }
                         }
                     }
                 });
@@ -3300,6 +3344,22 @@
                     // 更新主页显示
                     document.getElementById('user-name').textContent = newName;
                     
+                    // 同步到Firebase
+                    if (firebaseEnabled && database) {
+                        const userRef = database.ref(`users/${this.currentUser.id}`);
+                        userRef.update({
+                            name: newName,
+                            avatar: this.currentUser.avatar,
+                            updatedAt: firebase.database.ServerValue.TIMESTAMP
+                        }, (error) => {
+                            if (error) {
+                                console.error('❌ 同步用户信息到Firebase失败:', error);
+                            } else {
+                                console.log('✅ 用户信息已同步到Firebase');
+                            }
+                        });
+                    }
+                    
                     alert('✅ 个人信息已更新！\n\n昵称已同步到游戏和聊天系统。');
                 } else if (newName) {
                     alert('❌ 昵称长度应该在3-10个字符之间');
@@ -3331,6 +3391,21 @@
                         storageManager.save('chatUser', this.currentUser);
                         document.getElementById('profile-avatar').textContent = avatar;
                         this.generateAvatarSelector();
+                        
+                        // 同步头像到Firebase
+                        if (firebaseEnabled && database) {
+                            const userRef = database.ref(`users/${this.currentUser.id}`);
+                            userRef.update({
+                                avatar: avatar,
+                                updatedAt: firebase.database.ServerValue.TIMESTAMP
+                            }, (error) => {
+                                if (error) {
+                                    console.error('❌ 同步头像到Firebase失败:', error);
+                                } else {
+                                    console.log('✅ 头像已同步到Firebase:', avatar);
+                                }
+                            });
+                        }
                     };
                     selector.appendChild(btn);
                 });
