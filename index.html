@@ -2860,20 +2860,12 @@
             addMessageToConversation(messageData, updateDisplay = true) {
                 const friendId = messageData.from;
                 
-                // 确保发送者是好友
-                let friend = this.friends.find(f => f.id === friendId);
+                // 检查发送者是否是好友（不允许自动添加陌生人）
+                const friend = this.friends.find(f => f.id === friendId);
                 if (!friend) {
-                    console.log('➕ 自动添加新好友:', friendId);
-                    friend = {
-                        id: friendId,
-                        name: messageData.fromName || '新好友',
-                        avatar: messageData.fromAvatar || '👤',
-                        online: true,
-                        lastMessage: '',
-                        lastTime: new Date().toISOString()
-                    };
-                    this.friends.push(friend);
-                    this.saveData();
+                    console.warn('⚠️ 收到来自非好友的消息，已忽略:', friendId, messageData.content);
+                    // 不自动添加，只记录日志
+                    return false;
                 }
                 
                 // 保存消息
@@ -3571,7 +3563,8 @@
                     };
                     
                     // 1. 将消息发送到接收者的消息队列（接收者能看到）
-                    const receiverRef = database.ref(`messages/${friendId}`).push();
+                    // 使用消息ID作为key，避免undefined节点
+                    const receiverRef = database.ref(`messages/${friendId}/${message.id}`);
                     receiverRef.set(messageData, (error) => {
                         if (error) {
                             console.error('❌ Firebase发送消息到接收者失败:', error);
