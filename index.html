@@ -2616,22 +2616,36 @@
                 });
                 
                 // 监听新消息（实时接收）- 使用value监听确保实时更新
-                let lastMessageCount = 0;
+                let lastMessageKeys = new Set();
+                let isFirstLoad = true;
+                
                 messagesRef.on('value', (snapshot) => {
                     const allMessages = snapshot.val();
-                    const currentMessageCount = allMessages ? Object.keys(allMessages).length : 0;
+                    const currentMessageKeys = allMessages ? new Set(Object.keys(allMessages)) : new Set();
                     
-                    console.log('📬 消息列表变化:', { 
-                        count: currentMessageCount, 
-                        lastCount: lastMessageCount,
-                        userId: userId 
-                    });
+                    if (isFirstLoad) {
+                        // 第一次加载，记录所有消息键
+                        lastMessageKeys = currentMessageKeys;
+                        isFirstLoad = false;
+                        console.log('📚 首次加载消息完成，共', currentMessageKeys.size, '条');
+                        return;
+                    }
                     
-                    if (allMessages && currentMessageCount > lastMessageCount) {
-                        // 有新消息，找出新增的消息
-                        Object.keys(allMessages).forEach(messageKey => {
+                    // 找出新增的消息键
+                    const newMessageKeys = [...currentMessageKeys].filter(key => !lastMessageKeys.has(key));
+                    
+                    if (newMessageKeys.length > 0) {
+                        console.log('📬 检测到', newMessageKeys.length, '条新消息');
+                        newMessageKeys.forEach(messageKey => {
                             const messageData = allMessages[messageKey];
                             if (messageData && messageData.from !== userId) {
+                                console.log('📨 处理新消息:', {
+                                    key: messageKey,
+                                    from: messageData.from,
+                                    content: messageData.content,
+                                    id: messageData.id
+                                });
+                                
                                 // 检查是否已存在
                                 const exists = this.conversations[messageData.from] && 
                                     this.conversations[messageData.from].some(m => 
@@ -2641,18 +2655,46 @@
                                 if (!exists) {
                                     console.log('✅ 发现新消息，处理中:', messageData.content);
                                     this.handleFirebaseMessage(messageData);
+                                } else {
+                                    console.log('⚠️ 消息已存在，跳过:', messageData.id);
                                 }
+                            } else {
+                                console.log('⚠️ 消息过滤（自己发送的或无效）:', {
+                                    hasData: !!messageData,
+                                    from: messageData?.from,
+                                    userId: userId
+                                });
                             }
                         });
                     }
                     
-                    lastMessageCount = currentMessageCount;
+                    lastMessageKeys = currentMessageKeys;
                 });
                 
                 // 同时使用child_added作为备用监听（确保不遗漏）
+                // 注意：child_added会在历史消息加载时也触发，所以需要跳过历史消息
+                let historyLoaded = false;
+                messagesRef.once('value', () => {
+                    // 历史消息加载完成后，再启用child_added监听
+                    setTimeout(() => {
+                        historyLoaded = true;
+                        console.log('✅ 历史消息加载完成，启用child_added实时监听');
+                    }, 1000);
+                });
+                
                 messagesRef.on('child_added', (snapshot) => {
+                    // 跳过历史消息加载阶段
+                    if (!historyLoaded) {
+                        return;
+                    }
+                    
                     const messageData = snapshot.val();
-                    console.log('📨 child_added触发，收到消息:', messageData);
+                    console.log('📨 child_added触发，收到消息:', {
+                        from: messageData?.from,
+                        content: messageData?.content,
+                        id: messageData?.id
+                    });
+                    
                     if (messageData && messageData.from !== userId) {
                         // 检查是否已存在
                         const exists = this.conversations[messageData.from] && 
@@ -3514,15 +3556,21 @@
                 this.unreadCount = 0;
                 Object.keys(this.conversations).forEach(friendId => {
                     const messages = this.conversations[friendId];
-                    this.unreadCount += messages.filter(m => m.from !== this.currentUser.id && !m.read).length;
+                    if (messages && Array.isArray(messages)) {
+                        this.unreadCount += messages.filter(m => m.from !== this.currentUser.id && !m.read).length;
+                    }
                 });
                 
                 const badge = document.getElementById('chat-badge');
-                if (this.unreadCount > 0) {
-                    badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
-                    badge.style.display = 'block';
+                if (badge) {
+                    if (this.unreadCount > 0) {
+                        badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                        badge.style.display = 'block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 } else {
-                    badge.style.display = 'none';
+                    console.warn('⚠️ 未找到chat-badge元素');
                 }
             },
 
