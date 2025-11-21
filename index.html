@@ -2844,7 +2844,8 @@
                         content: messageData.content,
                         type: messageData.type || 'text',
                         timestamp: messageData.timestamp || new Date().toISOString(),
-                        read: false
+                        read: false,
+                        status: 'received' // 接收到的消息状态
                     };
                     
                     this.conversations[friendId].push(receivedMessage);
@@ -3442,7 +3443,8 @@
                     content: content,
                     type: type,
                     timestamp: new Date().toISOString(),
-                    read: false
+                    read: false,
+                    status: 'sending' // 消息状态: sending(发送中) -> sent(已发送) -> read(已读)
                 };
 
                 // 保存到本地对话记录
@@ -3492,8 +3494,12 @@
                     receiverRef.set(messageData, (error) => {
                         if (error) {
                             console.error('❌ Firebase发送消息到接收者失败:', error);
+                            // 更新消息状态为失败
+                            this.updateMessageStatus(friendId, message.id, 'failed');
                         } else {
                             console.log('✅ 消息已成功发送到接收者:', message.id);
+                            // 更新消息状态为已发送
+                            this.updateMessageStatus(friendId, message.id, 'sent');
                         }
                     });
                     
@@ -3577,13 +3583,77 @@
             // 标记消息为已读
             markAsRead(friendId) {
                 if (this.conversations[friendId]) {
+                    const unreadMessages = [];
                     this.conversations[friendId].forEach(m => {
-                        if (m.from === friendId) {
+                        if (m.from === friendId && !m.read) {
                             m.read = true;
+                            unreadMessages.push(m.id);
                         }
                     });
+                    
+                    // 通知发送方消息已读
+                    if (unreadMessages.length > 0 && firebaseEnabled && database) {
+                        this.notifyMessagesRead(friendId, unreadMessages);
+                    }
+                    
                     this.updateUnreadCount();
                     this.saveData();
+                }
+            },
+            
+            // 通知发送方消息已读
+            notifyMessagesRead(receiverId, messageIds) {
+                if (!firebaseEnabled || !database) return;
+                
+                try {
+                    // 通知发送方（接收方是发送方的好友）
+                    const friend = this.friends.find(f => f.id === receiverId);
+                    if (friend) {
+                        // 在发送方的消息记录中标记这些消息为已读
+                        messageIds.forEach(messageId => {
+                            const readRef = database.ref(`messages/${this.currentUser.id}/${messageId}/status`);
+                            readRef.set('read', (error) => {
+                                if (error) {
+                                    console.error('❌ 通知消息已读失败:', error);
+                                } else {
+                                    console.log('✅ 消息已读状态已更新:', messageId);
+                                    // 更新本地消息状态
+                                    this.updateMessageStatus(receiverId, messageId, 'read');
+                                }
+                            });
+                        });
+                    }
+                } catch (error) {
+                    console.error('❌ 通知消息已读异常:', error);
+                }
+            },
+            
+            // 更新消息状态
+            updateMessageStatus(friendId, messageId, status) {
+                if (!this.conversations[friendId]) return;
+                
+                const message = this.conversations[friendId].find(m => m.id === messageId);
+                if (message) {
+                    message.status = status;
+                    this.saveData();
+                    
+                    // 更新UI显示
+                    const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+                    if (messageDiv) {
+                        const statusEl = messageDiv.querySelector('.message-status');
+                        if (statusEl) {
+                            if (status === 'sent') {
+                                statusEl.textContent = '✓';
+                                statusEl.style.color = '#999';
+                            } else if (status === 'read') {
+                                statusEl.textContent = '✓✓';
+                                statusEl.style.color = '#4FC3F7';
+                            } else if (status === 'failed') {
+                                statusEl.textContent = '✗';
+                                statusEl.style.color = '#f44336';
+                            }
+                        }
+                    }
                 }
             },
 
@@ -3669,11 +3739,29 @@
                 messageDiv.dataset.messageId = msg.id || msg.timestamp;
                 
                 if (msg.type === 'text') {
+                    // 消息状态图标（仅自己发送的消息显示）
+                    let statusIcon = '';
+                    if (isMe) {
+                        const status = msg.status || 'sent';
+                        if (status === 'sending') {
+                            statusIcon = '<span class="message-status" style="color: #999; font-size: 12px;">⏳</span>';
+                        } else if (status === 'sent') {
+                            statusIcon = '<span class="message-status" style="color: #999; font-size: 12px;">✓</span>';
+                        } else if (status === 'read') {
+                            statusIcon = '<span class="message-status" style="color: #4FC3F7; font-size: 12px;">✓✓</span>';
+                        } else if (status === 'failed') {
+                            statusIcon = '<span class="message-status" style="color: #f44336; font-size: 12px;">✗</span>';
+                        }
+                    }
+                    
                     messageDiv.innerHTML = `
                         <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
                         <div class="chat-message-content">
                             <div class="chat-message-bubble">${this.escapeHtml(msg.content)}</div>
-                            <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                            <div class="chat-message-time" style="display: flex; align-items: center; gap: 4px;">
+                                ${this.formatTime(msg.timestamp)}
+                                ${statusIcon}
+                            </div>
                         </div>
                     `;
                 } else if (msg.type === 'location') {
@@ -3687,7 +3775,10 @@
                                 <div style="font-size: 0.9em; opacity: 0.8;">${locationContent}</div>
                                 <button class="chat-location-btn" data-location="${locationContent}">查看位置</button>
                             </div>
-                            <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                            <div class="chat-message-time" style="display: flex; align-items: center; gap: 4px;">
+                                ${this.formatTime(msg.timestamp)}
+                                ${isMe ? '<span class="message-status" style="color: #999; font-size: 12px;">✓</span>' : ''}
+                            </div>
                         </div>
                     `;
                     // 绑定位置按钮点击事件
