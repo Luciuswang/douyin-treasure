@@ -2870,10 +2870,25 @@
                 this.updateFriendsList();
                 
                 if (isChatOpen && activeFriendId === friendId) {
-                    // 如果正在和这个好友聊天，立即更新聊天界面
-                    console.log('🔄 实时更新聊天界面 - 正在和', friend.name, '聊天');
-                    // 立即更新，不使用setTimeout
-                    this.openChat(friendId);
+                    // 如果正在和这个好友聊天，立即追加消息到界面（微信式实时显示）
+                    console.log('💬 实时显示新消息 - 正在和', friend.name, '聊天');
+                    const messagesList = document.getElementById('chat-messages-list');
+                    if (messagesList) {
+                        // 构建消息对象
+                        const receivedMessage = {
+                            id: messageData.id || 'msg_' + Date.now(),
+                            from: friendId,
+                            to: this.currentUser.id,
+                            content: messageData.content,
+                            type: messageData.type || 'text',
+                            timestamp: messageData.timestamp || new Date().toISOString()
+                        };
+                        // 直接追加到聊天列表，实现微信式实时显示效果
+                        this.appendMessageToChatList(receivedMessage, friend, messagesList, true);
+                    } else {
+                        // 如果找不到消息列表，重新渲染
+                        this.openChat(friendId);
+                    }
                 } else if (isChatOpen) {
                     // 如果聊天窗口打开但不是这个好友，只更新好友列表（已更新）
                     console.log('🔄 更新好友列表 - 正在和其他人聊天');
@@ -3411,15 +3426,14 @@
                 return message;
             },
             
-            // 通过Firebase发送消息
+            // 通过Firebase发送消息（确保双向同步）
             sendFirebaseMessage(friendId, message) {
                 if (!firebaseEnabled || !database) return;
                 
                 try {
                     console.log('📤 通过Firebase发送消息:', { to: friendId, content: message.content });
-                    // 将消息发送到接收者的消息队列
-                    const messageRef = database.ref(`messages/${friendId}`).push();
-                    messageRef.set({
+                    
+                    const messageData = {
                         id: message.id,
                         from: message.from,
                         fromName: this.currentUser.name,
@@ -3429,13 +3443,37 @@
                         type: message.type,
                         timestamp: message.timestamp,
                         createdAt: firebase.database.ServerValue.TIMESTAMP
-                    }, (error) => {
+                    };
+                    
+                    // 1. 将消息发送到接收者的消息队列（接收者能看到）
+                    const receiverRef = database.ref(`messages/${friendId}`).push();
+                    receiverRef.set(messageData, (error) => {
                         if (error) {
-                            console.error('❌ Firebase发送消息失败:', error);
+                            console.error('❌ Firebase发送消息到接收者失败:', error);
                         } else {
-                            console.log('✅ 消息已成功发送到Firebase:', message.id);
+                            console.log('✅ 消息已成功发送到接收者:', message.id);
                         }
                     });
+                    
+                    // 2. 同时保存到发送者的消息记录（确保发送者也能看到自己的消息）
+                    // 使用相同的消息ID，确保一致性
+                    const senderRef = database.ref(`messages/${this.currentUser.id}`).child(message.id);
+                    senderRef.set({
+                        ...messageData,
+                        // 对于发送者，from和to需要交换视角
+                        from: friendId,
+                        fromName: this.friends.find(f => f.id === friendId)?.name || '好友',
+                        fromAvatar: this.friends.find(f => f.id === friendId)?.avatar || '👤',
+                        to: this.currentUser.id,
+                        isSent: true // 标记为已发送的消息
+                    }, (error) => {
+                        if (error) {
+                            console.error('❌ Firebase保存发送者消息失败:', error);
+                        } else {
+                            console.log('✅ 消息已保存到发送者记录:', message.id);
+                        }
+                    });
+                    
                 } catch (error) {
                     console.error('❌ Firebase发送消息异常:', error);
                 }
@@ -3545,42 +3583,98 @@
 
                 const messages = this.conversations[friendId] || [];
                 console.log('📋 渲染消息列表，共', messages.length, '条消息');
+                
+                // 使用统一的渲染函数
                 messages.forEach(msg => {
-                    const isMe = msg.from === this.currentUser.id;
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'chat-message ' + (isMe ? 'chat-message-me' : 'chat-message-other');
-                    
-                    if (msg.type === 'text') {
-                        messageDiv.innerHTML = `
-                            <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
-                            <div class="chat-message-content">
-                                <div class="chat-message-bubble">${this.escapeHtml(msg.content)}</div>
-                                <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
-                            </div>
-                        `;
-                    } else if (msg.type === 'location') {
-                        messageDiv.innerHTML = `
-                            <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
-                            <div class="chat-message-content">
-                                <div class="chat-message-bubble chat-location-message">
-                                    <div style="font-size: 24px; margin-bottom: 5px;">📍</div>
-                                    <div><strong>位置分享</strong></div>
-                                    <div style="font-size: 0.9em; opacity: 0.8;">${msg.content}</div>
-                                    <button onclick="chatManager.viewLocation(${msg.content})" class="chat-location-btn">查看位置</button>
-                                </div>
-                                <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
-                            </div>
-                        `;
-                    }
-                    
-                    messagesList.appendChild(messageDiv);
+                    this.appendMessageToChatList(msg, friend, messagesList, false);
                 });
 
                 // 滚动到底部
-                messagesList.scrollTop = messagesList.scrollHeight;
+                setTimeout(() => {
+                    messagesList.scrollTop = messagesList.scrollHeight;
+                }, 100);
 
                 // 隐藏好友列表
                 document.getElementById('friends-panel').style.display = 'none';
+            },
+
+            // 追加单条消息到聊天列表（微信式实时显示）
+            appendMessageToChatList(msg, friend, messagesList = null, autoScroll = true) {
+                if (!messagesList) {
+                    messagesList = document.getElementById('chat-messages-list');
+                    if (!messagesList) {
+                        console.error('❌ 找不到消息列表元素');
+                        return false;
+                    }
+                }
+                
+                // 检查消息是否已存在（避免重复）
+                const existingMessage = messagesList.querySelector(`[data-message-id="${msg.id || msg.timestamp}"]`);
+                if (existingMessage) {
+                    console.log('⚠️ 消息已存在，跳过追加:', msg.id);
+                    return false;
+                }
+                
+                const isMe = msg.from === this.currentUser.id;
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'chat-message ' + (isMe ? 'chat-message-me' : 'chat-message-other');
+                messageDiv.dataset.messageId = msg.id || msg.timestamp;
+                
+                if (msg.type === 'text') {
+                    messageDiv.innerHTML = `
+                        <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                        <div class="chat-message-content">
+                            <div class="chat-message-bubble">${this.escapeHtml(msg.content)}</div>
+                            <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                        </div>
+                    `;
+                } else if (msg.type === 'location') {
+                    const locationContent = this.escapeHtml(msg.content);
+                    messageDiv.innerHTML = `
+                        <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                        <div class="chat-message-content">
+                            <div class="chat-message-bubble chat-location-message">
+                                <div style="font-size: 24px; margin-bottom: 5px;">📍</div>
+                                <div><strong>位置分享</strong></div>
+                                <div style="font-size: 0.9em; opacity: 0.8;">${locationContent}</div>
+                                <button class="chat-location-btn" data-location="${locationContent}">查看位置</button>
+                            </div>
+                            <div class="chat-message-time">${this.formatTime(msg.timestamp)}</div>
+                        </div>
+                    `;
+                    // 绑定位置按钮点击事件
+                    const locationBtn = messageDiv.querySelector('.chat-location-btn');
+                    if (locationBtn) {
+                        locationBtn.onclick = () => {
+                            this.viewLocation(locationBtn.dataset.location);
+                        };
+                    }
+                }
+                
+                // 添加淡入动画效果（微信式）
+                messageDiv.style.opacity = '0';
+                messageDiv.style.transform = 'translateY(10px)';
+                messageDiv.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                
+                messagesList.appendChild(messageDiv);
+                
+                // 触发动画
+                setTimeout(() => {
+                    messageDiv.style.opacity = '1';
+                    messageDiv.style.transform = 'translateY(0)';
+                }, 10);
+                
+                // 自动滚动到底部（如果用户在底部附近）
+                if (autoScroll) {
+                    const isNearBottom = messagesList.scrollHeight - messagesList.scrollTop <= messagesList.clientHeight + 200;
+                    if (isNearBottom) {
+                        setTimeout(() => {
+                            messagesList.scrollTop = messagesList.scrollHeight;
+                        }, 50);
+                    }
+                }
+                
+                return true;
             },
 
             // 关闭聊天窗口
@@ -3596,11 +3690,29 @@
                 if (!content) return;
 
                 const friendId = document.getElementById('chat-panel').dataset.friendId;
+                const friend = this.friends.find(f => f.id === friendId);
+                if (!friend) {
+                    console.error('❌ 未找到好友信息');
+                    return;
+                }
+                
                 const message = this.sendMessage(friendId, content, 'text');
                 input.value = '';
 
-                // 重新渲染聊天界面
-                this.openChat(friendId);
+                // 立即在聊天界面显示发送的消息（微信式实时显示）
+                const messagesList = document.getElementById('chat-messages-list');
+                const chatPanel = document.getElementById('chat-panel');
+                
+                if (messagesList && chatPanel && chatPanel.style.display === 'flex' && chatPanel.dataset.friendId === friendId) {
+                    // 如果聊天窗口已打开且正在和该好友聊天，直接追加消息
+                    this.appendMessageToChatList(message, friend, messagesList, true);
+                } else {
+                    // 如果聊天窗口未打开，重新渲染
+                    this.openChat(friendId);
+                }
+                
+                // 更新好友列表（显示最后消息）
+                this.updateFriendsList();
                 
                 // 如果Firebase未启用，提示用户如何分享消息（只在第一次发送时显示）
                 if (!firebaseEnabled && !localStorage.getItem('messageShareTipShown')) {
@@ -3621,14 +3733,34 @@
             // 分享当前位置
             shareLocation() {
                 const friendId = document.getElementById('chat-panel').dataset.friendId;
+                const friend = this.friends.find(f => f.id === friendId);
+                if (!friend) {
+                    console.error('❌ 未找到好友信息');
+                    return;
+                }
+                
                 if (!currentPosition) {
                     alert('请先获取GPS定位');
                     return;
                 }
 
                 const locationText = `${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
-                this.sendMessage(friendId, locationText, 'location');
-                this.openChat(friendId);
+                const message = this.sendMessage(friendId, locationText, 'location');
+                
+                // 立即在聊天界面显示位置消息（微信式实时显示）
+                const messagesList = document.getElementById('chat-messages-list');
+                const chatPanel = document.getElementById('chat-panel');
+                
+                if (messagesList && chatPanel && chatPanel.style.display === 'flex' && chatPanel.dataset.friendId === friendId) {
+                    // 如果聊天窗口已打开且正在和该好友聊天，直接追加消息
+                    this.appendMessageToChatList(message, friend, messagesList, true);
+                } else {
+                    // 如果聊天窗口未打开，重新渲染
+                    this.openChat(friendId);
+                }
+                
+                // 更新好友列表
+                this.updateFriendsList();
             },
 
             // 查看位置
