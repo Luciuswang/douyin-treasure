@@ -4020,12 +4020,19 @@
                 console.log('🔄 更新好友列表，共', sortedFriends.length, '个好友');
 
                 sortedFriends.forEach((friend, index) => {
-                    const unread = this.conversations[friend.id] ? 
-                        this.conversations[friend.id].filter(m => m.from === friend.id && !m.read).length : 0;
+                    // 确保好友有ID，如果没有则生成一个
+                    if (!friend.id) {
+                        friend.id = friend.name + '_' + Date.now();
+                        console.warn('⚠️ 好友缺少ID，已自动生成:', friend.id, '好友名:', friend.name);
+                    }
+                    
+                    const friendId = friend.id;
+                    const unread = this.conversations[friendId] ? 
+                        this.conversations[friendId].filter(m => m.from === friendId && !m.read).length : 0;
 
                     const friendDiv = document.createElement('div');
                     friendDiv.className = 'friend-item';
-                    friendDiv.setAttribute('data-friend-id', friend.id);
+                    friendDiv.setAttribute('data-friend-id', friendId);
                     
                     // 点击打开聊天
                     friendDiv.onclick = (e) => {
@@ -4033,7 +4040,19 @@
                         if (e.target.closest('.friend-delete-btn')) {
                             return;
                         }
-                        this.openChat(friend.id);
+                        this.openChat(friendId);
+                    };
+                    
+                    // 创建删除按钮，使用闭包确保ID正确传递
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'friend-delete-btn';
+                    deleteBtn.title = '删除好友';
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.style.cssText = 'display: flex !important; visibility: visible !important; opacity: 1 !important;';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        this.removeFriend(friendId);
                     };
                     
                     friendDiv.innerHTML = `
@@ -4051,10 +4070,10 @@
                             <div class="friend-time">${this.formatTime(friend.lastTime)}</div>
                             ${unread > 0 ? `<div class="friend-unread">${unread}</div>` : ''}
                         </div>
-                        <button class="friend-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); chatManager.removeFriend('${friend.id}')" title="删除好友" style="display: flex !important; visibility: visible !important; opacity: 1 !important;">
-                            🗑️
-                        </button>
                     `;
+                    
+                    // 将删除按钮添加到好友项
+                    friendDiv.appendChild(deleteBtn);
                     
                     // 添加长按功能（移动端）
                     let longPressTimer = null;
@@ -4144,9 +4163,31 @@
             // 删除好友
             removeFriend(friendId) {
                 console.log('🗑️ 开始删除好友，ID:', friendId);
-                const friend = this.friends.find(f => f.id === friendId);
+                
+                // 检查ID是否有效
+                if (!friendId || friendId === 'undefined' || friendId === 'null') {
+                    console.error('❌ 无效的好友ID:', friendId);
+                    alert('无效的好友ID，无法删除！');
+                    return;
+                }
+                
+                // 尝试通过ID查找好友
+                let friend = this.friends.find(f => f.id === friendId);
+                
+                // 如果找不到，尝试通过data属性查找（兼容旧数据）
+                if (!friend) {
+                    const friendDiv = document.querySelector(`[data-friend-id="${friendId}"]`);
+                    if (friendDiv) {
+                        const friendName = friendDiv.querySelector('.friend-name')?.textContent?.trim();
+                        if (friendName) {
+                            friend = this.friends.find(f => f.name === friendName);
+                        }
+                    }
+                }
+                
                 if (!friend) {
                     console.error('❌ 未找到好友信息，ID:', friendId);
+                    console.log('当前好友列表:', this.friends.map(f => ({ id: f.id, name: f.name })));
                     alert('未找到好友信息！');
                     return;
                 }
@@ -4158,15 +4199,26 @@
                     return;
                 }
 
-                // 从好友列表中删除
-                const friendIndex = this.friends.findIndex(f => f.id === friendId);
+                // 从好友列表中删除（支持通过ID或名称查找）
+                let friendIndex = this.friends.findIndex(f => f.id === friendId);
+                if (friendIndex === -1) {
+                    // 如果通过ID找不到，尝试通过名称查找
+                    friendIndex = this.friends.findIndex(f => f.name === friendName);
+                }
+                
                 if (friendIndex !== -1) {
+                    const deletedFriend = this.friends[friendIndex];
                     this.friends.splice(friendIndex, 1);
+                    console.log('✅ 已从好友列表中移除:', deletedFriend.name);
+                } else {
+                    console.warn('⚠️ 未在好友列表中找到要删除的好友');
                 }
 
-                // 删除对话记录
-                if (this.conversations[friendId]) {
-                    delete this.conversations[friendId];
+                // 删除对话记录（使用实际的好友ID）
+                const actualFriendId = friend?.id || friendId;
+                if (this.conversations[actualFriendId]) {
+                    delete this.conversations[actualFriendId];
+                    console.log('✅ 已删除对话记录');
                 }
 
                 // 如果正在和该好友聊天，关闭聊天窗口
