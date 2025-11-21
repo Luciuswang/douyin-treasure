@@ -3615,28 +3615,32 @@
                 try {
                     // senderId 是发送方的ID（当前用户是接收方）
                     // 需要在发送方的消息记录中更新这些消息的状态为已读
-                    console.log('📖 通知发送方消息已读:', { senderId, messageIds });
-                    
-                    // 获取接收到的消息，找到对应的消息ID
-                    const receivedMessages = this.conversations[senderId] || [];
+                    console.log('📖 通知发送方消息已读:', { senderId, messageIds, currentUserId: this.currentUser.id });
                     
                     messageIds.forEach(messageId => {
-                        // 找到对应的消息，获取原始消息ID
-                        const message = receivedMessages.find(m => m.id === messageId);
-                        if (message) {
-                            // 在发送方的消息记录中更新状态
-                            // 发送方的消息存储在 messages/${senderId}/${messageId}
-                            const readRef = database.ref(`messages/${senderId}/${messageId}/status`);
-                            readRef.set('read', (error) => {
-                                if (error) {
-                                    console.error('❌ 通知消息已读失败:', error, '路径:', `messages/${senderId}/${messageId}/status`);
-                                } else {
-                                    console.log('✅ 消息已读状态已更新到发送方:', messageId);
-                                }
-                            });
-                        } else {
-                            console.warn('⚠️ 未找到消息:', messageId);
-                        }
+                        // 在发送方的消息记录中更新状态
+                        // 发送方的消息存储在 messages/${senderId}/${messageId}
+                        const readRef = database.ref(`messages/${senderId}/${messageId}/status`);
+                        console.log('📤 更新消息状态，路径:', `messages/${senderId}/${messageId}/status`);
+                        
+                        readRef.set('read', (error) => {
+                            if (error) {
+                                console.error('❌ 通知消息已读失败:', error, '路径:', `messages/${senderId}/${messageId}/status`);
+                                // 尝试使用不同的路径
+                                const altRef = database.ref(`messages/${senderId}`).orderByChild('id').equalTo(messageId);
+                                altRef.once('value', (snapshot) => {
+                                    if (snapshot.exists()) {
+                                        snapshot.forEach((childSnapshot) => {
+                                            const altReadRef = database.ref(`messages/${senderId}/${childSnapshot.key}/status`);
+                                            altReadRef.set('read');
+                                            console.log('✅ 使用备用路径更新消息状态:', childSnapshot.key);
+                                        });
+                                    }
+                                });
+                            } else {
+                                console.log('✅ 消息已读状态已更新到发送方:', messageId);
+                            }
+                        });
                     });
                 } catch (error) {
                     console.error('❌ 通知消息已读异常:', error);
