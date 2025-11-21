@@ -1488,20 +1488,7 @@
             
             updateStatus(`定位成功！精度: ${Math.round(accuracy)}米`, 'success');
             
-            // 显示完整的调试信息
-            let debugInfo = `
-                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #ffc107;">
-                    <strong style="color: #856404;">🔍 调试信息</strong><br>
-                    <div style="font-family: monospace; font-size: 12px; margin-top: 10px;">
-                        定位坐标: [${lng.toFixed(6)}, ${lat.toFixed(6)}]<br>
-                        userLocation: [${userLocation[0].toFixed(6)}, ${userLocation[1].toFixed(6)}]<br>
-                        地图已初始化: ${map ? '✅ 是' : '❌ 否'}<br>
-                        坐标是否在上海: ${lat > 30 && lat < 32 && lng > 120 && lng < 122 ? '✅ 是' : '❌ 否'}<br>
-                    </div>
-                </div>
-            `;
-            
-            let locationInfo = debugInfo + `
+            let locationInfo = `
                 <strong>📍 位置信息</strong><br>
                 定位方式: ${position.locationType || 'GPS定位'}<br>
                 <strong style="color: #4FC3F7;">📮 ${address}</strong><br>
@@ -1896,11 +1883,6 @@
                 console.log('🔍 地图中心:', map.getCenter());
                 console.log('📊 当前地图上的标记数:', map.getAllOverlays('marker').length);
                 
-                // 在页面上显示对比信息
-                const markerPos = userMarker.getPosition();
-                const mapCenter = map.getCenter();
-                alert(`调试信息:\n\nuserLocation: [${userLocation[0].toFixed(6)}, ${userLocation[1].toFixed(6)}]\n\n标记位置: [${markerPos.lng.toFixed(6)}, ${markerPos.lat.toFixed(6)}]\n\n地图中心: [${mapCenter.lng.toFixed(6)}, ${mapCenter.lat.toFixed(6)}]`);
-                
                 // 验证标记是否正确添加
                 const allMarkers = map.getAllOverlays('marker');
                 console.log('地图上的所有标记:', allMarkers);
@@ -2163,9 +2145,6 @@
                 
                 const newCenter = map.getCenter();
                 console.log('验证新中心:', [newCenter.lng, newCenter.lat]);
-                
-                // 在页面上显示提示
-                alert(`地图已移动到:\n经度: ${newCenter.lng.toFixed(6)}\n纬度: ${newCenter.lat.toFixed(6)}\n\n你的位置:\n经度: ${userLocation[0].toFixed(6)}\n纬度: ${userLocation[1].toFixed(6)}`);
             }, 500);
             
             // 如果用户标记存在，触发弹跳动画
@@ -2588,12 +2567,27 @@
                 // 2.1 监听自己发送的消息状态变化（已读状态）
                 // 当接收方标记消息为已读时，会更新发送方消息记录中的状态
                 messagesRef.on('child_changed', (snapshot) => {
+                    const messageKey = snapshot.key;
                     const messageData = snapshot.val();
-                    if (messageData && messageData.from === userId && messageData.status === 'read') {
-                        // 这是自己发送的消息，状态被更新为已读
-                        const receiverId = messageData.to;
-                        console.log('📖 消息已被对方读取:', messageData.id, '接收方:', receiverId);
-                        this.updateMessageStatus(receiverId, messageData.id, 'read');
+                    console.log('📬 消息状态变化:', { key: messageKey, data: messageData });
+                    
+                    if (messageData) {
+                        // 检查是否是自己的消息且状态变为已读
+                        if (messageData.from === userId && messageData.status === 'read') {
+                            const receiverId = messageData.to;
+                            const messageId = messageData.id || messageKey;
+                            console.log('📖 消息已被对方读取:', messageId, '接收方:', receiverId);
+                            this.updateMessageStatus(receiverId, messageId, 'read');
+                        }
+                        // 也检查通过key直接匹配的消息（因为消息可能用ID作为key）
+                        else if (messageKey && messageKey.startsWith('msg_') && messageData.status === 'read') {
+                            // 查找这个消息对应的接收方
+                            const receiverId = messageData.to;
+                            if (receiverId && messageData.from === userId) {
+                                console.log('📖 消息已被对方读取（通过key匹配）:', messageKey, '接收方:', receiverId);
+                                this.updateMessageStatus(receiverId, messageKey, 'read');
+                            }
+                        }
                     }
                 });
                 
@@ -3623,17 +3617,26 @@
                     // 需要在发送方的消息记录中更新这些消息的状态为已读
                     console.log('📖 通知发送方消息已读:', { senderId, messageIds });
                     
+                    // 获取接收到的消息，找到对应的消息ID
+                    const receivedMessages = this.conversations[senderId] || [];
+                    
                     messageIds.forEach(messageId => {
-                        // 在发送方的消息记录中更新状态
-                        // 发送方的消息存储在 messages/${senderId}/${messageId}
-                        const readRef = database.ref(`messages/${senderId}/${messageId}/status`);
-                        readRef.set('read', (error) => {
-                            if (error) {
-                                console.error('❌ 通知消息已读失败:', error);
-                            } else {
-                                console.log('✅ 消息已读状态已更新到发送方:', messageId);
-                            }
-                        });
+                        // 找到对应的消息，获取原始消息ID
+                        const message = receivedMessages.find(m => m.id === messageId);
+                        if (message) {
+                            // 在发送方的消息记录中更新状态
+                            // 发送方的消息存储在 messages/${senderId}/${messageId}
+                            const readRef = database.ref(`messages/${senderId}/${messageId}/status`);
+                            readRef.set('read', (error) => {
+                                if (error) {
+                                    console.error('❌ 通知消息已读失败:', error, '路径:', `messages/${senderId}/${messageId}/status`);
+                                } else {
+                                    console.log('✅ 消息已读状态已更新到发送方:', messageId);
+                                }
+                            });
+                        } else {
+                            console.warn('⚠️ 未找到消息:', messageId);
+                        }
                     });
                 } catch (error) {
                     console.error('❌ 通知消息已读异常:', error);
