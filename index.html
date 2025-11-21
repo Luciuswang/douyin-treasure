@@ -2585,16 +2585,13 @@
                 const messagesRef = database.ref(`messages/${userId}`);
                 console.log('🔔 设置消息监听器，路径:', `messages/${userId}`);
                 
-                // 记录已加载的消息ID，避免重复处理
-                const loadedMessageIds = new Set();
-                
                 // 先加载历史消息（只加载一次）
                 messagesRef.once('value', (snapshot) => {
                     const allMessages = snapshot.val();
                     if (allMessages) {
                         console.log('📚 加载历史消息，共', Object.keys(allMessages).length, '条');
-                        let loadedCount = 0;
-                        Object.keys(allMessages).forEach(messageKey => {
+                        const messageKeys = Object.keys(allMessages);
+                        messageKeys.forEach((messageKey, index) => {
                             const messageData = allMessages[messageKey];
                             if (messageData && messageData.from !== userId) {
                                 // 检查是否已存在，避免重复
@@ -2604,57 +2601,77 @@
                                         (m.timestamp === messageData.timestamp && m.content === messageData.content)
                                     );
                                 if (!exists) {
-                                    console.log('📥 加载历史消息:', messageData.content, '来自:', messageData.fromName || messageData.from);
-                                    this.handleFirebaseMessage(messageData);
-                                    // 记录已加载的消息
-                                    if (messageData.id) loadedMessageIds.add(messageData.id);
-                                    if (messageKey) loadedMessageIds.add(messageKey);
-                                    loadedCount++;
+                                    console.log(`📥 [${index + 1}/${messageKeys.length}] 加载历史消息:`, messageData.content, '来自:', messageData.fromName || messageData.from);
+                                    // 直接添加到对话，不触发显示更新（避免频繁刷新）
+                                    this.addMessageToConversation(messageData, false);
                                 } else {
-                                    console.log('⚠️ 历史消息已存在，跳过:', messageData.id);
+                                    console.log(`⚠️ [${index + 1}/${messageKeys.length}] 历史消息已存在，跳过:`, messageData.id);
                                 }
                             }
                         });
-                        console.log('✅ 历史消息加载完成，新加载', loadedCount, '条，已记录', loadedMessageIds.size, '条消息ID');
-                        
-                        // 历史消息加载完成后，更新好友列表显示
-                        this.updateFriendsList();
+                        console.log('✅ 历史消息加载完成');
                     } else {
-                        console.log('📭 没有历史消息');
+                        console.log('📚 没有历史消息');
                     }
                 });
                 
-                // 监听新消息（实时接收）- 只处理新添加的消息
-                messagesRef.on('child_added', (snapshot) => {
-                    const messageKey = snapshot.key;
-                    const messageData = snapshot.val();
+                // 监听新消息（实时接收）- 使用value监听确保实时更新
+                let lastMessageCount = 0;
+                messagesRef.on('value', (snapshot) => {
+                    const allMessages = snapshot.val();
+                    const currentMessageCount = allMessages ? Object.keys(allMessages).length : 0;
                     
-                    console.log('📨 child_added触发，消息Key:', messageKey, '消息数据:', messageData);
+                    console.log('📬 消息列表变化:', { 
+                        count: currentMessageCount, 
+                        lastCount: lastMessageCount,
+                        userId: userId 
+                    });
                     
-                    // 如果这条消息已经在历史消息中加载过，跳过
-                    if (loadedMessageIds.has(messageKey) || (messageData && messageData.id && loadedMessageIds.has(messageData.id))) {
-                        console.log('⚠️ 消息已在历史加载中处理，跳过:', messageKey);
-                        return;
+                    if (allMessages && currentMessageCount > lastMessageCount) {
+                        // 有新消息，找出新增的消息
+                        Object.keys(allMessages).forEach(messageKey => {
+                            const messageData = allMessages[messageKey];
+                            if (messageData && messageData.from !== userId) {
+                                // 检查是否已存在
+                                const exists = this.conversations[messageData.from] && 
+                                    this.conversations[messageData.from].some(m => 
+                                        m.id === messageData.id || 
+                                        (m.timestamp === messageData.timestamp && m.content === messageData.content)
+                                    );
+                                if (!exists) {
+                                    console.log('✅ 发现新消息，处理中:', messageData.content);
+                                    this.handleFirebaseMessage(messageData);
+                                }
+                            }
+                        });
                     }
                     
+                    lastMessageCount = currentMessageCount;
+                });
+                
+                // 同时使用child_added作为备用监听（确保不遗漏）
+                messagesRef.on('child_added', (snapshot) => {
+                    const messageData = snapshot.val();
+                    console.log('📨 child_added触发，收到消息:', messageData);
                     if (messageData && messageData.from !== userId) {
-                        // 检查是否已存在，避免重复处理
+                        // 检查是否已存在
                         const exists = this.conversations[messageData.from] && 
                             this.conversations[messageData.from].some(m => 
                                 m.id === messageData.id || 
                                 (m.timestamp === messageData.timestamp && m.content === messageData.content)
                             );
                         if (!exists) {
-                            console.log('✅ 处理新消息:', messageData.content);
+                            console.log('✅ child_added处理新消息:', messageData.content);
                             this.handleFirebaseMessage(messageData);
-                            // 记录已处理的消息
-                            if (messageData.id) loadedMessageIds.add(messageData.id);
-                            if (messageKey) loadedMessageIds.add(messageKey);
                         } else {
-                            console.log('⚠️ 消息已存在于对话记录，跳过:', messageData.id);
+                            console.log('⚠️ child_added消息已存在，跳过:', messageData.id);
                         }
-                    } else if (messageData && messageData.from === userId) {
-                        console.log('ℹ️ 忽略自己发送的消息');
+                    } else {
+                        console.log('⚠️ child_added消息过滤:', { 
+                            hasData: !!messageData, 
+                            from: messageData?.from, 
+                            userId: userId 
+                        });
                     }
                 });
                 
@@ -2747,16 +2764,14 @@
                 });
             },
             
-            // 处理从Firebase接收的消息
-            handleFirebaseMessage(messageData) {
-                console.log('💬 处理Firebase消息:', messageData);
+            // 添加消息到对话记录
+            addMessageToConversation(messageData, updateDisplay = true) {
                 const friendId = messageData.from;
                 
                 // 确保发送者是好友
                 let friend = this.friends.find(f => f.id === friendId);
                 if (!friend) {
                     console.log('➕ 自动添加新好友:', friendId);
-                    // 如果不是好友，先添加为好友
                     friend = {
                         id: friendId,
                         name: messageData.fromName || '新好友',
@@ -2780,7 +2795,6 @@
                 );
                 
                 if (!messageExists) {
-                    console.log('✅ 添加新消息到对话:', messageData.content);
                     const receivedMessage = {
                         id: messageData.id || 'msg_' + Date.now(),
                         from: friendId,
@@ -2792,7 +2806,6 @@
                     };
                     
                     this.conversations[friendId].push(receivedMessage);
-                    console.log('💾 消息已添加到conversations，当前对话记录:', this.conversations[friendId].length, '条');
                     
                     // 更新好友最后消息
                     friend.lastMessage = messageData.type === 'location' ? '📍 位置' : messageData.content;
@@ -2801,56 +2814,69 @@
                     this.updateUnreadCount();
                     this.saveData();
                     
-                    // 强制更新显示（无论聊天窗口是否打开）
-                    console.log('🔄 强制更新聊天显示');
-                    this.updateChatDisplayAfterMessage(friendId, friend, messageData);
-                    
-                    // 如果聊天窗口打开且正在和这个好友聊天，立即刷新
-                    const chatPanel = document.getElementById('chat-panel');
-                    const activeFriendId = chatPanel && chatPanel.dataset ? chatPanel.dataset.friendId : null;
-                    if (activeFriendId === friendId) {
-                        console.log('🔄 立即刷新当前聊天窗口');
-                        setTimeout(() => {
-                            this.openChat(friendId);
-                        }, 50);
+                    if (updateDisplay) {
+                        // 检查聊天窗口状态并更新显示
+                        this.updateChatDisplayAfterMessage(friendId, friend, messageData);
                     }
+                    
+                    return true; // 消息已添加
                 } else {
-                    console.log('⚠️ 消息已存在，跳过:', messageData.id, '当前对话记录:', this.conversations[friendId] ? this.conversations[friendId].length : 0, '条');
+                    return false; // 消息已存在
+                }
+            },
+            
+            // 处理从Firebase接收的消息
+            handleFirebaseMessage(messageData) {
+                console.log('💬 处理Firebase消息:', messageData);
+                const added = this.addMessageToConversation(messageData, true);
+                if (added) {
+                    console.log('✅ 消息已添加到对话:', messageData.content);
+                } else {
+                    console.log('⚠️ 消息已存在，跳过:', messageData.id);
                 }
             },
             
             // 消息接收后更新聊天显示
             updateChatDisplayAfterMessage(friendId, friend, messageData) {
+                console.log('🔄 开始更新聊天显示，好友:', friend.name, friendId);
+                
                 const chatContainer = document.getElementById('chat-container');
                 const chatPanel = document.getElementById('chat-panel');
                 
-                // 检查聊天窗口是否打开
-                const chatContainerStyle = window.getComputedStyle(chatContainer);
-                const isChatOpen = chatContainer && 
-                    chatContainer.style.display !== 'none' && 
-                    chatContainer.style.display !== '' &&
-                    chatContainerStyle.display !== 'none';
+                if (!chatContainer || !chatPanel) {
+                    console.error('❌ 找不到聊天容器或面板');
+                    return;
+                }
                 
-                const activeFriendId = chatPanel && chatPanel.dataset ? chatPanel.dataset.friendId : null;
+                // 检查聊天窗口是否打开（使用多种方式检测）
+                const containerDisplay = chatContainer.style.display;
+                const containerComputed = window.getComputedStyle(chatContainer).display;
+                const isChatOpen = containerDisplay !== 'none' && 
+                                   containerDisplay !== '' &&
+                                   containerComputed !== 'none';
+                
+                const activeFriendId = chatPanel.dataset ? chatPanel.dataset.friendId : null;
                 
                 console.log('💬 聊天状态检查:', { 
                     isChatOpen, 
                     activeFriendId, 
                     friendId,
-                    chatContainerDisplay: chatContainer ? chatContainer.style.display : 'null',
-                    chatPanelDisplay: chatPanel ? chatPanel.style.display : 'null'
+                    containerDisplay: containerDisplay,
+                    containerComputed: containerComputed,
+                    panelDisplay: chatPanel.style.display
                 });
+                
+                // 强制更新好友列表（确保最后消息显示）
+                this.updateFriendsList();
                 
                 if (isChatOpen && activeFriendId === friendId) {
                     // 如果正在和这个好友聊天，立即更新聊天界面
                     console.log('🔄 实时更新聊天界面 - 正在和', friend.name, '聊天');
-                    setTimeout(() => {
-                        this.openChat(friendId);
-                    }, 100); // 稍微延迟确保DOM更新
+                    // 立即更新，不使用setTimeout
+                    this.openChat(friendId);
                 } else if (isChatOpen) {
-                    // 如果聊天窗口打开但不是这个好友，更新好友列表
+                    // 如果聊天窗口打开但不是这个好友，只更新好友列表（已更新）
                     console.log('🔄 更新好友列表 - 正在和其他人聊天');
-                    this.updateFriendsList();
                 } else {
                     // 如果聊天窗口未打开，显示通知
                     console.log('🔔 显示通知 - 聊天窗口未打开');
@@ -2862,6 +2888,8 @@
                 if (profilePanel && profilePanel.style.display === 'flex') {
                     this.updateProfileFriendsList();
                 }
+                
+                console.log('✅ 聊天显示更新完成');
             },
             
             // 显示消息通知
@@ -3653,49 +3681,11 @@
                 if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
                     chatContainer.style.display = 'block';
                     this.updateFriendsList();
-                    
-                    // 调试：输出当前对话记录
-                    console.log('💬 打开聊天面板，当前对话记录:');
-                    Object.keys(this.conversations).forEach(friendId => {
-                        const friend = this.friends.find(f => f.id === friendId);
-                        console.log(`  - ${friend ? friend.name : friendId}: ${this.conversations[friendId].length}条消息`);
-                    });
                 } else {
                     chatContainer.style.display = 'none';
                     document.getElementById('chat-panel').style.display = 'none';
                     document.getElementById('friends-panel').style.display = 'block';
                 }
-            },
-            
-            // 调试：手动从Firebase重新加载消息
-            debugReloadMessages() {
-                if (!firebaseEnabled || !database) {
-                    console.error('❌ Firebase未启用');
-                    return;
-                }
-                
-                const userId = this.currentUser.id;
-                console.log('🔍 手动重新加载消息，用户ID:', userId);
-                
-                const messagesRef = database.ref(`messages/${userId}`);
-                messagesRef.once('value', (snapshot) => {
-                    const allMessages = snapshot.val();
-                    console.log('📦 Firebase中的消息:', allMessages);
-                    
-                    if (allMessages) {
-                        Object.keys(allMessages).forEach(messageKey => {
-                            const messageData = allMessages[messageKey];
-                            console.log(`  - ${messageKey}:`, messageData);
-                        });
-                    }
-                    
-                    // 显示当前对话记录
-                    console.log('💾 本地对话记录:');
-                    Object.keys(this.conversations).forEach(friendId => {
-                        const friend = this.friends.find(f => f.id === friendId);
-                        console.log(`  - ${friend ? friend.name : friendId}:`, this.conversations[friendId]);
-                    });
-                });
             },
 
             // 格式化时间
