@@ -1061,6 +1061,14 @@
                     throw new Error('AMap对象未定义，地图API可能未正确加载');
                 }
                 
+                // 移除占位符
+                const mapContainer = document.getElementById('map-container');
+                const placeholder = mapContainer.querySelector('.map-placeholder');
+                if (placeholder) {
+                    placeholder.remove();
+                    console.log('已移除地图占位符');
+                }
+                
                 map = new AMap.Map('map-container', {
                     zoom: 15,
                     center: [121.4737, 31.2304], // 默认上海坐标
