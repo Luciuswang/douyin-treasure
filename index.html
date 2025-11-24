@@ -1037,7 +1037,7 @@
 
             // 动态加载高德地图API（包含坐标转换插件）
             const script = document.createElement('script');
-            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+            script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&plugin=AMap.Geocoder,AMap.Geolocation,AMap.ConvertFrom`;
             script.onload = function() {
                 console.log('高德地图API加载成功');
                 createMap();
@@ -1212,49 +1212,150 @@
                             }
                         }
                         
-                        console.log('📍 直接使用坐标（中国境内通常为GCJ-02）');
+                        console.log('📍 GPS返回WGS84坐标，需要转换为GCJ-02');
+                        console.log('📍 原始坐标 (WGS84):', { lat: wgs84Lat, lng: wgs84Lng });
                         
-                        // 直接使用坐标，先显示位置，异步获取地址
-                        const positionData = {
-                            coords: {
-                                latitude: wgs84Lat,
-                                longitude: wgs84Lng,
-                                accuracy: accuracy
-                            },
-                            timestamp: position.timestamp,
-                            address: '获取地址中...',
-                            locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
-                        };
-                        
-                        // 立即处理定位成功，不等待地址
-                        handleAmapLocationSuccess(positionData);
-                        
-                        // 异步获取地址（不阻塞主流程）
-                        setTimeout(() => {
-                            try {
-                                AMap.plugin('AMap.Geocoder', function() {
-                                    const geocoder = new AMap.Geocoder({
-                                        timeout: 3000  // 3秒超时
-                                    });
-                                    geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
-                                        let address = '地址未知';
-                                        if (status === 'complete' && geoResult.info === 'OK') {
-                                            address = geoResult.regeocode.formattedAddress;
+                        // 使用高德地图API进行坐标转换
+                        if (typeof AMap !== 'undefined' && AMap.convertFrom) {
+                            AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                                if (status === 'complete' && result.info === 'ok' && result.locations && result.locations.length > 0) {
+                                    const converted = result.locations[0];
+                                    const gcj02Lat = converted.lat;
+                                    const gcj02Lng = converted.lng;
+                                    
+                                    console.log('✅ 坐标转换成功 (WGS84 → GCJ-02)');
+                                    console.log('📍 转换后坐标 (GCJ-02):', { lat: gcj02Lat, lng: gcj02Lng });
+                                    
+                                    // 计算偏移距离
+                                    const offset = Math.sqrt(
+                                        Math.pow((gcj02Lng - wgs84Lng) * 111000, 2) + 
+                                        Math.pow((gcj02Lat - wgs84Lat) * 111000, 2)
+                                    );
+                                    console.log('📍 坐标偏移:', Math.round(offset), '米');
+                                    
+                                    // 使用转换后的坐标
+                                    const positionData = {
+                                        coords: {
+                                            latitude: gcj02Lat,
+                                            longitude: gcj02Lng,
+                                            accuracy: accuracy
+                                        },
+                                        timestamp: position.timestamp,
+                                        address: '获取地址中...',
+                                        locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位',
+                                        wgs84: { lat: wgs84Lat, lng: wgs84Lng } // 保存原始坐标用于对比
+                                    };
+                                    
+                                    // 立即处理定位成功，不等待地址
+                                    handleAmapLocationSuccess(positionData);
+                                    
+                                    // 异步获取地址（使用转换后的坐标）
+                                    setTimeout(() => {
+                                        try {
+                                            AMap.plugin('AMap.Geocoder', function() {
+                                                const geocoder = new AMap.Geocoder({
+                                                    timeout: 3000  // 3秒超时
+                                                });
+                                                geocoder.getAddress([gcj02Lng, gcj02Lat], function(status, geoResult) {
+                                                    let address = '地址未知';
+                                                    if (status === 'complete' && geoResult.info === 'OK') {
+                                                        address = geoResult.regeocode.formattedAddress;
+                                                    }
+                                                    console.log('📮 地址获取结果:', address);
+                                                    
+                                                    // 更新显示的地址
+                                                    positionData.address = address;
+                                                    const locationInfo = document.querySelector('.gps-data');
+                                                    if (locationInfo) {
+                                                        locationInfo.innerHTML = locationInfo.innerHTML.replace('获取地址中...', address);
+                                                    }
+                                                });
+                                            });
+                                        } catch (error) {
+                                            console.warn('⚠️ 获取地址失败:', error);
                                         }
-                                        console.log('📮 地址获取结果:', address);
-                                        
-                                        // 更新显示的地址
-                                        positionData.address = address;
-                                        const locationInfo = document.querySelector('.gps-data');
-                                        if (locationInfo) {
-                                            locationInfo.innerHTML = locationInfo.innerHTML.replace('获取地址中...', address);
+                                    }, 100);
+                                } else {
+                                    console.warn('⚠️ 坐标转换失败，使用原始坐标（可能有偏移）');
+                                    // 转换失败，使用原始坐标
+                                    const positionData = {
+                                        coords: {
+                                            latitude: wgs84Lat,
+                                            longitude: wgs84Lng,
+                                            accuracy: accuracy
+                                        },
+                                        timestamp: position.timestamp,
+                                        address: '获取地址中...',
+                                        locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
+                                    };
+                                    handleAmapLocationSuccess(positionData);
+                                    
+                                    // 异步获取地址
+                                    setTimeout(() => {
+                                        try {
+                                            AMap.plugin('AMap.Geocoder', function() {
+                                                const geocoder = new AMap.Geocoder({
+                                                    timeout: 3000
+                                                });
+                                                geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
+                                                    let address = '地址未知';
+                                                    if (status === 'complete' && geoResult.info === 'OK') {
+                                                        address = geoResult.regeocode.formattedAddress;
+                                                    }
+                                                    console.log('📮 地址获取结果:', address);
+                                                    positionData.address = address;
+                                                    const locationInfo = document.querySelector('.gps-data');
+                                                    if (locationInfo) {
+                                                        locationInfo.innerHTML = locationInfo.innerHTML.replace('获取地址中...', address);
+                                                    }
+                                                });
+                                            });
+                                        } catch (error) {
+                                            console.warn('⚠️ 获取地址失败:', error);
                                         }
+                                    }, 100);
+                                }
+                            });
+                        } else {
+                            console.warn('⚠️ AMap.convertFrom不可用，使用原始坐标（可能有偏移）');
+                            // API不可用，使用原始坐标
+                            const positionData = {
+                                coords: {
+                                    latitude: wgs84Lat,
+                                    longitude: wgs84Lng,
+                                    accuracy: accuracy
+                                },
+                                timestamp: position.timestamp,
+                                address: '获取地址中...',
+                                locationType: position.coords.altitude ? 'GPS卫星定位' : '网络辅助定位'
+                            };
+                            handleAmapLocationSuccess(positionData);
+                            
+                            // 异步获取地址
+                            setTimeout(() => {
+                                try {
+                                    AMap.plugin('AMap.Geocoder', function() {
+                                        const geocoder = new AMap.Geocoder({
+                                            timeout: 3000
+                                        });
+                                        geocoder.getAddress([wgs84Lng, wgs84Lat], function(status, geoResult) {
+                                            let address = '地址未知';
+                                            if (status === 'complete' && geoResult.info === 'OK') {
+                                                address = geoResult.regeocode.formattedAddress;
+                                            }
+                                            console.log('📮 地址获取结果:', address);
+                                            positionData.address = address;
+                                            const locationInfo = document.querySelector('.gps-data');
+                                            if (locationInfo) {
+                                                locationInfo.innerHTML = locationInfo.innerHTML.replace('获取地址中...', address);
+                                            }
+                                        });
                                     });
-                                });
-                            } catch (error) {
-                                console.warn('⚠️ 获取地址失败:', error);
-                            }
-                        }, 100);
+                                } catch (error) {
+                                    console.warn('⚠️ 获取地址失败:', error);
+                                }
+                            }, 100);
+                        }
                     },
                     function(error) {
                         clearTimeout(timeoutId); // 清除超时定时器
