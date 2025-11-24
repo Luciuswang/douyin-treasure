@@ -1017,7 +1017,7 @@
 
         // 默认API Key（高德地图Key）
         // 如果需要更换，请修改下面这行
-        const DEFAULT_AMAP_KEY = 'c3e0c33e45ad805025e9ccffbb4e9f37'; // 默认测试Key
+        const DEFAULT_AMAP_KEY = 'a4fdcddda4024a6a4df12431a7e6c536'; // 高德地图Key
         
         // 初始化地图
         function initMap() {
@@ -1061,12 +1061,20 @@
                     throw new Error('AMap对象未定义，地图API可能未正确加载');
                 }
                 
-                // 移除占位符
+                // 移除占位符并设置地图容器
                 const mapContainer = document.getElementById('map-container');
-                const placeholder = mapContainer.querySelector('.map-placeholder');
-                if (placeholder) {
-                    placeholder.remove();
-                    console.log('已移除地图占位符');
+                if (mapContainer) {
+                    // 移除占位符
+                    const placeholder = mapContainer.querySelector('.map-placeholder');
+                    if (placeholder) {
+                        placeholder.remove();
+                        console.log('已移除地图占位符');
+                    }
+                    
+                    // 确保地图容器有正确的高度
+                    mapContainer.style.height = '60vh';
+                    mapContainer.style.minHeight = '400px';
+                    console.log('地图容器高度已设置:', mapContainer.offsetHeight);
                 }
                 
                 map = new AMap.Map('map-container', {
@@ -1084,6 +1092,12 @@
                 });
 
                 console.log('地图实例创建成功，等待加载完成...');
+                
+                // 地图加载错误处理
+                map.on('error', function(e) {
+                    console.error('地图加载错误:', e);
+                    updateStatus('地图加载出错，可能是API Key无效。请检查控制台错误信息', 'error');
+                });
 
                 // 地图加载完成事件
                 map.on('complete', function() {
@@ -4266,6 +4280,89 @@
                 }, 100);
             },
 
+            // 清空聊天记录（不删除好友）
+            clearChatHistory() {
+                const chatPanel = document.getElementById('chat-panel');
+                const friendId = chatPanel?.dataset.friendId;
+                
+                if (!friendId) {
+                    console.warn('⚠️ 未找到当前聊天好友ID');
+                    return;
+                }
+                
+                const friend = this.friends.find(f => f.id === friendId);
+                const friendName = friend?.name || '好友';
+                
+                // 确认删除
+                if (!confirm(`确定要清空与"${friendName}"的聊天记录吗？\n\n注意：此操作不会删除好友，只是清空聊天记录。`)) {
+                    return;
+                }
+                
+                console.log('🗑️ 开始清空聊天记录:', friendId);
+                
+                // 清空本地对话记录
+                if (this.conversations[friendId]) {
+                    delete this.conversations[friendId];
+                    console.log('✅ 已清空本地对话记录');
+                }
+                
+                // 清空Firebase中的消息记录
+                if (firebaseEnabled && database) {
+                    const userId = this.currentUser.id;
+                    const chatId1 = `${userId}_${friendId}`;
+                    const chatId2 = `${friendId}_${userId}`;
+                    
+                    // 删除双方的消息记录
+                    Promise.all([
+                        database.ref(`messages/${chatId1}`).remove(),
+                        database.ref(`messages/${chatId2}`).remove()
+                    ]).then(() => {
+                        console.log('✅ Firebase消息记录已清空');
+                    }).catch(err => {
+                        console.error('❌ 清空Firebase消息记录失败:', err);
+                    });
+                    
+                    // 清空会话记录
+                    database.ref(`conversations/${userId}/${friendId}`).remove().catch(err => {
+                        console.error('❌ 清空Firebase会话记录失败:', err);
+                    });
+                }
+                
+                // 更新好友的最后消息
+                if (friend) {
+                    friend.lastMessage = '';
+                    friend.lastTime = null;
+                }
+                
+                // 清空消息列表显示
+                const messagesList = document.getElementById('chat-messages-list');
+                if (messagesList) {
+                    messagesList.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无消息</div>';
+                }
+                
+                // 保存数据
+                this.saveData();
+                console.log('💾 数据已保存');
+                
+                // 更新好友列表显示
+                this.updateFriendsList();
+                
+                // 显示成功提示
+                setTimeout(() => {
+                    const statusEl = document.getElementById('status');
+                    if (statusEl) {
+                        statusEl.className = 'status success';
+                        statusEl.innerHTML = `<span>✅</span><span>已清空与"${friendName}"的聊天记录</span>`;
+                        setTimeout(() => {
+                            statusEl.className = 'status info';
+                            statusEl.innerHTML = '<span>🔄</span><span>点击"启动寻宝之旅"开始游戏...</span>';
+                        }, 3000);
+                    }
+                }, 100);
+                
+                console.log(`✅ 已成功清空与"${friendName}"的聊天记录`);
+            },
+
             // 切换聊天面板显示
             toggleChat() {
                 const chatContainer = document.getElementById('chat-container');
@@ -4452,6 +4549,18 @@
                     <div id="chat-friend-name" style="font-weight: bold; font-size: 16px;"></div>
                     <div id="chat-friend-status" style="font-size: 12px; opacity: 0.9;"></div>
                 </div>
+                <button onclick="chatManager.clearChatHistory()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: none;
+                    color: white;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 16px;
+                    line-height: 1;
+                    margin-left: 10px;
+                " title="清空聊天记录">🗑️</button>
             </div>
 
             <!-- 消息列表 -->
