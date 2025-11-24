@@ -1167,17 +1167,73 @@
 
         // 使用高德定位服务（推荐方式，避免坐标系问题）
         function useAmapGeolocation() {
-            console.log('🚀 启动高德定位服务（强制使用浏览器GPS）...');
+            console.log('🚀 启动高德定位服务（使用高德官方定位API）...');
+            updateStatus('正在获取GPS位置，请允许位置权限...', 'info', true);
+            
+            // 优先使用高德地图官方定位服务（与APP一致，更准确）
+            if (typeof AMap !== 'undefined') {
+                AMap.plugin('AMap.Geolocation', function() {
+                    const geolocation = new AMap.Geolocation({
+                        enableHighAccuracy: true,  // 启用高精度定位
+                        timeout: 20000,           // 20秒超时
+                        maximumAge: 0,            // 不使用缓存
+                        convert: true,            // 自动偏移坐标，偏移的坐标转换为高德坐标
+                        showButton: false,        // 不显示定位按钮
+                        showMarker: false,        // 不显示定位标记
+                        showCircle: false,        // 不显示定位精度圆圈
+                        panToLocation: false,     // 不自动移动地图
+                        zoomToAccuracy: false     // 不自动缩放
+                    });
+                    
+                    geolocation.getCurrentPosition(function(status, result) {
+                        if (status === 'complete') {
+                            console.log('✅ 高德定位成功:', result);
+                            const lat = result.position.lat;
+                            const lng = result.position.lng;
+                            const accuracy = result.accuracy || 50;
+                            
+                            console.log('📍 高德定位坐标 (GCJ-02):', { lat, lng, accuracy });
+                            console.log('📍 定位方式:', result.location_type);
+                            console.log('📍 地址:', result.formattedAddress);
+                            
+                            const positionData = {
+                                coords: {
+                                    latitude: lat,
+                                    longitude: lng,
+                                    accuracy: accuracy
+                                },
+                                timestamp: Date.now(),
+                                address: result.formattedAddress || '获取地址中...',
+                                locationType: result.location_type || '高德定位'
+                            };
+                            
+                            handleAmapLocationSuccess(positionData);
+                        } else {
+                            console.warn('⚠️ 高德定位失败，回退到浏览器GPS:', result);
+                            // 高德定位失败，回退到浏览器GPS
+                            useBrowserGPSFallback();
+                        }
+                    });
+                });
+            } else {
+                console.warn('⚠️ 高德地图API未加载，使用浏览器GPS');
+                useBrowserGPSFallback();
+            }
+        }
+        
+        // 浏览器GPS备用方案
+        function useBrowserGPSFallback() {
+            console.log('🛰️ 使用浏览器原生GPS定位（备用方案）...');
             updateStatus('正在获取GPS位置，请允许位置权限...', 'info', true);
             
             // 设置超时保护（20秒后自动使用备用方案）
             const timeoutId = setTimeout(() => {
-                console.warn('⏰ GPS定位超时，使用备用定位方案');
-                updateStatus('GPS定位超时，正在使用备用定位方案...', 'warning', true);
-                useAmapLocationFallback();
+                console.warn('⏰ GPS定位超时，使用默认位置');
+                updateStatus('GPS定位超时，使用默认位置', 'warning');
+                useDefaultLocation();
             }, 20000);
             
-            // 先尝试使用浏览器原生GPS获取WGS84坐标
+            // 使用浏览器原生GPS获取WGS84坐标
             if (navigator.geolocation) {
                 console.log('🛰️ 使用浏览器原生GPS定位...');
                 navigator.geolocation.getCurrentPosition(
