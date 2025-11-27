@@ -2784,6 +2784,13 @@
                         messageKeys.forEach((messageKey, index) => {
                             const messageData = allMessages[messageKey];
                             if (messageData && messageData.from !== userId) {
+                                // 检查本地是否已有该好友的对话记录
+                                // 如果本地没有对话记录（conversations中没有该好友的记录），说明可能被清空了，不加载历史消息
+                                if (!this.conversations[messageData.from]) {
+                                    console.log(`⚠️ [${index + 1}/${messageKeys.length}] 跳过已清空的聊天记录（本地无对话）:`, messageData.from);
+                                    return;
+                                }
+                                
                                 // 检查是否已存在，避免重复
                                 const exists = this.conversations[messageData.from] && 
                                     this.conversations[messageData.from].some(m => 
@@ -2940,31 +2947,59 @@
                 friendshipsRef.once('value', (snapshot) => {
                     const friendships = snapshot.val();
                     if (friendships) {
+                        // 如果本地已有好友列表，只同步更新已存在好友的信息，不添加新好友
+                        // 这样可以避免重新加载已删除的好友
+                        const hasLocalFriends = this.friends.length > 0;
+                        
                         Object.keys(friendships).forEach(friendId => {
                             const friendship = friendships[friendId];
-                            // 检查是否已经是好友
-                            if (!this.friends.find(f => f.id === friendId)) {
-                                // 获取好友的详细信息
+                            const existingFriend = this.friends.find(f => f.id === friendId);
+                            
+                            if (existingFriend) {
+                                // 更新已存在好友的信息（在线状态、头像、昵称等）
                                 const friendUserRef = database.ref(`users/${friendId}`);
                                 friendUserRef.once('value', (friendSnapshot) => {
                                     const friendUserData = friendSnapshot.val();
                                     if (friendUserData) {
-                                        const newFriend = {
-                                            id: friendId,
-                                            name: friendUserData.name || friendship.friendName || '新好友',
-                                            avatar: friendUserData.avatar || friendship.friendAvatar || '👤',
-                                            online: friendUserData.online || false,
-                                            lastMessage: '',
-                                            lastTime: new Date().toISOString()
-                                        };
-                                        
-                                        this.friends.push(newFriend);
+                                        existingFriend.online = friendUserData.online || false;
+                                        if (friendUserData.name) existingFriend.name = friendUserData.name;
+                                        if (friendUserData.avatar) existingFriend.avatar = friendUserData.avatar;
                                         this.saveData();
                                         this.updateFriendsList();
+                                        console.log('✅ 已更新好友信息:', existingFriend.name);
                                     }
                                 });
+                            } else if (!hasLocalFriends) {
+                                // 只有在本地好友列表为空时，才从Firebase添加新好友
+                                // 这样可以避免重新加载已删除的好友
+                                const friendUserRef = database.ref(`users/${friendId}`);
+                                friendUserRef.once('value', (friendSnapshot) => {
+                                    const friendUserData = friendSnapshot.val();
+                                    if (friendUserData) {
+                                        // 再次检查是否已经是好友（防止并发添加）
+                                        if (!this.friends.find(f => f.id === friendId)) {
+                                            const newFriend = {
+                                                id: friendId,
+                                                name: friendUserData.name || friendship.friendName || '新好友',
+                                                avatar: friendUserData.avatar || friendship.friendAvatar || '👤',
+                                                online: friendUserData.online || false,
+                                                lastMessage: '',
+                                                lastTime: new Date().toISOString()
+                                            };
+                                            
+                                            this.friends.push(newFriend);
+                                            this.saveData();
+                                            this.updateFriendsList();
+                                            console.log('✅ 从Firebase加载好友:', newFriend.name);
+                                        }
+                                    }
+                                });
+                            } else {
+                                console.log('⚠️ 跳过Firebase中的好友（本地已删除）:', friendId);
                             }
                         });
+                    } else {
+                        console.log('📋 Firebase中没有好友关系');
                     }
                 });
             },
@@ -4400,31 +4435,53 @@
                     document.getElementById('friends-panel').style.display = 'block';
                 }
 
-                // 保存数据
-                this.saveData();
-                console.log('💾 数据已保存');
-
-                // 更新好友列表显示
-                this.updateFriendsList();
-                console.log('🔄 好友列表已更新');
-
-                // 如果Firebase已启用，从Firebase删除好友关系
+                // 如果Firebase已启用，先删除Firebase中的好友关系，然后再保存本地数据
                 if (firebaseEnabled && database) {
                     const userId = this.currentUser.id;
-                    const friendshipId1 = `${userId}_${friendId}`;
-                    const friendshipId2 = `${friendId}_${userId}`;
                     
-                    console.log('🔥 开始从Firebase删除好友关系:', friendshipId1, friendshipId2);
+                    console.log('🔥 开始从Firebase删除好友关系:', userId, friendId);
                     
-                    // 删除双向好友关系
+                    // 删除双向好友关系（使用正确的路径格式：friendships/${userId}/${friendId}）
                     Promise.all([
-                        database.ref(`friendships/${friendshipId1}`).remove(),
-                        database.ref(`friendships/${friendshipId2}`).remove()
+                        database.ref(`friendships/${userId}/${friendId}`).remove(),
+                        database.ref(`friendships/${friendId}/${userId}`).remove()
                     ]).then(() => {
                         console.log('✅ Firebase好友关系已删除');
+                        
+                        // Firebase删除成功后，保存本地数据
+                        this.saveData();
+                        console.log('💾 数据已保存');
+                        
+                        // 更新好友列表显示
+                        this.updateFriendsList();
+                        console.log('🔄 好友列表已更新');
                     }).catch(err => {
                         console.error('❌ 删除Firebase好友关系失败:', err);
+                        // 即使Firebase删除失败，也保存本地删除操作
+                        this.saveData();
+                        console.log('💾 数据已保存（Firebase删除失败，但本地已删除）');
+                        this.updateFriendsList();
                     });
+                    
+                    // 同时删除旧格式的好友关系（兼容旧数据）
+                    const friendshipId1 = `${userId}_${friendId}`;
+                    const friendshipId2 = `${friendId}_${userId}`;
+                    Promise.all([
+                        database.ref(`friendships/${friendshipId1}`).remove().catch(() => {}),
+                        database.ref(`friendships/${friendshipId2}`).remove().catch(() => {})
+                    ]).then(() => {
+                        console.log('✅ 旧格式Firebase好友关系已清理');
+                    }).catch(() => {
+                        // 忽略错误，可能不存在旧格式数据
+                    });
+                } else {
+                    // 如果没有Firebase，直接保存本地数据
+                    this.saveData();
+                    console.log('💾 数据已保存');
+                    
+                    // 更新好友列表显示
+                    this.updateFriendsList();
+                    console.log('🔄 好友列表已更新');
                 }
 
                 console.log(`✅ 已成功删除好友: ${friendName}`);
@@ -4468,28 +4525,6 @@
                     console.log('✅ 已清空本地对话记录');
                 }
                 
-                // 清空Firebase中的消息记录
-                if (firebaseEnabled && database) {
-                    const userId = this.currentUser.id;
-                    const chatId1 = `${userId}_${friendId}`;
-                    const chatId2 = `${friendId}_${userId}`;
-                    
-                    // 删除双方的消息记录
-                    Promise.all([
-                        database.ref(`messages/${chatId1}`).remove(),
-                        database.ref(`messages/${chatId2}`).remove()
-                    ]).then(() => {
-                        console.log('✅ Firebase消息记录已清空');
-                    }).catch(err => {
-                        console.error('❌ 清空Firebase消息记录失败:', err);
-                    });
-                    
-                    // 清空会话记录
-                    database.ref(`conversations/${userId}/${friendId}`).remove().catch(err => {
-                        console.error('❌ 清空Firebase会话记录失败:', err);
-                    });
-                }
-                
                 // 更新好友的最后消息
                 if (friend) {
                     friend.lastMessage = '';
@@ -4502,27 +4537,134 @@
                     messagesList.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无消息</div>';
                 }
                 
-                // 保存数据
-                this.saveData();
-                console.log('💾 数据已保存');
-                
-                // 更新好友列表显示
-                this.updateFriendsList();
-                
-                // 显示成功提示
-                setTimeout(() => {
-                    const statusEl = document.getElementById('status');
-                    if (statusEl) {
-                        statusEl.className = 'status success';
-                        statusEl.innerHTML = `<span>✅</span><span>已清空与"${friendName}"的聊天记录</span>`;
-                        setTimeout(() => {
-                            statusEl.className = 'status info';
-                            statusEl.innerHTML = '<span>🔄</span><span>点击"启动寻宝之旅"开始游戏...</span>';
-                        }, 3000);
-                    }
-                }, 100);
-                
-                console.log(`✅ 已成功清空与"${friendName}"的聊天记录`);
+                // 如果Firebase已启用，先删除Firebase中的消息记录，然后再保存本地数据
+                if (firebaseEnabled && database) {
+                    const userId = this.currentUser.id;
+                    
+                    console.log('🔥 开始从Firebase删除聊天记录:', userId, friendId);
+                    
+                    // 删除当前用户消息队列中与该好友相关的所有消息
+                    // 消息存储路径：messages/${userId}/${messageId}
+                    const userMessagesRef = database.ref(`messages/${userId}`);
+                    userMessagesRef.once('value', (snapshot) => {
+                        const allMessages = snapshot.val();
+                        const deletePromises = [];
+                        
+                        if (allMessages) {
+                            Object.keys(allMessages).forEach(messageId => {
+                                const message = allMessages[messageId];
+                                // 如果消息是与该好友相关的（from或to是该好友）
+                                if (message && (message.from === friendId || message.to === friendId)) {
+                                    deletePromises.push(
+                                        database.ref(`messages/${userId}/${messageId}`).remove()
+                                    );
+                                }
+                            });
+                        }
+                        
+                        // 删除好友消息队列中与当前用户相关的所有消息
+                        const friendMessagesRef = database.ref(`messages/${friendId}`);
+                        friendMessagesRef.once('value', (friendSnapshot) => {
+                            const friendAllMessages = friendSnapshot.val();
+                            
+                            if (friendAllMessages) {
+                                Object.keys(friendAllMessages).forEach(messageId => {
+                                    const message = friendAllMessages[messageId];
+                                    // 如果消息是与当前用户相关的（from或to是当前用户）
+                                    if (message && (message.from === userId || message.to === userId)) {
+                                        deletePromises.push(
+                                            database.ref(`messages/${friendId}/${messageId}`).remove()
+                                        );
+                                    }
+                                });
+                            }
+                            
+                            // 同时删除会话记录
+                            deletePromises.push(
+                                database.ref(`conversations/${userId}/${friendId}`).remove().catch(() => {}),
+                                database.ref(`conversations/${friendId}/${userId}`).remove().catch(() => {})
+                            );
+                            
+                            // 等待所有删除操作完成
+                            Promise.all(deletePromises).then(() => {
+                                console.log('✅ Firebase聊天记录已清空');
+                                
+                                // Firebase删除成功后，保存本地数据
+                                this.saveData();
+                                console.log('💾 数据已保存');
+                                
+                                // 更新好友列表显示
+                                this.updateFriendsList();
+                                
+                                // 显示成功提示
+                                setTimeout(() => {
+                                    const statusEl = document.getElementById('status');
+                                    if (statusEl) {
+                                        statusEl.className = 'status success';
+                                        statusEl.innerHTML = `<span>✅</span><span>已清空与"${friendName}"的聊天记录</span>`;
+                                        setTimeout(() => {
+                                            statusEl.className = 'status info';
+                                            statusEl.innerHTML = '<span>🔄</span><span>点击"启动寻宝之旅"开始游戏...</span>';
+                                        }, 3000);
+                                    }
+                                }, 100);
+                                
+                                console.log(`✅ 已成功清空与"${friendName}"的聊天记录`);
+                            }).catch(err => {
+                                console.error('❌ 清空Firebase聊天记录失败:', err);
+                                // 即使Firebase删除失败，也保存本地删除操作
+                                this.saveData();
+                                console.log('💾 数据已保存（Firebase删除失败，但本地已清空）');
+                                this.updateFriendsList();
+                                
+                                // 显示提示
+                                setTimeout(() => {
+                                    const statusEl = document.getElementById('status');
+                                    if (statusEl) {
+                                        statusEl.className = 'status success';
+                                        statusEl.innerHTML = `<span>✅</span><span>已清空本地聊天记录</span>`;
+                                        setTimeout(() => {
+                                            statusEl.className = 'status info';
+                                            statusEl.innerHTML = '<span>🔄</span><span>点击"启动寻宝之旅"开始游戏...</span>';
+                                        }, 3000);
+                                    }
+                                }, 100);
+                            });
+                        }).catch(err => {
+                            console.error('❌ 读取好友消息失败:', err);
+                            // 即使读取失败，也保存本地删除操作
+                            this.saveData();
+                            this.updateFriendsList();
+                        });
+                    }).catch(err => {
+                        console.error('❌ 读取用户消息失败:', err);
+                        // 即使读取失败，也保存本地删除操作
+                        this.saveData();
+                        this.updateFriendsList();
+                    });
+                } else {
+                    // 如果没有Firebase，直接保存本地数据
+                    this.saveData();
+                    console.log('💾 数据已保存');
+                    
+                    // 更新好友列表显示
+                    this.updateFriendsList();
+                    
+                    // 显示成功提示
+                    setTimeout(() => {
+                        const statusEl = document.getElementById('status');
+                        if (statusEl) {
+                            statusEl.className = 'status success';
+                            statusEl.innerHTML = `<span>✅</span><span>已清空与"${friendName}"的聊天记录</span>`;
+                            setTimeout(() => {
+                                statusEl.className = 'status info';
+                                statusEl.innerHTML = '<span>🔄</span><span>点击"启动寻宝之旅"开始游戏...</span>';
+                            }, 3000);
+                        }
+                    }, 100);
+                    
+                    console.log(`✅ 已成功清空与"${friendName}"的聊天记录`);
+                }
             },
 
             // 切换聊天面板显示
