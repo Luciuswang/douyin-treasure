@@ -3487,8 +3487,24 @@
                 return userId;
             },
 
-            // 获取默认好友（演示用）- 现在返回空数组，让用户自己添加
+            // 获取默认好友（包含AI机器人"小突"）
             getDefaultFriends() {
+                // 检查是否已经添加过机器人好友
+                const savedFriends = storageManager.load('chatFriends') || [];
+                const hasBot = savedFriends.some(f => f.id === 'totofun_bot');
+                
+                if (!hasBot) {
+                    // 添加AI机器人"小突"作为默认好友
+                    return [{
+                        id: 'totofun_bot',
+                        name: '小突',
+                        avatar: '🤖',
+                        online: true,
+                        isBot: true, // 标记为机器人
+                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
+                        lastTime: new Date().toISOString()
+                    }];
+                }
                 return [];
             },
 
@@ -3948,12 +3964,192 @@
 
                 this.saveData();
                 
-                // 如果Firebase已启用，通过Firebase发送实时消息
-                if (firebaseEnabled && database) {
-                    this.sendFirebaseMessage(friendId, message);
+                // 检查是否是发给AI机器人的消息
+                if (friend && friend.isBot && friendId === 'totofun_bot') {
+                    // 延迟一下，模拟思考时间，然后获取AI回复
+                    setTimeout(() => {
+                        this.getBotReply(content, friendId).then(reply => {
+                            if (reply) {
+                                // 模拟机器人发送消息
+                                const botMessage = {
+                                    id: 'msg_' + Date.now(),
+                                    from: friendId,
+                                    to: this.currentUser.id,
+                                    content: reply,
+                                    type: 'text',
+                                    timestamp: new Date().toISOString(),
+                                    read: false,
+                                    status: 'received'
+                                };
+                                
+                                // 添加到对话记录
+                                this.addMessageToConversation(botMessage, true);
+                                
+                                // 更新消息状态为已发送
+                                this.updateMessageStatus(friendId, message.id, 'sent');
+                            }
+                        });
+                    }, 500); // 500ms延迟，模拟思考时间
+                } else {
+                    // 普通好友消息，通过Firebase发送
+                    if (firebaseEnabled && database) {
+                        this.sendFirebaseMessage(friendId, message);
+                    }
                 }
                 
                 return message;
+            },
+            
+            // AI机器人回复服务
+            async getBotReply(userMessage, botId) {
+                try {
+                    // 先尝试规则回复（快速、免费）
+                    const ruleReply = this.getRuleBasedReply(userMessage);
+                    if (ruleReply) {
+                        console.log('🤖 使用规则回复:', ruleReply);
+                        return ruleReply;
+                    }
+                    
+                    // 如果没有匹配的规则，尝试调用AI API
+                    const aiReply = await this.getAIReply(userMessage);
+                    if (aiReply) {
+                        console.log('🤖 使用AI回复:', aiReply);
+                        return aiReply;
+                    }
+                    
+                    // 如果AI API不可用，返回默认回复
+                    return this.getDefaultBotReply();
+                } catch (error) {
+                    console.error('❌ 获取机器人回复失败:', error);
+                    return '抱歉，我现在有点累，稍后再聊吧~ 😴';
+                }
+            },
+            
+            // 规则回复（快速、免费）
+            getRuleBasedReply(message) {
+                const lowerMessage = message.toLowerCase().trim();
+                
+                // 问候语
+                if (/^(你好|hello|hi|嗨|早上好|下午好|晚上好|在吗|在不在)/.test(lowerMessage)) {
+                    return '你好！我是小突，你的寻宝伙伴！😊 有什么问题都可以问我哦~';
+                }
+                
+                // 游戏引导
+                if (/^(怎么|如何|怎样|不会|不懂|教我|引导|新手|第一次)/.test(lowerMessage)) {
+                    return '让我来帮你！🎮\n\n1️⃣ 点击"启动寻宝之旅"开始游戏\n2️⃣ 允许GPS定位权限\n3️⃣ 在地图上找到附近的宝藏\n4️⃣ 点击宝藏查看详情\n5️⃣ 到达宝藏位置后点击"发现宝藏"\n\n有什么不懂的随时问我！';
+                }
+                
+                // 寻宝相关
+                if (/^(宝藏|寻宝|找到|发现|位置|在哪里|在哪)/.test(lowerMessage)) {
+                    return '宝藏就在你身边！🗺️\n\n• 打开地图可以看到附近的宝藏\n• 绿色标记是普通宝藏\n• 金色标记是稀有宝藏\n• 点击标记可以查看详情\n• 到达位置后就能发现宝藏啦！\n\n加油，寻宝者！💪';
+                }
+                
+                // 好友相关
+                if (/^(好友|朋友|添加|加好友|怎么加)/.test(lowerMessage)) {
+                    return '添加好友很简单！👥\n\n1️⃣ 点击聊天按钮💬\n2️⃣ 点击"添加好友"\n3️⃣ 输入好友的ID（10位数字）\n4️⃣ 或者让好友添加你的ID\n\n你的ID是：' + this.currentUser.id + '\n\n分享给朋友，一起寻宝吧！';
+                }
+                
+                // 成就/等级相关
+                if (/^(等级|经验|升级|成就|徽章|奖励)/.test(lowerMessage)) {
+                    return '升级和成就系统！🏆\n\n• 发现宝藏可以获得经验值\n• 经验值满了就会升级\n• 完成特殊任务可以获得徽章\n• 等级越高，能发现的宝藏越多\n\n继续寻宝，成为寻宝大师吧！⭐';
+                }
+                
+                // 情感支持
+                if (/^(累|疲惫|困|想休息|不想玩了)/.test(lowerMessage)) {
+                    return '累了就休息一下吧！😴\n\n寻宝虽然有趣，但也要注意休息哦~ 我会一直在这里等你，随时可以来找我聊天！💙';
+                }
+                
+                if (/^(开心|高兴|快乐|兴奋|太棒了)/.test(lowerMessage)) {
+                    return '太好了！看到你开心我也很开心！😄\n\n继续加油，发现更多宝藏吧！💪';
+                }
+                
+                if (/^(难过|伤心|不开心|沮丧|失望)/.test(lowerMessage)) {
+                    return '别难过~ 每个人都会遇到挫折的！💙\n\n寻宝的路上总会有惊喜，说不定下一个宝藏就在不远处等着你呢！加油！✨';
+                }
+                
+                // 感谢
+                if (/^(谢谢|感谢|多谢|thx|thanks)/.test(lowerMessage)) {
+                    return '不客气！能帮到你我很开心！😊\n\n有什么问题随时问我，我会一直陪着你的！';
+                }
+                
+                // 再见
+                if (/^(再见|拜拜|bye|goodbye|下次见)/.test(lowerMessage)) {
+                    return '再见！期待下次和你聊天！👋\n\n记得常来找我哦，我会想你的！💙';
+                }
+                
+                // 没有匹配的规则
+                return null;
+            },
+            
+            // 获取AI回复（需要配置API密钥）
+            async getAIReply(message) {
+                // TODO: 在这里集成AI API
+                // 可以使用 OpenAI、Claude、文心一言、豆包等
+                
+                // 示例：使用免费的AI API（需要配置）
+                const aiApiKey = localStorage.getItem('ai_api_key'); // 用户可以在设置中配置
+                const aiApiUrl = localStorage.getItem('ai_api_url') || 'https://api.openai.com/v1/chat/completions';
+                
+                if (!aiApiKey) {
+                    // 如果没有配置API密钥，返回null，使用默认回复
+                    return null;
+                }
+                
+                try {
+                    // 构建上下文（最近5条消息）
+                    const recentMessages = this.conversations['totofun_bot'] || [];
+                    const contextMessages = recentMessages.slice(-5).map(m => ({
+                        role: m.from === this.currentUser.id ? 'user' : 'assistant',
+                        content: m.content
+                    }));
+                    
+                    const response = await fetch(aiApiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${aiApiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'gpt-3.5-turbo',
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: '你是Totofun寻宝游戏的AI伙伴"小突"，性格活泼可爱，说话简洁幽默，喜欢用emoji。你的任务是帮助用户寻宝、完成任务、解答疑问，同时也是一个好朋友，可以聊任何事情。回复要简短（50字以内），活泼有趣。'
+                                },
+                                ...contextMessages,
+                                {
+                                    role: 'user',
+                                    content: message
+                                }
+                            ],
+                            max_tokens: 100,
+                            temperature: 0.8
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.choices[0]?.message?.content || null;
+                    }
+                } catch (error) {
+                    console.error('AI API调用失败:', error);
+                }
+                
+                return null;
+            },
+            
+            // 默认机器人回复
+            getDefaultBotReply() {
+                const replies = [
+                    '我在听呢！😊 有什么想聊的吗？',
+                    '嗯嗯，我在呢~ 有什么问题吗？',
+                    '我在！有什么需要帮助的吗？',
+                    '虽然我不太懂，但我很愿意听你说~ 💙',
+                    '让我想想... 你可以试试问我关于寻宝的问题哦！',
+                    '哈哈，这个问题有点难呢~ 要不我们聊聊寻宝？',
+                    '我在学习呢，多和我聊天我会变得更聪明！😄'
+                ];
+                return replies[Math.floor(Math.random() * replies.length)];
             },
             
             // 通过Firebase发送消息（确保双向同步）
@@ -4532,9 +4728,9 @@
                             <div class="friend-time">${this.formatTime(friend.lastTime)}</div>
                             ${unread > 0 ? `<div class="friend-unread">${unread}</div>` : ''}
                         </div>
-                        <button class="friend-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); chatManager.removeFriend('${friendId}')" title="删除好友">
+                        ${friend.isBot ? '' : `<button class="friend-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); chatManager.removeFriend('${friendId}')" title="删除好友">
                             🗑️
-                        </button>
+                        </button>`}
                     `;
                     
                     // 添加长按功能（移动端）
@@ -4625,6 +4821,13 @@
             // 删除好友
             removeFriend(friendId) {
                 console.log('🗑️ 开始删除好友，ID:', friendId);
+                
+                // 检查是否是机器人好友
+                const botFriend = this.friends.find(f => f.id === friendId);
+                if (botFriend && botFriend.isBot) {
+                    alert('🤖 小突是你的AI伙伴，不能删除哦~ 我会一直陪着你的！💙');
+                    return;
+                }
                 
                 // 检查ID是否有效
                 if (!friendId || friendId === 'undefined' || friendId === 'null') {
