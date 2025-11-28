@@ -2692,6 +2692,13 @@
                     console.log('✅ 新用户已创建:', userId, '昵称:', username);
                 } else {
                     console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
+                    
+                    // 检查ID格式，如果是旧的长ID，提示用户（但不强制迁移，避免破坏好友关系）
+                    if (savedChatUser.id && (savedChatUser.id.length > 10 || !/^\d+$/.test(savedChatUser.id))) {
+                        console.log('⚠️ 检测到旧格式ID（长度>10或包含非数字字符）:', savedChatUser.id);
+                        // 可选：在这里可以提示用户迁移到短ID，但为了不破坏好友关系，暂时保持原ID
+                    }
+                    
                     // 同步游戏昵称到聊天昵称
                     const gameUserData = storageManager.load('totofun-treasure-user');
                     if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
@@ -2703,6 +2710,11 @@
                 
                 this.currentUser = savedChatUser;
                 console.log('👤 当前用户:', this.currentUser.id, this.currentUser.name);
+                
+                // 如果ID是短ID（10位数字），在控制台显示友好提示
+                if (this.currentUser.id && /^\d{10}$/.test(this.currentUser.id)) {
+                    console.log('✅ 用户ID格式正确（10位数字）');
+                }
                 
                 // 加载好友列表
                 this.friends = storageManager.load('chatFriends') || this.getDefaultFriends();
@@ -3425,18 +3437,18 @@
                 }
                 
                 if (!userId) {
-                    // 生成新的持久ID
-                    // 使用时间戳 + 随机数 + 浏览器信息
-                    const timestamp = Date.now();
-                    const random = Math.random().toString(36).substring(2, 15);
-                    const browserInfo = navigator.userAgent.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
-                    userId = `user_${timestamp}_${random}_${browserInfo}`.substring(0, 50);
+                    // 生成新的短ID（10位数字）
+                    // 使用时间戳的后8位 + 2位随机数，确保唯一性
+                    const timestamp = Date.now().toString();
+                    const timestampSuffix = timestamp.substring(timestamp.length - 8); // 取时间戳后8位
+                    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0'); // 2位随机数
+                    userId = timestampSuffix + random; // 总共10位数字
                     
                     // 永久保存到多个位置
                     try {
                         localStorage.setItem('totofun-user-id', userId);
                         sessionStorage.setItem('totofun-user-id', userId);
-                        console.log('✅ 新用户ID已生成:', userId);
+                        console.log('✅ 新用户ID已生成（10位数字）:', userId);
                     } catch (e) {
                         console.error('❌ 保存用户ID失败:', e);
                         // 如果localStorage失败，至少保存到sessionStorage
@@ -3447,7 +3459,16 @@
                         }
                     }
                 } else {
-                    console.log('✅ 恢复用户ID:', userId);
+                    // 如果已有ID，检查是否是旧的长ID格式
+                    // 如果是旧格式（长度>10或包含非数字字符），可以选择迁移到短ID
+                    // 但为了兼容性，先保持原ID不变
+                    if (userId.length > 10 || !/^\d+$/.test(userId)) {
+                        console.log('⚠️ 检测到旧格式ID，保持原ID:', userId);
+                        // 可选：如果需要迁移到短ID，可以在这里实现
+                        // 但为了不破坏已有用户的好友关系，暂时保持原ID
+                    } else {
+                        console.log('✅ 恢复用户ID（10位数字）:', userId);
+                    }
                 }
                 
                 return userId;
