@@ -2732,7 +2732,8 @@
                     const botFriend = {
                         id: 'totofun_bot',
                         name: '小突',
-                        avatar: '🤖',
+                        avatar: './assets/images/xiaotu-bot.png', // 机器人头像图片路径
+                        avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
                         online: true,
                         isBot: true,
                         lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
@@ -3142,7 +3143,10 @@
                                 const chatPanel = document.getElementById('chat-panel');
                                 if (chatPanel && chatPanel.dataset.friendId === friendId) {
                                     document.getElementById('chat-friend-name').textContent = this.friends[friendIndex].name;
-                                    document.getElementById('chat-friend-avatar').textContent = this.friends[friendIndex].avatar;
+                                    const chatFriendAvatarUpdateEl = document.getElementById('chat-friend-avatar');
+                                    if (chatFriendAvatarUpdateEl) {
+                                        chatFriendAvatarUpdateEl.innerHTML = this.renderAvatar(this.friends[friendIndex].avatar, 24);
+                                    }
                                     
                                     // 更新聊天消息中的头像
                                     const messagesList = document.getElementById('chat-messages-list');
@@ -3152,7 +3156,7 @@
                                             // 只更新对方消息的头像（不是自己的）
                                             const messageDiv = avatarEl.closest('.chat-message');
                                             if (messageDiv && messageDiv.classList.contains('chat-message-other')) {
-                                                avatarEl.textContent = this.friends[friendIndex].avatar;
+                                                avatarEl.innerHTML = this.renderAvatar(this.friends[friendIndex].avatar, 40);
                                             }
                                         });
                                     }
@@ -3535,13 +3539,25 @@
                 return userId;
             },
 
+            // 渲染头像（支持图片和emoji）
+            renderAvatar(avatar, size = 40) {
+                // 如果是图片路径（以 http://、https://、./ 或 / 开头），使用img标签
+                if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('./') || avatar.startsWith('/') || avatar.endsWith('.png') || avatar.endsWith('.jpg') || avatar.endsWith('.jpeg') || avatar.endsWith('.gif') || avatar.endsWith('.svg'))) {
+                    return `<img src="${avatar}" alt="头像" style="width: ${size}px; height: ${size}px; border-radius: 50%; object-fit: cover; display: block;">`;
+                }
+                // 否则使用emoji或文字
+                return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">${avatar || '👤'}</span>`;
+            },
+            
             // 获取默认好友（包含AI机器人"小突"）
             getDefaultFriends() {
                 // 添加AI机器人"小突"作为默认好友
+                // 使用图片路径（如果图片不存在，会fallback到emoji）
                 return [{
                     id: 'totofun_bot',
                     name: '小突',
-                    avatar: '🤖',
+                    avatar: './assets/images/xiaotu-bot.png', // 机器人头像图片路径
+                    avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
                     online: true,
                     isBot: true, // 标记为机器人
                     lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
@@ -4486,7 +4502,10 @@
 
                 // 更新聊天头部
                 document.getElementById('chat-friend-name').textContent = friend.name;
-                document.getElementById('chat-friend-avatar').textContent = friend.avatar;
+                const chatFriendAvatarEl = document.getElementById('chat-friend-avatar');
+                if (chatFriendAvatarEl) {
+                    chatFriendAvatarEl.innerHTML = this.renderAvatar(friend.avatar, 24);
+                }
                 document.getElementById('chat-friend-status').textContent = friend.online ? '在线' : '离线';
                 document.getElementById('chat-friend-status').style.color = friend.online ? '#22C55E' : '#999';
 
@@ -4559,8 +4578,10 @@
                         }
                     }
                     
+                    const userAvatar = isMe ? this.currentUser.avatar : friend.avatar;
+                    const avatarHtml = this.renderAvatar(userAvatar, 40);
                     messageDiv.innerHTML = `
-                        <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                        <div class="chat-message-avatar">${avatarHtml}</div>
                         <div class="chat-message-content">
                             <div class="chat-message-bubble">${this.escapeHtml(msg.content)}</div>
                             <div class="chat-message-time" style="display: flex; align-items: center; gap: 4px;">
@@ -4571,8 +4592,10 @@
                     `;
                 } else if (msg.type === 'location') {
                     const locationContent = this.escapeHtml(msg.content);
+                    const userAvatarForLocation = isMe ? this.currentUser.avatar : friend.avatar;
+                    const avatarHtmlForLocation = this.renderAvatar(userAvatarForLocation, 40);
                     messageDiv.innerHTML = `
-                        <div class="chat-message-avatar">${isMe ? this.currentUser.avatar : friend.avatar}</div>
+                        <div class="chat-message-avatar">${avatarHtmlForLocation}</div>
                         <div class="chat-message-content">
                             <div class="chat-message-bubble chat-location-message">
                                 <div style="font-size: 24px; margin-bottom: 5px;">📍</div>
@@ -4754,8 +4777,9 @@
                         this.openChat(friendId);
                     };
                     
+                    const friendAvatarHtml = this.renderAvatar(friend.avatar, 32);
                     friendDiv.innerHTML = `
-                        <div class="friend-avatar">${friend.avatar}</div>
+                        <div class="friend-avatar">${friendAvatarHtml}</div>
                         <div class="friend-info">
                             <div class="friend-name">
                                 ${friend.name}
@@ -5487,7 +5511,7 @@
                     font-size: 18px;
                     line-height: 1;
                 ">←</button>
-                <div id="chat-friend-avatar" style="font-size: 24px;"></div>
+                <div id="chat-friend-avatar" style="font-size: 24px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden;"></div>
                 <div style="flex: 1;">
                     <div id="chat-friend-name" style="font-weight: bold; font-size: 16px;"></div>
                     <div id="chat-friend-status" style="font-size: 12px; opacity: 0.9;"></div>
@@ -5881,6 +5905,13 @@
         .friend-avatar {
             font-size: 32px;
             flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            overflow: hidden;
         }
         .friend-info {
             flex: 1;
@@ -5992,6 +6023,13 @@
         .chat-message-avatar {
             font-size: 28px;
             flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            overflow: hidden;
         }
         .chat-message-content {
             max-width: 70%;
