@@ -2732,7 +2732,7 @@
                     const botFriend = {
                         id: 'totofun_bot',
                         name: '小突',
-                        avatar: './assets/images/xiaotu-bot.png', // 机器人头像图片路径
+                        avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径（使用相对路径，不带./）
                         avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
                         online: true,
                         isBot: true,
@@ -3541,12 +3541,46 @@
 
             // 渲染头像（支持图片和emoji）
             renderAvatar(avatar, size = 40) {
-                // 如果是图片路径（以 http://、https://、./ 或 / 开头），使用img标签
-                if (avatar && (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('./') || avatar.startsWith('/') || avatar.endsWith('.png') || avatar.endsWith('.jpg') || avatar.endsWith('.jpeg') || avatar.endsWith('.gif') || avatar.endsWith('.svg'))) {
-                    return `<img src="${avatar}" alt="头像" style="width: ${size}px; height: ${size}px; border-radius: 50%; object-fit: cover; display: block;">`;
+                if (!avatar) {
+                    return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">👤</span>`;
                 }
+                
+                // 如果是图片路径（以 http://、https://、./ 或 / 开头，或以图片扩展名结尾），使用img标签
+                const isImagePath = avatar.startsWith('http://') || 
+                                   avatar.startsWith('https://') || 
+                                   avatar.startsWith('./') || 
+                                   avatar.startsWith('/') || 
+                                   avatar.endsWith('.png') || 
+                                   avatar.endsWith('.jpg') || 
+                                   avatar.endsWith('.jpeg') || 
+                                   avatar.endsWith('.gif') || 
+                                   avatar.endsWith('.svg') ||
+                                   avatar.endsWith('.webp');
+                
+                if (isImagePath) {
+                    // 规范化路径：如果路径不以 ./ 或 / 开头，且不是http/https，则添加 ./
+                    let imagePath = avatar;
+                    if (!avatar.startsWith('http://') && 
+                        !avatar.startsWith('https://') && 
+                        !avatar.startsWith('./') && 
+                        !avatar.startsWith('/')) {
+                        imagePath = './' + avatar;
+                    }
+                    
+                    // 获取fallback emoji（如果是机器人，使用🤖，否则使用👤）
+                    const fallbackEmoji = avatar.includes('xiaotu') || avatar.includes('totofun_bot') ? '🤖' : '👤';
+                    
+                    // 使用onerror处理图片加载失败的情况，自动fallback到emoji
+                    return `<div style="position: relative; width: ${size}px; height: ${size}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                        <img src="${imagePath}" alt="头像" style="width: 100%; height: 100%; object-fit: cover; display: block;" 
+                             onerror="this.style.display='none'; this.parentElement.querySelector('.avatar-fallback').style.display='flex';" 
+                             onload="this.parentElement.querySelector('.avatar-fallback').style.display='none';">
+                        <span class="avatar-fallback" style="font-size: ${size * 0.7}px; display: none; text-align: center; line-height: ${size}px; width: ${size}px; height: ${size}px;">${fallbackEmoji}</span>
+                    </div>`;
+                }
+                
                 // 否则使用emoji或文字
-                return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">${avatar || '👤'}</span>`;
+                return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">${avatar}</span>`;
             },
             
             // 获取默认好友（包含AI机器人"小突"）
@@ -3556,7 +3590,7 @@
                 return [{
                     id: 'totofun_bot',
                     name: '小突',
-                    avatar: './assets/images/xiaotu-bot.png', // 机器人头像图片路径
+                    avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径（使用相对路径，不带./）
                     avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
                     online: true,
                     isBot: true, // 标记为机器人
