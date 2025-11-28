@@ -2713,10 +2713,31 @@
                 
                 this.updateUnreadCount();
                 
+                // 保存原始标题
+                this.originalTitle = document.title;
+                
                 // 初始化好友列表显示（延迟执行确保DOM已加载）
                 setTimeout(() => {
                     this.updateFriendsList();
                 }, 200);
+                
+                // 请求通知权限
+                this.requestNotificationPermission();
+                
+                // 监听页面可见性变化，恢复标题
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) {
+                        // 页面变为可见时，停止标题闪烁，更新标题
+                        this.stopTitleBlink();
+                        this.updatePageTitle();
+                    }
+                });
+                
+                // 监听窗口焦点变化
+                window.addEventListener('focus', () => {
+                    this.stopTitleBlink();
+                    this.updatePageTitle();
+                });
                 
                 // 初始化Firebase实时通信
                 if (firebaseEnabled && database) {
@@ -3199,9 +3220,14 @@
                     // 如果聊天窗口打开但不是这个好友，只更新好友列表（已更新）
                     console.log('🔄 更新好友列表 - 正在和其他人聊天');
                 } else {
-                    // 如果聊天窗口未打开，显示通知
-                    console.log('🔔 显示通知 - 聊天窗口未打开');
-                    this.showNotification(friend.name, messageData.content);
+                    // 如果聊天窗口未打开，或者不在当前聊天窗口，显示通知
+                    console.log('🔔 显示通知 - 聊天窗口未打开或不在当前聊天');
+                    // 检查页面是否在前台
+                    const isPageVisible = !document.hidden;
+                    // 如果页面不在前台，或者不在当前聊天窗口，都显示通知
+                    if (!isPageVisible || activeFriendId !== friendId) {
+                        this.showNotification(friend.name, messageData.content);
+                    }
                 }
                 
                 // 如果用户信息面板打开，也更新好友列表
@@ -3213,23 +3239,155 @@
                 console.log('✅ 聊天显示更新完成');
             },
             
-            // 显示消息通知
+            // 页面标题闪烁相关变量
+            titleBlinkInterval: null,
+            originalTitle: document.title,
+            
+            // 显示消息通知（增强版）
             showNotification(friendName, message) {
-                // 检查浏览器是否支持通知
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification(`来自 ${friendName} 的消息`, {
-                        body: message,
-                        icon: '/assets/images/icon-32x32.png'
-                    });
-                } else if ('Notification' in window && Notification.permission !== 'denied') {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            new Notification(`来自 ${friendName} 的消息`, {
-                                body: message,
-                                icon: '/assets/images/icon-32x32.png'
-                            });
-                        }
-                    });
+                // 检查页面是否在前台
+                const isPageVisible = !document.hidden;
+                
+                // 1. 浏览器桌面通知（只在页面不在前台时显示，或总是显示）
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        // 创建通知
+                        const notification = new Notification(`💬 来自 ${friendName} 的消息`, {
+                            body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+                            icon: './assets/images/icon-192x192.png',
+                            badge: './assets/images/icon-96x96.png',
+                            tag: `chat-${friendName}`, // 使用tag避免重复通知
+                            requireInteraction: false,
+                            vibrate: [200, 100, 200] // 震动模式（如果设备支持）
+                        });
+                        
+                        // 点击通知时聚焦窗口
+                        notification.onclick = () => {
+                            window.focus();
+                            notification.close();
+                            // 打开聊天窗口
+                            this.toggleChat();
+                            // 打开该好友的聊天
+                            const friend = this.friends.find(f => f.name === friendName);
+                            if (friend) {
+                                this.openChat(friend.id);
+                            }
+                        };
+                        
+                        // 4秒后自动关闭通知
+                        setTimeout(() => {
+                            notification.close();
+                        }, 4000);
+                    } else if (Notification.permission !== 'denied') {
+                        // 请求通知权限
+                        Notification.requestPermission().then(permission => {
+                            if (permission === 'granted') {
+                                this.showNotification(friendName, message);
+                            }
+                        });
+                    }
+                }
+                
+                // 2. 页面标题闪烁提醒（如果页面在前台）
+                if (isPageVisible) {
+                    this.startTitleBlink(`💬 ${friendName}: ${message.substring(0, 20)}...`);
+                } else {
+                    // 如果页面不在前台，更新标题显示未读消息数
+                    this.updatePageTitle();
+                }
+                
+                // 3. 声音提醒（可选）
+                this.playNotificationSound();
+            },
+            
+            // 页面标题闪烁
+            startTitleBlink(text) {
+                // 清除之前的闪烁
+                if (this.titleBlinkInterval) {
+                    clearInterval(this.titleBlinkInterval);
+                }
+                
+                let isBlinking = false;
+                this.titleBlinkInterval = setInterval(() => {
+                    if (isBlinking) {
+                        document.title = this.originalTitle;
+                    } else {
+                        document.title = text;
+                    }
+                    isBlinking = !isBlinking;
+                }, 1000); // 每秒切换一次
+                
+                // 10秒后停止闪烁
+                setTimeout(() => {
+                    this.stopTitleBlink();
+                }, 10000);
+            },
+            
+            // 停止标题闪烁
+            stopTitleBlink() {
+                if (this.titleBlinkInterval) {
+                    clearInterval(this.titleBlinkInterval);
+                    this.titleBlinkInterval = null;
+                }
+                document.title = this.originalTitle;
+            },
+            
+            // 更新页面标题（显示未读消息数）
+            updatePageTitle() {
+                if (this.unreadCount > 0) {
+                    document.title = `(${this.unreadCount}) ${this.originalTitle}`;
+                } else {
+                    document.title = this.originalTitle;
+                }
+            },
+            
+            // 播放通知声音
+            playNotificationSound() {
+                try {
+                    // 使用 Web Audio API 生成简单的提示音
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // 设置音调（800Hz，类似消息提示音）
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+                    
+                    // 设置音量（0.1，避免太大声）
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    
+                    // 播放200毫秒
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.2);
+                } catch (error) {
+                    // 如果音频API不可用，静默失败
+                    console.log('音频提醒不可用:', error);
+                }
+            },
+            
+            // 请求通知权限（在初始化时调用）
+            requestNotificationPermission() {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    // 延迟请求，避免在页面加载时立即弹出
+                    setTimeout(() => {
+                        Notification.requestPermission().then(permission => {
+                            if (permission === 'granted') {
+                                console.log('✅ 通知权限已授予');
+                                // 显示一个测试通知
+                                new Notification('Totofun 消息提醒', {
+                                    body: '您已启用消息通知，有新消息时会及时提醒您！',
+                                    icon: './assets/images/icon-192x192.png',
+                                    tag: 'permission-granted'
+                                });
+                            } else {
+                                console.log('❌ 通知权限被拒绝');
+                            }
+                        });
+                    }, 3000); // 3秒后请求权限
                 }
             },
             
@@ -3874,6 +4032,9 @@
                 } else {
                     console.warn('⚠️ 未找到chat-badge元素');
                 }
+                
+                // 更新页面标题
+                this.updatePageTitle();
             },
 
             // 标记消息为已读
@@ -3981,6 +4142,10 @@
 
                 console.log('💬 打开聊天窗口:', friend.name, friendId);
 
+                // 停止标题闪烁
+                this.stopTitleBlink();
+                
+                // 标记为已读
                 this.markAsRead(friendId);
 
                 const chatPanel = document.getElementById('chat-panel');
