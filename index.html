@@ -2725,6 +2725,11 @@
                 
                 this.updateUnreadCount();
                 
+                // 修复可能的错误未读计数
+                setTimeout(() => {
+                    this.fixUnreadCount();
+                }, 1000); // 延迟1秒执行，确保数据加载完成
+                
                 // 保存原始标题
                 this.originalTitle = document.title;
                 
@@ -2835,7 +2840,15 @@
                                     const fromName = messageData.fromName || messageData.from || '(未知用户)';
                                     console.log(`📥 [${index + 1}/${messageKeys.length}] 加载历史消息:`, content, '来自:', fromName);
                                     // 直接添加到对话，不触发显示更新（避免频繁刷新）
-                                    this.addMessageToConversation(messageData, false);
+                                    // 历史消息应该标记为已读（因为用户之前已经看过）
+                                    const added = this.addMessageToConversation(messageData, false);
+                                    // 如果是历史消息，标记为已读
+                                    if (added && this.conversations[messageData.from]) {
+                                        const lastMessage = this.conversations[messageData.from][this.conversations[messageData.from].length - 1];
+                                        if (lastMessage && lastMessage.id === (messageData.id || messageKey)) {
+                                            lastMessage.read = true;
+                                        }
+                                    }
                                 } else {
                                     console.log(`⚠️ [${index + 1}/${messageKeys.length}] 历史消息已存在，跳过:`, messageData.id || messageKey);
                                 }
@@ -4062,20 +4075,76 @@
             markAsRead(friendId) {
                 if (this.conversations[friendId]) {
                     const unreadMessages = [];
+                    let hasUnread = false;
+                    
+                    // 标记所有来自该好友的未读消息为已读
                     this.conversations[friendId].forEach(m => {
+                        // 检查是否是来自该好友的消息且未读
                         if (m.from === friendId && !m.read) {
                             m.read = true;
-                            unreadMessages.push(m.id);
+                            unreadMessages.push(m.id || m.timestamp);
+                            hasUnread = true;
+                            console.log('✅ 标记消息为已读:', m.id || m.timestamp, m.content?.substring(0, 20));
                         }
                     });
+                    
+                    // 如果没有任何未读消息，也确保所有消息都是已读状态（修复可能的错误状态）
+                    if (!hasUnread) {
+                        // 检查是否有消息的read属性为undefined或null，统一设置为true
+                        this.conversations[friendId].forEach(m => {
+                            if (m.from === friendId && (m.read === undefined || m.read === null)) {
+                                m.read = true;
+                                console.log('🔧 修复消息read状态:', m.id || m.timestamp);
+                            }
+                        });
+                    }
                     
                     // 通知发送方消息已读
                     if (unreadMessages.length > 0 && firebaseEnabled && database) {
                         this.notifyMessagesRead(friendId, unreadMessages);
                     }
                     
+                    // 更新未读计数并保存
                     this.updateUnreadCount();
                     this.saveData();
+                    
+                    console.log('📖 已标记', unreadMessages.length, '条消息为已读，好友:', friendId);
+                } else {
+                    console.log('⚠️ 没有找到该好友的对话记录:', friendId);
+                }
+            },
+            
+            // 修复错误的未读计数（清理所有错误的未读状态）
+            fixUnreadCount() {
+                console.log('🔧 开始修复未读消息计数...');
+                let fixedCount = 0;
+                
+                Object.keys(this.conversations).forEach(friendId => {
+                    const messages = this.conversations[friendId];
+                    if (messages && Array.isArray(messages)) {
+                        messages.forEach(m => {
+                            // 如果是自己的消息，应该始终标记为已读
+                            if (m.from === this.currentUser.id) {
+                                if (!m.read) {
+                                    m.read = true;
+                                    fixedCount++;
+                                }
+                            }
+                            // 如果read属性为undefined或null，设置为true（历史消息应该是已读的）
+                            else if (m.read === undefined || m.read === null) {
+                                m.read = true;
+                                fixedCount++;
+                            }
+                        });
+                    }
+                });
+                
+                if (fixedCount > 0) {
+                    console.log('✅ 修复了', fixedCount, '条消息的read状态');
+                    this.updateUnreadCount();
+                    this.saveData();
+                } else {
+                    console.log('✅ 未读消息计数正常，无需修复');
                 }
             },
             
