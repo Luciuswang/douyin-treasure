@@ -2717,11 +2717,59 @@
                 }
                 
                 // 加载好友列表
-                this.friends = storageManager.load('chatFriends') || this.getDefaultFriends();
+                const savedFriends = storageManager.load('chatFriends');
+                if (savedFriends && Array.isArray(savedFriends) && savedFriends.length > 0) {
+                    this.friends = savedFriends;
+                } else {
+                    // 如果没有保存的好友列表，使用默认好友（包含机器人）
+                    this.friends = this.getDefaultFriends();
+                }
+                
+                // 确保机器人好友存在（如果不存在则添加）
+                const hasBot = this.friends.some(f => f.id === 'totofun_bot');
+                let isNewBot = false;
+                if (!hasBot) {
+                    const botFriend = {
+                        id: 'totofun_bot',
+                        name: '小突',
+                        avatar: '🤖',
+                        online: true,
+                        isBot: true,
+                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
+                        lastTime: new Date().toISOString()
+                    };
+                    this.friends.unshift(botFriend); // 添加到列表开头
+                    isNewBot = true;
+                    console.log('✅ 已添加AI机器人好友"小突"');
+                }
+                
                 storageManager.save('chatFriends', this.friends);
                 
                 // 加载对话记录
                 this.conversations = storageManager.load('chatConversations') || {};
+                
+                // 如果是新添加的机器人好友，添加欢迎消息
+                if (isNewBot) {
+                    if (!this.conversations['totofun_bot']) {
+                        this.conversations['totofun_bot'] = [];
+                    }
+                    // 检查是否已有欢迎消息
+                    const hasWelcomeMsg = this.conversations['totofun_bot'].some(m => m.id === 'welcome_msg');
+                    if (!hasWelcomeMsg) {
+                        this.conversations['totofun_bot'].push({
+                            id: 'welcome_msg',
+                            from: 'totofun_bot',
+                            to: this.currentUser.id,
+                            content: '你好！我是小突，你的寻宝伙伴！😊\n\n我可以帮你：\n• 解答游戏问题\n• 引导新手操作\n• 陪你聊天\n• 分享寻宝技巧\n\n有什么问题都可以问我哦~',
+                            type: 'text',
+                            timestamp: new Date().toISOString(),
+                            read: false,
+                            status: 'received'
+                        });
+                        console.log('✅ 已添加机器人欢迎消息');
+                        this.saveData();
+                    }
+                }
                 
                 this.updateUnreadCount();
                 
@@ -3489,23 +3537,16 @@
 
             // 获取默认好友（包含AI机器人"小突"）
             getDefaultFriends() {
-                // 检查是否已经添加过机器人好友
-                const savedFriends = storageManager.load('chatFriends') || [];
-                const hasBot = savedFriends.some(f => f.id === 'totofun_bot');
-                
-                if (!hasBot) {
-                    // 添加AI机器人"小突"作为默认好友
-                    return [{
-                        id: 'totofun_bot',
-                        name: '小突',
-                        avatar: '🤖',
-                        online: true,
-                        isBot: true, // 标记为机器人
-                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                        lastTime: new Date().toISOString()
-                    }];
-                }
-                return [];
+                // 添加AI机器人"小突"作为默认好友
+                return [{
+                    id: 'totofun_bot',
+                    name: '小突',
+                    avatar: '🤖',
+                    online: true,
+                    isBot: true, // 标记为机器人
+                    lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
+                    lastTime: new Date().toISOString()
+                }];
             },
 
             // 显示添加好友面板
