@@ -2725,14 +2725,16 @@
                     this.friends = this.getDefaultFriends();
                 }
                 
-                // 确保机器人好友存在（如果不存在则添加）
-                const hasBot = this.friends.some(f => f.id === 'totofun_bot');
+                // 确保机器人好友存在（如果不存在则添加，如果存在则更新头像）
+                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
                 let isNewBot = false;
-                if (!hasBot) {
+                
+                if (botIndex === -1) {
+                    // 不存在，添加机器人好友
                     const botFriend = {
                         id: 'totofun_bot',
                         name: '小突',
-                        avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径（使用相对路径，不带./）
+                        avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径
                         avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
                         online: true,
                         isBot: true,
@@ -2742,6 +2744,15 @@
                     this.friends.unshift(botFriend); // 添加到列表开头
                     isNewBot = true;
                     console.log('✅ 已添加AI机器人好友"小突"');
+                } else {
+                    // 已存在，更新头像（确保使用图片而不是emoji）
+                    const botFriend = this.friends[botIndex];
+                    if (!botFriend.avatar || botFriend.avatar === '🤖' || !botFriend.avatar.includes('.png')) {
+                        botFriend.avatar = 'assets/images/xiaotu-bot.png';
+                        botFriend.avatarFallback = '🤖';
+                        botFriend.isBot = true; // 确保标记为机器人
+                        console.log('✅ 已更新机器人好友"小突"的头像为图片');
+                    }
                 }
                 
                 storageManager.save('chatFriends', this.friends);
@@ -3567,15 +3578,18 @@
                         imagePath = './' + avatar;
                     }
                     
+                    // 调试日志
+                    console.log('🖼️ 渲染头像图片:', { avatar, imagePath, size });
+                    
                     // 获取fallback emoji（如果是机器人，使用🤖，否则使用👤）
                     const fallbackEmoji = avatar.includes('xiaotu') || avatar.includes('totofun_bot') ? '🤖' : '👤';
                     
                     // 使用onerror处理图片加载失败的情况，自动fallback到emoji
-                    return `<div style="position: relative; width: ${size}px; height: ${size}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    return `<div style="position: relative; width: ${size}px; height: ${size}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f0f0f0;">
                         <img src="${imagePath}" alt="头像" style="width: 100%; height: 100%; object-fit: cover; display: block;" 
-                             onerror="this.style.display='none'; this.parentElement.querySelector('.avatar-fallback').style.display='flex';" 
-                             onload="this.parentElement.querySelector('.avatar-fallback').style.display='none';">
-                        <span class="avatar-fallback" style="font-size: ${size * 0.7}px; display: none; text-align: center; line-height: ${size}px; width: ${size}px; height: ${size}px;">${fallbackEmoji}</span>
+                             onerror="console.error('❌ 图片加载失败:', '${imagePath}'); this.style.display='none'; const fallback = this.parentElement.querySelector('.avatar-fallback'); if(fallback) fallback.style.display='flex';" 
+                             onload="console.log('✅ 图片加载成功:', '${imagePath}'); const fallback = this.parentElement.querySelector('.avatar-fallback'); if(fallback) fallback.style.display='none';">
+                        <span class="avatar-fallback" style="font-size: ${size * 0.7}px; display: flex; text-align: center; line-height: ${size}px; width: ${size}px; height: ${size}px; align-items: center; justify-content: center;">${fallbackEmoji}</span>
                     </div>`;
                 }
                 
