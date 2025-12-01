@@ -4900,8 +4900,22 @@
 
             // 关闭聊天窗口
             closeChat() {
-                document.getElementById('chat-panel').style.display = 'none';
-                document.getElementById('friends-panel').style.display = 'block';
+                const chatPanel = document.getElementById('chat-panel');
+                const friendsPanel = document.getElementById('friends-panel');
+                const chatContainer = document.getElementById('chat-container');
+                
+                // 隐藏聊天面板，显示好友列表
+                if (chatPanel) {
+                    chatPanel.style.display = 'none';
+                }
+                if (friendsPanel) {
+                    friendsPanel.style.display = 'block';
+                }
+                
+                // 在移动端，如果整个聊天容器是全屏的，也需要关闭
+                if (chatContainer && window.innerWidth <= 768) {
+                    chatContainer.style.display = 'none';
+                }
             },
 
             // 发送文本消息
@@ -5449,13 +5463,25 @@
             // 切换聊天面板显示
             toggleChat() {
                 const chatContainer = document.getElementById('chat-container');
+                const chatPanel = document.getElementById('chat-panel');
+                const friendsPanel = document.getElementById('friends-panel');
+                
                 if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
-                    chatContainer.style.display = 'block';
+                    // 打开聊天窗口
+                    if (window.innerWidth <= 768) {
+                        chatContainer.style.display = 'flex'; // 移动端使用flex
+                    } else {
+                        chatContainer.style.display = 'block'; // PC端使用block
+                    }
                     this.updateFriendsList();
+                    // 确保显示好友列表面板
+                    if (chatPanel) chatPanel.style.display = 'none';
+                    if (friendsPanel) friendsPanel.style.display = 'block';
                 } else {
+                    // 关闭聊天窗口
                     chatContainer.style.display = 'none';
-                    document.getElementById('chat-panel').style.display = 'none';
-                    document.getElementById('friends-panel').style.display = 'block';
+                    if (chatPanel) chatPanel.style.display = 'none';
+                    if (friendsPanel) friendsPanel.style.display = 'block';
                 }
             },
 
@@ -6024,12 +6050,16 @@
                         background: rgba(255, 255, 255, 0.2);
                         border: none;
                         color: white;
-                        width: 30px;
-                        height: 30px;
+                        width: 40px;
+                        height: 40px;
                         border-radius: 50%;
                         cursor: pointer;
                         font-size: 20px;
                         line-height: 1;
+                        flex-shrink: 0;
+                        z-index: 10001;
+                        -webkit-tap-highlight-color: transparent;
+                        touch-action: manipulation;
                     ">×</button>
                 </div>
             </div>
@@ -6062,12 +6092,16 @@
                     background: rgba(255, 255, 255, 0.2);
                     border: none;
                     color: white;
-                    width: 30px;
-                    height: 30px;
+                    width: 40px;
+                    height: 40px;
                     border-radius: 50%;
                     cursor: pointer;
-                    font-size: 18px;
+                    font-size: 20px;
                     line-height: 1;
+                    flex-shrink: 0;
+                    z-index: 10001;
+                    -webkit-tap-highlight-color: transparent;
+                    touch-action: manipulation;
                 ">←</button>
                 <div id="chat-friend-avatar" style="font-size: 24px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden;"></div>
                 <div style="flex: 1;">
@@ -6817,6 +6851,15 @@
             #chat-input {
                 font-size: 16px !important; /* 防止iOS自动缩放 */
                 padding: 12px 15px !important;
+            }
+            
+            /* 聊天头部按钮移动端适配 */
+            #chat-panel > div:first-child button,
+            #chat-container > div:first-child button {
+                min-width: 44px !important; /* iOS推荐的最小触摸目标 */
+                min-height: 44px !important;
+                -webkit-tap-highlight-color: transparent !important;
+                touch-action: manipulation !important;
             }
             
             /* 表情面板移动端适配 */
