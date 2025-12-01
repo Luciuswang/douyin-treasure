@@ -3801,6 +3801,9 @@
                 
                 // 生成头像选择器
                 this.generateAvatarSelector();
+                
+                // 更新DeepSeek API配置状态
+                this.updateDeepSeekApiStatus();
             },
             
             // 更新用户信息面板中的好友列表
@@ -4316,6 +4319,134 @@
                     return key.substring(0, 4) + '****' + key.substring(key.length - 4);
                 }
                 return null;
+            },
+            
+            // 保存DeepSeek API密钥（从输入框）
+            saveDeepSeekApiKey() {
+                const input = document.getElementById('deepseek-api-key-input');
+                const apiKey = input.value.trim();
+                
+                if (!apiKey) {
+                    alert('❌ 请输入API Key');
+                    return;
+                }
+                
+                if (!apiKey.startsWith('sk-')) {
+                    alert('⚠️ API Key格式不正确，应该以"sk-"开头');
+                    return;
+                }
+                
+                if (this.setDeepSeekApiKey(apiKey)) {
+                    alert('✅ DeepSeek API密钥已保存！\n\n现在可以测试连接了。');
+                    this.updateDeepSeekApiStatus();
+                    // 清空输入框（安全考虑）
+                    input.value = '';
+                }
+            },
+            
+            // 测试DeepSeek API连接
+            async testDeepSeekApi() {
+                const apiKey = localStorage.getItem('deepseek_api_key');
+                if (!apiKey) {
+                    alert('❌ 请先配置API Key');
+                    return;
+                }
+                
+                const statusEl = document.getElementById('deepseek-status');
+                statusEl.textContent = '测试中...';
+                statusEl.style.background = '#ffaa00';
+                
+                try {
+                    console.log('🧪 开始测试DeepSeek API连接...');
+                    const deepseekApiUrl = 'https://api.deepseek.com/v1/chat/completions';
+                    
+                    const response = await fetch(deepseekApiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: '你是一个友好的AI助手。'
+                                },
+                                {
+                                    role: 'user',
+                                    content: '你好，请回复"测试成功"'
+                                }
+                            ],
+                            max_tokens: 50,
+                            temperature: 0.7
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const reply = data.choices?.[0]?.message?.content || '';
+                        
+                        if (reply) {
+                            statusEl.textContent = '连接成功';
+                            statusEl.style.background = '#22C55E';
+                            console.log('✅ API测试成功，回复:', reply);
+                            alert('✅ API连接成功！\n\n测试回复：' + reply + '\n\n现在可以正常使用AI机器人了！');
+                        } else {
+                            throw new Error('API返回空回复');
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+                        
+                        console.error('❌ API测试失败:', response.status, errorData);
+                        
+                        if (response.status === 401) {
+                            statusEl.textContent = '密钥无效';
+                            statusEl.style.background = '#ff4444';
+                            alert('❌ API Key无效\n\n请检查：\n1. API Key是否正确\n2. 是否已复制完整\n3. 是否包含多余空格');
+                        } else if (response.status === 429) {
+                            statusEl.textContent = '请求过多';
+                            statusEl.style.background = '#ffaa00';
+                            alert('⚠️ 请求频率过高\n\n请稍后再试。');
+                        } else if (response.status === 402 || response.status === 403) {
+                            statusEl.textContent = '余额不足';
+                            statusEl.style.background = '#ff4444';
+                            alert('❌ 账户余额不足\n\n请前往 https://platform.deepseek.com/ 充值后再试。');
+                        } else {
+                            statusEl.textContent = '连接失败';
+                            statusEl.style.background = '#ff4444';
+                            alert('❌ API连接失败\n\n错误：' + errorMsg + '\n\n状态码：' + response.status);
+                        }
+                    }
+                } catch (error) {
+                    statusEl.textContent = '连接失败';
+                    statusEl.style.background = '#ff4444';
+                    console.error('❌ API测试异常:', error);
+                    
+                    let errorMsg = '未知错误';
+                    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                        errorMsg = '网络连接失败，请检查网络';
+                    } else {
+                        errorMsg = error.message;
+                    }
+                    
+                    alert('❌ API连接失败\n\n错误：' + errorMsg + '\n\n可能的原因：\n1. 网络连接问题\n2. API服务暂时不可用\n3. 浏览器阻止了请求\n\n请检查后重试。');
+                }
+            },
+            
+            // 更新DeepSeek API状态显示
+            updateDeepSeekApiStatus() {
+                const statusEl = document.getElementById('deepseek-status');
+                const apiKey = localStorage.getItem('deepseek_api_key');
+                
+                if (apiKey) {
+                    statusEl.textContent = '已配置';
+                    statusEl.style.background = '#22C55E';
+                } else {
+                    statusEl.textContent = '未配置';
+                    statusEl.style.background = '#ff9999';
+                }
             },
             
             // 默认机器人回复
@@ -6291,6 +6422,65 @@
                     </div>
                 </div>
             </div>
+
+            <!-- DeepSeek API 配置 -->
+            <div style="
+                background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+                padding: 15px;
+                border-radius: 10px;
+                margin-top: 15px;
+                border: 2px solid #ffd699;
+            ">
+                <h3 style="margin-bottom: 10px; color: #333; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                    🤖 DeepSeek AI 配置
+                    <span id="deepseek-status" style="
+                        font-size: 10px;
+                        padding: 2px 6px;
+                        border-radius: 10px;
+                        background: #ff9999;
+                        color: white;
+                        font-weight: normal;
+                    ">未配置</span>
+                </h3>
+                <input id="deepseek-api-key-input" type="password" placeholder="输入DeepSeek API Key (sk-...)" style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 2px solid #ffd699;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    margin-bottom: 8px;
+                    font-family: monospace;
+                    box-sizing: border-box;
+                ">
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="chatManager.saveDeepSeekApiKey()" style="
+                        flex: 1;
+                        padding: 8px;
+                        background: #4FC3F7;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        font-weight: bold;
+                    ">💾 保存</button>
+                    <button onclick="chatManager.testDeepSeekApi()" style="
+                        flex: 1;
+                        padding: 8px;
+                        background: #22C55E;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        font-weight: bold;
+                    ">🧪 测试</button>
+                </div>
+                <p style="font-size: 11px; color: #666; margin-top: 8px; line-height: 1.4;">
+                    💡 配置后，机器人"小突"将使用DeepSeek AI进行智能回复<br>
+                    🔗 获取API Key: <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color: #4FC3F7;">platform.deepseek.com</a>
+                </p>
+            </div>
             
             <!-- 好友列表 -->
             <div style="
@@ -6648,3 +6838,4 @@
     </style>
 </body>
 </html>
+
