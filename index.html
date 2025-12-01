@@ -5648,31 +5648,22 @@
         position: fixed;
         bottom: 30px;
         left: 30px;
+        width: 80px;
+        height: 80px;
         z-index: 9996;
         cursor: pointer;
         display: none;
         transition: transform 0.3s ease, filter 0.3s ease;
-        background: transparent !important;
+        background-image: url('assets/images/xiaotu-bot.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-color: transparent !important;
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        width: auto !important;
-        height: auto !important;
+        filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
     " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
-        <img src="assets/images/xiaotu-bot.png" alt="小突" style="
-            width: 80px;
-            height: auto;
-            max-width: 80px;
-            background: transparent !important;
-            display: block;
-            border: none !important;
-            outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:80px;height:80px;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
     </div>
 
     <!-- 机器人聊天窗口（左下角） -->
@@ -6293,25 +6284,21 @@
         }
         /* 小突头像按钮样式 - 确保背景透明 */
         #bot-avatar-button {
-            background: transparent !important;
+            background-color: transparent !important;
+            background-image: url('assets/images/xiaotu-bot.png') !important;
+            background-size: contain !important;
+            background-repeat: no-repeat !important;
+            background-position: center !important;
             border: none !important;
             padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
-            width: auto !important;
-            height: auto !important;
             line-height: 0 !important;
         }
         
-        #bot-avatar-button img {
-            background: transparent !important;
-            border: none !important;
-            outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            vertical-align: top !important;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
+        /* 移除所有可能的子元素样式 */
+        #bot-avatar-button * {
+            display: none !important;
         }
 
         .friend-avatar {
@@ -6494,19 +6481,15 @@
         @media (max-width: 768px) {
             /* 小突头像按钮移动端适配 */
             #bot-avatar-button {
-                width: auto !important;
-                height: auto !important;
+                width: 70px !important;
+                height: 70px !important;
                 bottom: 20px !important;
                 left: 20px !important;
-                background: transparent !important;
-                border: none !important;
-            }
-            
-            #bot-avatar-button img {
-                width: 70px !important;
-                height: auto !important;
-                max-width: 70px !important;
-                background: transparent !important;
+                background-color: transparent !important;
+                background-image: url('assets/images/xiaotu-bot.png') !important;
+                background-size: contain !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
                 border: none !important;
             }
 
