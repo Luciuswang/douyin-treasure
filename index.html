@@ -5322,20 +5322,51 @@
             initBotChat() {
                 // 默认显示机器人聊天窗口
                 const botChatContainer = document.getElementById('bot-chat-container');
+                const botAvatarButton = document.getElementById('bot-avatar-button');
                 if (botChatContainer) {
                     botChatContainer.style.display = 'flex';
                     this.updateBotChatMessages();
+                    // 隐藏头像按钮
+                    if (botAvatarButton) {
+                        botAvatarButton.style.display = 'none';
+                    }
+                }
+            },
+
+            // 打开机器人聊天窗口
+            openBotChat() {
+                const botChatContainer = document.getElementById('bot-chat-container');
+                const botAvatarButton = document.getElementById('bot-avatar-button');
+                if (botChatContainer) {
+                    botChatContainer.style.display = 'flex';
+                    this.updateBotChatMessages();
+                    // 隐藏头像按钮
+                    if (botAvatarButton) {
+                        botAvatarButton.style.display = 'none';
+                    }
                 }
             },
 
             // 切换机器人聊天窗口显示
             toggleBotChat() {
                 const botChatContainer = document.getElementById('bot-chat-container');
+                const botAvatarButton = document.getElementById('bot-avatar-button');
+                
                 if (botChatContainer.style.display === 'none' || !botChatContainer.style.display) {
+                    // 打开聊天窗口
                     botChatContainer.style.display = 'flex';
                     this.updateBotChatMessages();
+                    // 隐藏头像按钮
+                    if (botAvatarButton) {
+                        botAvatarButton.style.display = 'none';
+                    }
                 } else {
+                    // 关闭聊天窗口
                     botChatContainer.style.display = 'none';
+                    // 显示头像按钮
+                    if (botAvatarButton) {
+                        botAvatarButton.style.display = 'block';
+                    }
                 }
             },
 
@@ -5611,6 +5642,31 @@
             }
         });
     </script>
+
+    <!-- 小突头像按钮（左下角，关闭聊天窗口时显示） -->
+    <div id="bot-avatar-button" onclick="chatManager.openBotChat()" style="
+        position: fixed;
+        bottom: 30px;
+        left: 30px;
+        width: 80px;
+        height: 80px;
+        z-index: 9996;
+        cursor: pointer;
+        display: none;
+        transition: transform 0.3s ease;
+        border-radius: 50%;
+        overflow: hidden;
+        background: transparent;
+        box-shadow: 0 4px 15px rgba(79, 195, 247, 0.4);
+    " onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 20px rgba(79, 195, 247, 0.6)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(79, 195, 247, 0.4)'">
+        <img src="assets/images/xiaotu-bot.png" alt="小突" style="
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: transparent;
+            display: block;
+        " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
+    </div>
 
     <!-- 机器人聊天窗口（左下角） -->
     <div id="bot-chat-container" style="
@@ -6406,6 +6462,14 @@
 
         /* 移动端适配 */
         @media (max-width: 768px) {
+            /* 小突头像按钮移动端适配 */
+            #bot-avatar-button {
+                width: 70px !important;
+                height: 70px !important;
+                bottom: 20px !important;
+                left: 20px !important;
+            }
+
             /* 机器人聊天窗口移动端适配 */
             #bot-chat-container {
                 width: calc(100vw - 20px) !important;
