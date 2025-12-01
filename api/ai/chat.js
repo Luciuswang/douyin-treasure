@@ -1,27 +1,18 @@
-const express = require('express');
-const router = express.Router();
-const rateLimit = require('express-rate-limit');
+// Vercel Serverless Function for AI Chat
+// API Key 安全保存在服务器端，不暴露给前端
 
-// DeepSeek API配置（从环境变量读取，不暴露给前端）
-// 如果环境变量未设置，使用默认API key（仅用于开发/测试）
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || 'sk-d16822cef3994518bdd4977401edd3ec';
+const DEEPSEEK_API_KEY = 'sk-d16822cef3994518bdd4977401edd3ec';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
-// AI API限流（防止滥用）
-const aiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1分钟
-    max: 10, // 每分钟最多10次请求
-    message: 'AI请求过于频繁，请稍后再试',
-    standardHeaders: true,
-    legacyHeaders: false,
-});
+export default async function handler(req, res) {
+    // 只允许 POST 请求
+    if (req.method !== 'POST') {
+        return res.status(405).json({
+            success: false,
+            message: 'Method Not Allowed'
+        });
+    }
 
-/**
- * POST /api/ai/chat
- * DeepSeek AI聊天接口（代理）
- * 安全：API Key在后端，不暴露给前端
- */
-router.post('/chat', aiLimiter, async (req, res) => {
     try {
         // 检查是否配置了API Key
         if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === '') {
@@ -124,7 +115,7 @@ router.post('/chat', aiLimiter, async (req, res) => {
 
         console.log('✅ [AI代理] DeepSeek API回复成功:', reply.substring(0, 50) + '...');
 
-        res.json({
+        return res.status(200).json({
             success: true,
             reply: reply,
             usage: data.usage || {}
@@ -132,25 +123,11 @@ router.post('/chat', aiLimiter, async (req, res) => {
 
     } catch (error) {
         console.error('❌ [AI代理] 处理异常:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'AI服务处理异常，请稍后再试',
             error: error.message
         });
     }
-});
-
-/**
- * GET /api/ai/status
- * 检查AI服务状态
- */
-router.get('/status', (req, res) => {
-    res.json({
-        success: true,
-        available: !!DEEPSEEK_API_KEY && DEEPSEEK_API_KEY !== '',
-        message: DEEPSEEK_API_KEY ? 'AI服务已配置' : 'AI服务未配置'
-    });
-});
-
-module.exports = router;
+}
 

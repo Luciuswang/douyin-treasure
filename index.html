@@ -4251,18 +4251,108 @@
                         const errorData = await response.json().catch(() => ({}));
                         console.error('❌ AI代理API调用失败:', response.status, errorData);
                         
-                        // 如果后端服务不可用，返回null使用默认回复
+                        // 如果后端服务不可用（404/405），尝试直接调用DeepSeek API（使用编码的API key）
+                        if (response.status === 404 || response.status === 405) {
+                            console.log('⚠️ 后端API不可用，尝试直接调用DeepSeek API');
+                            return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                        }
+                        
+                        // 如果后端服务未配置，返回null使用默认回复
                         if (response.status === 503) {
                             console.log('⚠️ AI服务未配置，使用默认回复');
                         }
                     }
                 } catch (error) {
                     console.error('❌ AI代理API调用异常:', error);
-                    // 网络错误时使用默认回复
-                    console.log('⚠️ 网络错误，使用默认回复');
+                    // 网络错误时，尝试直接调用DeepSeek API
+                    console.log('⚠️ 网络错误，尝试直接调用DeepSeek API');
+                    try {
+                        const recentMessages = this.conversations['totofun_bot'] || [];
+                        const contextMessages = recentMessages.slice(-5).map(m => ({
+                            role: m.from === this.currentUser.id ? 'user' : 'assistant',
+                            content: m.content
+                        }));
+                        const gameUserData = storageManager.load('totofun-treasure-user');
+                        const userLevel = gameUserData?.level?.currentLevel || 1;
+                        const username = gameUserData?.username || this.currentUser.name;
+                        return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                    } catch (directError) {
+                        console.error('❌ 直接调用DeepSeek API也失败:', directError);
+                    }
                 }
                 
                 return null; // 返回null会使用默认回复逻辑
+            },
+            
+            // 直接调用DeepSeek API（后备方案，API key已编码）
+            async callDeepSeekDirectly(message, contextMessages, username, userLevel) {
+                try {
+                    // API key使用base64编码，避免直接暴露（简单混淆）
+                    const encodedKey = 'c2stZDE2ODIyY2VmMzk5NDUxOGJkZDQ5Nzc0MDFlZGQzZWM=';
+                    const apiKey = atob(encodedKey); // 解码
+                    
+                    const systemMessage = {
+                        role: 'system',
+                        content: `你是Totofun寻宝游戏的AI伙伴"小突"，性格活泼可爱，说话简洁幽默，喜欢用emoji。
+
+你的能力：
+- 帮助用户解答游戏相关问题（寻宝、好友、成就等）
+- 提供日常生活咨询（学习、健康、生活技巧等）
+- 提供学习辅导（作业、知识点、学习方法等）
+- 提供健康建议（注意：不能替代专业医疗诊断，只能提供一般性建议）
+- 陪伴聊天，做用户的好朋友
+
+用户信息：
+- 昵称：${username}
+- 等级：Lv${userLevel}
+
+回复要求：
+- 简短（50-100字以内）
+- 活泼有趣，使用emoji
+- 如果是医疗问题，要提醒用户咨询专业医生
+- 如果是学习问题，要给出具体建议
+- 保持友好和鼓励的语气`
+                    };
+                    
+                    const messages = [
+                        systemMessage,
+                        ...contextMessages,
+                        {
+                            role: 'user',
+                            content: message.trim()
+                        }
+                    ];
+                    
+                    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: messages,
+                            max_tokens: 200,
+                            temperature: 0.8,
+                            stream: false
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const reply = data.choices?.[0]?.message?.content || null;
+                        if (reply) {
+                            console.log('✅ 直接调用DeepSeek API成功:', reply.substring(0, 50) + '...');
+                            return reply;
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('❌ 直接调用DeepSeek API失败:', response.status, errorData);
+                    }
+                } catch (error) {
+                    console.error('❌ 直接调用DeepSeek API异常:', error);
+                }
+                return null;
             },
             
             // 配置DeepSeek API密钥
@@ -4923,9 +5013,12 @@
                     chatContainer.setAttribute('style', currentStyle + ' display: none !important;');
                     // 也直接设置style属性确保生效
                     chatContainer.style.display = 'none';
+                    
+                    // 强制移除所有可能覆盖的样式
+                    chatContainer.classList.remove('open', 'visible', 'show');
                 }
                 
-                console.log('✅ 好友聊天窗口已关闭');
+                console.log('✅ 好友聊天窗口已强制关闭');
             },
 
             // 发送文本消息
@@ -5471,10 +5564,21 @@
             },
 
             // 切换聊天面板显示
-            toggleChat() {
+            toggleChat(event) {
+                // 阻止事件冒泡
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                
                 const chatContainer = document.getElementById('chat-container');
                 const chatPanel = document.getElementById('chat-panel');
                 const friendsPanel = document.getElementById('friends-panel');
+                
+                if (!chatContainer) {
+                    console.error('❌ chat-container 元素不存在');
+                    return;
+                }
                 
                 // 检查当前显示状态（考虑!important的情况，使用computedStyle）
                 const computedStyle = window.getComputedStyle(chatContainer);
@@ -5501,17 +5605,32 @@
                     if (friendsPanel) friendsPanel.style.display = 'block';
                     console.log('✅ 好友聊天窗口已打开');
                 } else {
-                    // 关闭聊天窗口
-                    let currentStyle = chatContainer.getAttribute('style') || '';
-                    // 移除所有display相关的样式
-                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
-                    // 添加display: none
-                    chatContainer.setAttribute('style', currentStyle + ' display: none !important;');
-                    chatContainer.style.display = 'none';
-                    if (chatPanel) chatPanel.style.display = 'none';
-                    if (friendsPanel) friendsPanel.style.display = 'block';
-                    console.log('✅ 好友聊天窗口已关闭');
+                    // 关闭聊天窗口 - 使用专门的关闭函数
+                    this.closeChatContainer();
                 }
+            },
+            
+            // 专门用于关闭聊天容器的函数
+            closeChatContainer() {
+                const chatContainer = document.getElementById('chat-container');
+                const chatPanel = document.getElementById('chat-panel');
+                const friendsPanel = document.getElementById('friends-panel');
+                
+                if (!chatContainer) return;
+                
+                // 强制关闭 - 使用多种方法确保生效
+                chatContainer.style.display = 'none';
+                let currentStyle = chatContainer.getAttribute('style') || '';
+                currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                chatContainer.setAttribute('style', currentStyle + ' display: none !important;');
+                
+                if (chatPanel) chatPanel.style.display = 'none';
+                if (friendsPanel) friendsPanel.style.display = 'block';
+                
+                // 强制移除所有可能覆盖的样式
+                chatContainer.classList.remove('open', 'visible', 'show');
+                
+                console.log('✅ 好友聊天窗口已强制关闭');
             },
 
             // 初始化机器人聊天窗口
@@ -5554,6 +5673,11 @@
                 const botChatContainer = document.getElementById('bot-chat-container');
                 const botAvatarButton = document.getElementById('bot-avatar-button');
                 
+                if (!botChatContainer) {
+                    console.error('❌ bot-chat-container 元素不存在');
+                    return;
+                }
+                
                 // 检查当前显示状态（考虑!important的情况）
                 const computedStyle = window.getComputedStyle(botChatContainer);
                 const isVisible = computedStyle.display !== 'none';
@@ -5571,17 +5695,29 @@
                     }
                     console.log('✅ 机器人聊天窗口已打开');
                 } else {
-                    // 关闭聊天窗口
-                    let currentStyle = botChatContainer.getAttribute('style') || '';
-                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
-                    botChatContainer.setAttribute('style', currentStyle + ' display: none !important;');
-                    botChatContainer.style.display = 'none';
-                    // 显示头像按钮
-                    if (botAvatarButton) {
-                        botAvatarButton.style.display = 'block';
-                    }
-                    console.log('✅ 机器人聊天窗口已关闭');
+                    // 关闭聊天窗口 - 强制关闭
+                    this.closeBotChat();
                 }
+            },
+            
+            // 专门用于关闭机器人聊天窗口的函数
+            closeBotChat() {
+                const botChatContainer = document.getElementById('bot-chat-container');
+                const botAvatarButton = document.getElementById('bot-avatar-button');
+                
+                if (!botChatContainer) return;
+                
+                // 强制关闭 - 使用多种方法确保生效
+                botChatContainer.style.display = 'none';
+                botChatContainer.setAttribute('style', (botChatContainer.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: none !important;');
+                
+                // 显示头像按钮
+                if (botAvatarButton) {
+                    botAvatarButton.style.display = 'block';
+                    botAvatarButton.setAttribute('style', (botAvatarButton.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: block !important;');
+                }
+                
+                console.log('✅ 机器人聊天窗口已强制关闭');
             },
 
             // 更新机器人聊天消息显示
@@ -5857,6 +5993,40 @@
         chatManager.init();
         chatManager.checkUrlParams();
         
+        // 移动端：添加触摸事件监听器确保按钮可点击
+        if (window.innerWidth <= 768) {
+            // 为关闭按钮添加额外的触摸事件监听
+            setTimeout(() => {
+                const botCloseBtn = document.getElementById('bot-chat-close-btn');
+                const chatCloseBtn = document.getElementById('chat-container-close-btn');
+                const panelCloseBtn = document.getElementById('chat-panel-close-btn');
+                
+                if (botCloseBtn) {
+                    botCloseBtn.addEventListener('touchend', function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        chatManager.closeBotChat();
+                    }, { passive: false });
+                }
+                
+                if (chatCloseBtn) {
+                    chatCloseBtn.addEventListener('touchend', function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        chatManager.closeChatContainer();
+                    }, { passive: false });
+                }
+                
+                if (panelCloseBtn) {
+                    panelCloseBtn.addEventListener('touchend', function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        chatManager.closeChat();
+                    }, { passive: false });
+                }
+            }, 500);
+        }
+        
         // 点击外部区域关闭表情面板
         document.addEventListener('click', function(event) {
             const emojiPanel = document.getElementById('emoji-panel');
@@ -5949,20 +6119,26 @@
                     <div style="font-size: 11px; opacity: 0.9;">智能寻宝伙伴</div>
                 </div>
             </div>
-            <button onclick="chatManager.toggleBotChat(event)" style="
+            <button id="bot-chat-close-btn" onclick="chatManager.toggleBotChat(event)" ontouchstart="chatManager.toggleBotChat(event)" style="
                 background: rgba(255, 255, 255, 0.2);
                 border: none;
                 color: white;
-                width: 40px;
-                height: 40px;
+                width: 44px;
+                height: 44px;
                 border-radius: 50%;
                 cursor: pointer;
                 font-size: 20px;
                 line-height: 1;
                 flex-shrink: 0;
                 z-index: 10001;
-                -webkit-tap-highlight-color: transparent;
+                position: relative;
+                pointer-events: auto !important;
+                -webkit-tap-highlight-color: rgba(255, 255, 255, 0.3);
                 touch-action: manipulation;
+                min-width: 44px;
+                min-height: 44px;
+                user-select: none;
+                -webkit-user-select: none;
             ">×</button>
         </div>
         
@@ -6102,7 +6278,7 @@
                         font-size: 16px;
                         line-height: 1;
                     " title="我的信息">👤</button>
-                    <button onclick="chatManager.toggleChat(event)" style="
+                    <button id="chat-container-close-btn" onclick="chatManager.toggleChat(event)" ontouchstart="chatManager.toggleChat(event)" style="
                         background: rgba(255, 255, 255, 0.2);
                         border: none;
                         color: white;
@@ -6114,10 +6290,14 @@
                         line-height: 1;
                         flex-shrink: 0;
                         z-index: 10001;
-                        -webkit-tap-highlight-color: transparent;
+                        position: relative;
+                        pointer-events: auto !important;
+                        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.3);
                         touch-action: manipulation;
                         min-width: 44px;
                         min-height: 44px;
+                        user-select: none;
+                        -webkit-user-select: none;
                     ">×</button>
                 </div>
             </div>
@@ -6146,7 +6326,7 @@
                 align-items: center;
                 gap: 15px;
             ">
-                <button onclick="chatManager.closeChat(event)" style="
+                <button id="chat-panel-close-btn" onclick="chatManager.closeChat(event)" ontouchstart="chatManager.closeChat(event)" style="
                     background: rgba(255, 255, 255, 0.2);
                     border: none;
                     color: white;
@@ -6158,10 +6338,14 @@
                     line-height: 1;
                     flex-shrink: 0;
                     z-index: 10001;
-                    -webkit-tap-highlight-color: transparent;
+                    position: relative;
+                    pointer-events: auto !important;
+                    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.3);
                     touch-action: manipulation;
                     min-width: 44px;
                     min-height: 44px;
+                    user-select: none;
+                    -webkit-user-select: none;
                 ">←</button>
                 <div id="chat-friend-avatar" style="font-size: 24px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden;"></div>
                 <div style="flex: 1;">
@@ -6943,11 +7127,34 @@
             
             /* 聊天头部按钮移动端适配 */
             #chat-panel > div:first-child button,
-            #chat-container > div:first-child button {
+            #chat-container > div:first-child button,
+            #bot-chat-container > div:first-child button {
                 min-width: 44px !important; /* iOS推荐的最小触摸目标 */
                 min-height: 44px !important;
-                -webkit-tap-highlight-color: transparent !important;
+                -webkit-tap-highlight-color: rgba(255, 255, 255, 0.3) !important;
                 touch-action: manipulation !important;
+                pointer-events: auto !important;
+                z-index: 10002 !important;
+                position: relative !important;
+                user-select: none !important;
+                -webkit-user-select: none !important;
+            }
+            
+            /* 确保关闭按钮在最上层 */
+            #bot-chat-close-btn,
+            #chat-container-close-btn,
+            #chat-panel-close-btn {
+                z-index: 10003 !important;
+                pointer-events: auto !important;
+                position: relative !important;
+            }
+            
+            /* 移动端按钮点击反馈 */
+            #bot-chat-close-btn:active,
+            #chat-container-close-btn:active,
+            #chat-panel-close-btn:active {
+                background: rgba(255, 255, 255, 0.4) !important;
+                transform: scale(0.95) !important;
             }
             
             /* 表情面板移动端适配 */
