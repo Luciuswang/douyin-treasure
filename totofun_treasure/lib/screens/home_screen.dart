@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'map_screen.dart';
 import 'task_screen.dart';
 import 'chat/friends_screen.dart';
+import 'chat/dual_chat_screen.dart';
 import '../providers/chat_provider.dart';
 import '../providers/user_provider.dart';
 
@@ -57,10 +58,11 @@ class _HomeScreenState extends State<HomeScreen> {
           
           return FloatingActionButton(
             onPressed: () {
+              // 直接打开双聊天界面
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const FriendsScreen(),
+                  builder: (context) => const DualChatScreen(),
                 ),
               );
             },

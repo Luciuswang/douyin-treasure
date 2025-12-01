@@ -38,3 +38,6 @@ git log --oneline -10
 2. 或确保PowerShell编码设置为UTF-8
 3. 或使用英文提交信息（避免编码问题）
 
+
+
+

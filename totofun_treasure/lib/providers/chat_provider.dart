@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/chat_user.dart';
 import '../models/chat_message.dart';
 import '../models/friendship.dart';
 import '../services/firebase_service.dart';
+import '../services/deepseek_service.dart';
 
 /// 聊天Provider
 class ChatProvider with ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
+  final DeepSeekService _deepSeekService = DeepSeekService();
   final Uuid _uuid = const Uuid();
+  static const String _botId = 'totofun_bot';
+  static const String _botMessagesKey = 'bot_messages';
 
   // 当前用户
   ChatUser? _currentUser;
@@ -29,9 +35,21 @@ class ChatProvider with ChangeNotifier {
   ChatUser? _currentChatFriend;
   ChatUser? get currentChatFriend => _currentChatFriend;
 
-  // 当前聊天消息
+  // 当前聊天消息（好友聊天）
   List<ChatMessage> _currentMessages = [];
   List<ChatMessage> get currentMessages => _currentMessages;
+
+  // 机器人聊天消息
+  List<ChatMessage> _botMessages = [];
+  List<ChatMessage> get botMessages => _botMessages;
+
+  // 机器人用户信息
+  ChatUser? _botUser;
+  ChatUser? get botUser => _botUser;
+
+  // 机器人是否正在回复
+  bool _botIsReplying = false;
+  bool get botIsReplying => _botIsReplying;
 
   // 总未读消息数
   int get totalUnreadCount {
@@ -52,6 +70,17 @@ class ChatProvider with ChangeNotifier {
 
     await _firebaseService.createOrUpdateUser(_currentUser!);
     await _firebaseService.updateOnlineStatus(true);
+
+    // 初始化机器人用户
+    _botUser = ChatUser(
+      id: _botId,
+      nickname: '小突',
+      avatar: null,
+      isOnline: true,
+    );
+
+    // 加载机器人聊天记录
+    await _loadBotMessages();
 
     // 加载好友列表和会话
     await loadFriendships();
@@ -318,6 +347,155 @@ class ChatProvider with ChangeNotifier {
   void endCurrentChat() {
     _currentChatFriend = null;
     _currentMessages = [];
+    notifyListeners();
+  }
+
+  // ==================== 机器人聊天功能 ====================
+
+  /// 加载机器人聊天记录
+  Future<void> _loadBotMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final messagesJson = prefs.getString(_botMessagesKey);
+      if (messagesJson != null) {
+        final List<dynamic> messagesList = jsonDecode(messagesJson);
+        _botMessages = messagesList
+            .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      } else {
+        // 如果没有消息，添加欢迎消息
+        _addWelcomeMessage();
+      }
+    } catch (e) {
+      print('❌ 加载机器人聊天记录失败: $e');
+      _addWelcomeMessage();
+    }
+  }
+
+  /// 保存机器人聊天记录
+  Future<void> _saveBotMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final messagesJson = jsonEncode(
+        _botMessages.map((m) => m.toJson()).toList(),
+      );
+      await prefs.setString(_botMessagesKey, messagesJson);
+    } catch (e) {
+      print('❌ 保存机器人聊天记录失败: $e');
+    }
+  }
+
+  /// 添加欢迎消息
+  void _addWelcomeMessage() {
+    if (_botMessages.isEmpty && _currentUser != null) {
+      final welcomeMessage = ChatMessage(
+        id: 'welcome_msg',
+        chatId: 'bot_chat',
+        senderId: _botId,
+        receiverId: _currentUser!.id,
+        type: MessageType.text,
+        content: '你好！我是小突，你的AI寻宝伙伴！😊 有什么问题都可以问我哦~',
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        isRead: true,
+      );
+      _botMessages.add(welcomeMessage);
+      _saveBotMessages();
+      notifyListeners();
+    }
+  }
+
+  /// 发送消息给机器人
+  Future<bool> sendBotMessage(String content) async {
+    if (_currentUser == null || content.trim().isEmpty) return false;
+
+    // 添加用户消息
+    final userMessage = ChatMessage(
+      id: _uuid.v4(),
+      chatId: 'bot_chat',
+      senderId: _currentUser!.id,
+      receiverId: _botId,
+      type: MessageType.text,
+      content: content.trim(),
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      isRead: true,
+    );
+
+    _botMessages.add(userMessage);
+    _saveBotMessages();
+    notifyListeners();
+
+    // 获取 AI 回复
+    _botIsReplying = true;
+    notifyListeners();
+
+    try {
+      // 构建对话历史（最近5条消息，排除当前刚发送的消息）
+      final recentMessages = _botMessages.length > 6
+          ? _botMessages.sublist(_botMessages.length - 6, _botMessages.length - 1)
+          : _botMessages.length > 1
+              ? _botMessages.sublist(0, _botMessages.length - 1)
+              : <ChatMessage>[];
+
+      final conversationHistory = recentMessages
+          .map((m) => <String, String>{
+                'role': m.senderId == _currentUser!.id ? 'user' : 'assistant',
+                'content': m.content,
+              })
+          .toList();
+
+      // 调用 DeepSeek API
+      final aiReply = await _deepSeekService.getAIReply(
+        content.trim(),
+        conversationHistory: conversationHistory.isNotEmpty
+            ? conversationHistory
+            : null,
+        userNickname: _currentUser!.nickname,
+        userLevel: _currentUser!.level,
+      );
+
+      // 添加机器人回复
+      final botReply = ChatMessage(
+        id: _uuid.v4(),
+        chatId: 'bot_chat',
+        senderId: _botId,
+        receiverId: _currentUser!.id,
+        type: MessageType.text,
+        content: aiReply ?? _deepSeekService.getDefaultReply(),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        isRead: true,
+      );
+
+      _botMessages.add(botReply);
+      _saveBotMessages();
+    } catch (e) {
+      print('❌ 获取机器人回复失败: $e');
+      // 添加默认回复
+      final defaultReply = ChatMessage(
+        id: _uuid.v4(),
+        chatId: 'bot_chat',
+        senderId: _botId,
+        receiverId: _currentUser!.id,
+        type: MessageType.text,
+        content: _deepSeekService.getDefaultReply(),
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        isRead: true,
+      );
+      _botMessages.add(defaultReply);
+      _saveBotMessages();
+    } finally {
+      _botIsReplying = false;
+      notifyListeners();
+    }
+
+    return true;
+  }
+
+  /// 清空机器人聊天记录
+  Future<void> clearBotMessages() async {
+    _botMessages.clear();
+    await _saveBotMessages();
+    _addWelcomeMessage();
     notifyListeners();
   }
 

@@ -37,3 +37,6 @@ git log --oneline -10
 - 如果使用PowerShell，可以设置：`$env:LANG="zh_CN.UTF-8"`
 - 或者使用Git Bash，它默认支持UTF-8
 
+
+
+

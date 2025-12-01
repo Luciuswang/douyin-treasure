@@ -4186,17 +4186,15 @@
                 return null;
             },
             
-            // 获取AI回复（需要配置API密钥）
+            // 获取AI回复（使用DeepSeek API）
             async getAIReply(message) {
-                // TODO: 在这里集成AI API
-                // 可以使用 OpenAI、Claude、文心一言、豆包等
+                // DeepSeek API配置
+                const deepseekApiKey = localStorage.getItem('deepseek_api_key'); // DeepSeek API密钥
+                const deepseekApiUrl = 'https://api.deepseek.com/v1/chat/completions';
                 
-                // 示例：使用免费的AI API（需要配置）
-                const aiApiKey = localStorage.getItem('ai_api_key'); // 用户可以在设置中配置
-                const aiApiUrl = localStorage.getItem('ai_api_url') || 'https://api.openai.com/v1/chat/completions';
-                
-                if (!aiApiKey) {
+                if (!deepseekApiKey) {
                     // 如果没有配置API密钥，返回null，使用默认回复
+                    console.log('⚠️ 未配置DeepSeek API密钥，使用默认回复');
                     return null;
                 }
                 
@@ -4208,18 +4206,43 @@
                         content: m.content
                     }));
                     
-                    const response = await fetch(aiApiUrl, {
+                    // 获取用户游戏数据，用于上下文
+                    const gameUserData = storageManager.load('totofun-treasure-user');
+                    const userLevel = gameUserData?.level?.currentLevel || 1;
+                    const username = gameUserData?.username || this.currentUser.name;
+                    
+                    console.log('🤖 调用DeepSeek API:', { message, contextLength: contextMessages.length });
+                    
+                    const response = await fetch(deepseekApiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${aiApiKey}`
+                            'Authorization': `Bearer ${deepseekApiKey}`
                         },
                         body: JSON.stringify({
-                            model: 'gpt-3.5-turbo',
+                            model: 'deepseek-chat', // DeepSeek模型名称
                             messages: [
                                 {
                                     role: 'system',
-                                    content: '你是Totofun寻宝游戏的AI伙伴"小突"，性格活泼可爱，说话简洁幽默，喜欢用emoji。你的任务是帮助用户寻宝、完成任务、解答疑问，同时也是一个好朋友，可以聊任何事情。回复要简短（50字以内），活泼有趣。'
+                                    content: `你是Totofun寻宝游戏的AI伙伴"小突"，性格活泼可爱，说话简洁幽默，喜欢用emoji。
+
+你的能力：
+- 帮助用户解答游戏相关问题（寻宝、好友、成就等）
+- 提供日常生活咨询（学习、健康、生活技巧等）
+- 提供学习辅导（作业、知识点、学习方法等）
+- 提供健康建议（注意：不能替代专业医疗诊断，只能提供一般性建议）
+- 陪伴聊天，做用户的好朋友
+
+用户信息：
+- 昵称：${username}
+- 等级：Lv${userLevel}
+
+回复要求：
+- 简短（50-100字以内）
+- 活泼有趣，使用emoji
+- 如果是医疗问题，要提醒用户咨询专业医生
+- 如果是学习问题，要给出具体建议
+- 保持友好和鼓励的语气`
                                 },
                                 ...contextMessages,
                                 {
@@ -4227,19 +4250,55 @@
                                     content: message
                                 }
                             ],
-                            max_tokens: 100,
-                            temperature: 0.8
+                            max_tokens: 200, // 增加token限制，支持更详细的回复
+                            temperature: 0.8, // 创造性，0.7-0.9之间
+                            stream: false
                         })
                     });
                     
                     if (response.ok) {
                         const data = await response.json();
-                        return data.choices[0]?.message?.content || null;
+                        const reply = data.choices[0]?.message?.content || null;
+                        if (reply) {
+                            console.log('✅ DeepSeek API回复成功:', reply.substring(0, 50) + '...');
+                            return reply;
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('❌ DeepSeek API调用失败:', response.status, errorData);
+                        
+                        // 如果是401错误，说明API密钥无效
+                        if (response.status === 401) {
+                            console.error('❌ API密钥无效，请检查配置');
+                        }
                     }
                 } catch (error) {
-                    console.error('AI API调用失败:', error);
+                    console.error('❌ DeepSeek API调用异常:', error);
                 }
                 
+                return null;
+            },
+            
+            // 配置DeepSeek API密钥
+            setDeepSeekApiKey(apiKey) {
+                if (apiKey && apiKey.trim()) {
+                    localStorage.setItem('deepseek_api_key', apiKey.trim());
+                    console.log('✅ DeepSeek API密钥已保存');
+                    return true;
+                } else {
+                    localStorage.removeItem('deepseek_api_key');
+                    console.log('✅ DeepSeek API密钥已清除');
+                    return false;
+                }
+            },
+            
+            // 获取DeepSeek API密钥（用于显示）
+            getDeepSeekApiKey() {
+                const key = localStorage.getItem('deepseek_api_key');
+                if (key) {
+                    // 只显示前4位和后4位，中间用*代替
+                    return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+                }
                 return null;
             },
             

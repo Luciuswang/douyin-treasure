@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../models/friendship.dart';
 import 'chat_screen.dart';
+import 'dual_chat_screen.dart';
 import 'add_friend_screen.dart';
 
 /// 好友列表页面
@@ -140,11 +141,11 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                     )
                   : null,
               onTap: () {
-                // 打开聊天页面
+                // 打开双聊天页面（包含机器人聊天和好友聊天）
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ChatScreen(friendId: friendship.friendId),
+                    builder: (context) => DualChatScreen(friendId: friendship.friendId),
                   ),
                 );
               },
@@ -300,7 +301,7 @@ class _FriendsScreenState extends State<FriendsScreen> with SingleTickerProvider
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatScreen(friendId: friendship.friendId),
+                      builder: (context) => DualChatScreen(friendId: friendship.friendId),
                     ),
                   );
                 },
