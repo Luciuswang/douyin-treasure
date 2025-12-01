@@ -5653,18 +5653,23 @@
         z-index: 9996;
         cursor: pointer;
         display: none;
-        transition: transform 0.3s ease;
-        border-radius: 50%;
-        overflow: hidden;
-        background: transparent;
-        box-shadow: 0 4px 15px rgba(79, 195, 247, 0.4);
-    " onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 20px rgba(79, 195, 247, 0.6)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(79, 195, 247, 0.4)'">
+        transition: transform 0.3s ease, filter 0.3s ease;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
         <img src="assets/images/xiaotu-bot.png" alt="小突" style="
             width: 100%;
             height: 100%;
             object-fit: contain;
-            background: transparent;
+            background: transparent !important;
             display: block;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
         " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
     </div>
 
@@ -6284,6 +6289,23 @@
         .friend-item:hover {
             background: #f5f5f5;
         }
+        /* 小突头像按钮样式 - 确保背景透明 */
+        #bot-avatar-button {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+        }
+        
+        #bot-avatar-button img {
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
         .friend-avatar {
             font-size: 32px;
             flex-shrink: 0;
@@ -6468,6 +6490,13 @@
                 height: 70px !important;
                 bottom: 20px !important;
                 left: 20px !important;
+                background: transparent !important;
+                border: none !important;
+            }
+            
+            #bot-avatar-button img {
+                background: transparent !important;
+                border: none !important;
             }
 
             /* 机器人聊天窗口移动端适配 */
