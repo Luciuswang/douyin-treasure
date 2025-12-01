@@ -5391,9 +5391,10 @@
                                 background-size: contain;
                                 background-repeat: no-repeat;
                                 background-position: center;
-                                background-color: transparent !important;
+                                background-color: rgba(0, 0, 0, 0) !important;
                                 border: none !important;
                                 padding: 0 !important;
+                                opacity: 1 !important;
                             "></div>
                             <div>开始和小突聊天吧！</div>
                         </div>
@@ -5667,16 +5668,27 @@
         cursor: pointer;
         display: none;
         transition: transform 0.3s ease, filter 0.3s ease;
-        background-image: url('assets/images/xiaotu-bot.png');
-        background-size: 80px auto;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-color: transparent !important;
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
+        background: none !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+        line-height: 0 !important;
     " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
+        <img src="assets/images/xiaotu-bot.png" alt="小突" style="
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: none !important;
+            background-color: rgba(0, 0, 0, 0) !important;
+            filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
+            vertical-align: top !important;
+        " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
     </div>
 
     <!-- 机器人聊天窗口（左下角） -->
@@ -5712,10 +5724,11 @@
                     background-size: contain;
                     background-repeat: no-repeat;
                     background-position: center;
-                    background-color: transparent !important;
+                    background-color: rgba(0, 0, 0, 0) !important;
                     border: none !important;
                     padding: 0 !important;
                     margin: 0 !important;
+                    opacity: 1 !important;
                 "></div>
                 <div>
                     <div style="font-size: 16px;">小突 AI助手</div>
@@ -6308,21 +6321,31 @@
         }
         /* 小突头像按钮样式 - 确保背景透明 */
         #bot-avatar-button {
-            background-color: transparent !important;
-            background-image: url('assets/images/xiaotu-bot.png') !important;
-            background-size: 80px auto !important;
-            background-repeat: no-repeat !important;
-            background-position: center !important;
+            background: none !important;
+            background-color: rgba(0, 0, 0, 0) !important;
             border: none !important;
             padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
             line-height: 0 !important;
+            opacity: 1 !important;
         }
         
-        /* 移除所有可能的子元素样式 */
-        #bot-avatar-button * {
+        #bot-avatar-button img {
+            background: none !important;
+            background-color: rgba(0, 0, 0, 0) !important;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important;
+        }
+        
+        /* 确保没有继承的背景色 */
+        #bot-avatar-button::before,
+        #bot-avatar-button::after {
             display: none !important;
+            background: none !important;
         }
 
         .friend-avatar {

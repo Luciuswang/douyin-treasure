@@ -327,3 +327,4 @@ class _BotChatWidgetState extends State<BotChatWidget> {
   }
 }
 
+
