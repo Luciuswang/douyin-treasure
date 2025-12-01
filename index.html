@@ -4205,17 +4205,10 @@
                 return null;
             },
             
-            // 获取AI回复（使用DeepSeek API）
+            // 获取AI回复（使用后端代理，API Key不暴露）
             async getAIReply(message) {
-                // DeepSeek API配置
-                const deepseekApiKey = localStorage.getItem('deepseek_api_key'); // DeepSeek API密钥
-                const deepseekApiUrl = 'https://api.deepseek.com/v1/chat/completions';
-                
-                if (!deepseekApiKey) {
-                    // 如果没有配置API密钥，返回null，使用默认回复
-                    console.log('⚠️ 未配置DeepSeek API密钥，使用默认回复');
-                    return null;
-                }
+                // 使用后端API代理，避免在前端暴露API Key
+                const apiProxyUrl = '/api/ai/chat'; // 相对路径，自动使用当前域名
                 
                 try {
                     // 构建上下文（最近5条消息）
@@ -4230,72 +4223,46 @@
                     const userLevel = gameUserData?.level?.currentLevel || 1;
                     const username = gameUserData?.username || this.currentUser.name;
                     
-                    console.log('🤖 调用DeepSeek API:', { message, contextLength: contextMessages.length });
+                    console.log('🤖 调用AI代理API:', { message, contextLength: contextMessages.length });
                     
-                    const response = await fetch(deepseekApiUrl, {
+                    const response = await fetch(apiProxyUrl, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${deepseekApiKey}`
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: 'deepseek-chat', // DeepSeek模型名称
-                            messages: [
-                                {
-                                    role: 'system',
-                                    content: `你是Totofun寻宝游戏的AI伙伴"小突"，性格活泼可爱，说话简洁幽默，喜欢用emoji。
-
-你的能力：
-- 帮助用户解答游戏相关问题（寻宝、好友、成就等）
-- 提供日常生活咨询（学习、健康、生活技巧等）
-- 提供学习辅导（作业、知识点、学习方法等）
-- 提供健康建议（注意：不能替代专业医疗诊断，只能提供一般性建议）
-- 陪伴聊天，做用户的好朋友
-
-用户信息：
-- 昵称：${username}
-- 等级：Lv${userLevel}
-
-回复要求：
-- 简短（50-100字以内）
-- 活泼有趣，使用emoji
-- 如果是医疗问题，要提醒用户咨询专业医生
-- 如果是学习问题，要给出具体建议
-- 保持友好和鼓励的语气`
-                                },
-                                ...contextMessages,
-                                {
-                                    role: 'user',
-                                    content: message
-                                }
-                            ],
-                            max_tokens: 200, // 增加token限制，支持更详细的回复
-                            temperature: 0.8, // 创造性，0.7-0.9之间
-                            stream: false
+                            message: message,
+                            context: contextMessages,
+                            username: username,
+                            userLevel: userLevel
                         })
                     });
                     
                     if (response.ok) {
                         const data = await response.json();
-                        const reply = data.choices[0]?.message?.content || null;
-                        if (reply) {
-                            console.log('✅ DeepSeek API回复成功:', reply.substring(0, 50) + '...');
-                            return reply;
+                        if (data.success && data.reply) {
+                            console.log('✅ AI代理API回复成功:', data.reply.substring(0, 50) + '...');
+                            return data.reply;
+                        } else {
+                            console.warn('⚠️ AI代理API返回失败:', data.message);
+                            return null; // 返回null会使用默认回复
                         }
                     } else {
                         const errorData = await response.json().catch(() => ({}));
-                        console.error('❌ DeepSeek API调用失败:', response.status, errorData);
+                        console.error('❌ AI代理API调用失败:', response.status, errorData);
                         
-                        // 如果是401错误，说明API密钥无效
-                        if (response.status === 401) {
-                            console.error('❌ API密钥无效，请检查配置');
+                        // 如果后端服务不可用，返回null使用默认回复
+                        if (response.status === 503) {
+                            console.log('⚠️ AI服务未配置，使用默认回复');
                         }
                     }
                 } catch (error) {
-                    console.error('❌ DeepSeek API调用异常:', error);
+                    console.error('❌ AI代理API调用异常:', error);
+                    // 网络错误时使用默认回复
+                    console.log('⚠️ 网络错误，使用默认回复');
                 }
                 
-                return null;
+                return null; // 返回null会使用默认回复逻辑
             },
             
             // 配置DeepSeek API密钥
@@ -4436,17 +4403,45 @@
             },
             
             // 更新DeepSeek API状态显示
+            // 检查AI服务状态（使用后端代理，不需要前端配置）
+            async checkAIServiceStatus() {
+                try {
+                    const response = await fetch('/api/ai/status');
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.available;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ 无法检查AI服务状态:', error);
+                }
+                return false;
+            },
+            
             updateDeepSeekApiStatus() {
                 const statusEl = document.getElementById('deepseek-status');
-                const apiKey = localStorage.getItem('deepseek_api_key');
+                if (!statusEl) return;
                 
-                if (apiKey) {
-                    statusEl.textContent = '已配置';
-                    statusEl.style.background = '#22C55E';
-                } else {
-                    statusEl.textContent = '未配置';
-                    statusEl.style.background = '#ff9999';
-                }
+                // 由于使用后端代理，始终显示"已启用"
+                statusEl.textContent = '已启用';
+                statusEl.style.background = '#22C55E';
+                
+                // 检查后端API是否可用（可选）
+                fetch('/api/ai/status')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success && data.available) {
+                            statusEl.textContent = '已启用';
+                            statusEl.style.background = '#22C55E';
+                        } else {
+                            statusEl.textContent = '服务中';
+                            statusEl.style.background = '#ffa500';
+                        }
+                    })
+                    .catch(() => {
+                        // 网络错误时仍显示已启用（使用默认回复）
+                        statusEl.textContent = '已启用';
+                        statusEl.style.background = '#22C55E';
+                    });
             },
             
             // 默认机器人回复
@@ -4899,7 +4894,13 @@
             },
 
             // 关闭聊天窗口
-            closeChat() {
+            closeChat(event) {
+                // 阻止事件冒泡，避免触发其他点击事件
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                
                 const chatPanel = document.getElementById('chat-panel');
                 const friendsPanel = document.getElementById('friends-panel');
                 const chatContainer = document.getElementById('chat-container');
@@ -4912,13 +4913,19 @@
                     friendsPanel.style.display = 'block';
                 }
                 
-                // 在移动端，必须关闭整个聊天容器（全屏显示）
-                if (chatContainer && window.innerWidth <= 768) {
-                    chatContainer.style.display = 'none';
-                } else if (chatContainer) {
-                    // PC端也关闭整个容器，确保完全关闭
+                // 强制关闭整个聊天容器（移动端和PC端都需要）
+                if (chatContainer) {
+                    // 直接设置display为none，移除所有display相关样式
+                    let currentStyle = chatContainer.getAttribute('style') || '';
+                    // 移除所有display相关的样式
+                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                    // 添加display: none
+                    chatContainer.setAttribute('style', currentStyle + ' display: none !important;');
+                    // 也直接设置style属性确保生效
                     chatContainer.style.display = 'none';
                 }
+                
+                console.log('✅ 好友聊天窗口已关闭');
             },
 
             // 发送文本消息
@@ -5469,22 +5476,41 @@
                 const chatPanel = document.getElementById('chat-panel');
                 const friendsPanel = document.getElementById('friends-panel');
                 
-                if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
+                // 检查当前显示状态（考虑!important的情况，使用computedStyle）
+                const computedStyle = window.getComputedStyle(chatContainer);
+                const isVisible = computedStyle.display !== 'none';
+                
+                if (!isVisible) {
                     // 打开聊天窗口
+                    let currentStyle = chatContainer.getAttribute('style') || '';
+                    // 移除所有display相关的样式
+                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                    
                     if (window.innerWidth <= 768) {
-                        chatContainer.style.display = 'flex'; // 移动端使用flex
+                        // 移动端使用flex
+                        chatContainer.setAttribute('style', currentStyle + ' display: flex !important;');
+                        chatContainer.style.display = 'flex';
                     } else {
-                        chatContainer.style.display = 'block'; // PC端使用block
+                        // PC端使用block
+                        chatContainer.setAttribute('style', currentStyle + ' display: block !important;');
+                        chatContainer.style.display = 'block';
                     }
                     this.updateFriendsList();
                     // 确保显示好友列表面板
                     if (chatPanel) chatPanel.style.display = 'none';
                     if (friendsPanel) friendsPanel.style.display = 'block';
+                    console.log('✅ 好友聊天窗口已打开');
                 } else {
                     // 关闭聊天窗口
+                    let currentStyle = chatContainer.getAttribute('style') || '';
+                    // 移除所有display相关的样式
+                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                    // 添加display: none
+                    chatContainer.setAttribute('style', currentStyle + ' display: none !important;');
                     chatContainer.style.display = 'none';
                     if (chatPanel) chatPanel.style.display = 'none';
                     if (friendsPanel) friendsPanel.style.display = 'block';
+                    console.log('✅ 好友聊天窗口已关闭');
                 }
             },
 
@@ -5518,25 +5544,43 @@
             },
 
             // 切换机器人聊天窗口显示
-            toggleBotChat() {
+            toggleBotChat(event) {
+                // 阻止事件冒泡，避免触发其他点击事件
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                
                 const botChatContainer = document.getElementById('bot-chat-container');
                 const botAvatarButton = document.getElementById('bot-avatar-button');
                 
-                if (botChatContainer.style.display === 'none' || !botChatContainer.style.display) {
+                // 检查当前显示状态（考虑!important的情况）
+                const computedStyle = window.getComputedStyle(botChatContainer);
+                const isVisible = computedStyle.display !== 'none';
+                
+                if (!isVisible) {
                     // 打开聊天窗口
+                    let currentStyle = botChatContainer.getAttribute('style') || '';
+                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                    botChatContainer.setAttribute('style', currentStyle + ' display: flex !important;');
                     botChatContainer.style.display = 'flex';
                     this.updateBotChatMessages();
                     // 隐藏头像按钮
                     if (botAvatarButton) {
                         botAvatarButton.style.display = 'none';
                     }
+                    console.log('✅ 机器人聊天窗口已打开');
                 } else {
                     // 关闭聊天窗口
+                    let currentStyle = botChatContainer.getAttribute('style') || '';
+                    currentStyle = currentStyle.replace(/display\s*:\s*[^;!]*!?important?;?/gi, '');
+                    botChatContainer.setAttribute('style', currentStyle + ' display: none !important;');
                     botChatContainer.style.display = 'none';
                     // 显示头像按钮
                     if (botAvatarButton) {
                         botAvatarButton.style.display = 'block';
                     }
+                    console.log('✅ 机器人聊天窗口已关闭');
                 }
             },
 
@@ -5905,16 +5949,20 @@
                     <div style="font-size: 11px; opacity: 0.9;">智能寻宝伙伴</div>
                 </div>
             </div>
-            <button onclick="chatManager.toggleBotChat()" style="
+            <button onclick="chatManager.toggleBotChat(event)" style="
                 background: rgba(255, 255, 255, 0.2);
                 border: none;
                 color: white;
-                width: 30px;
-                height: 30px;
+                width: 40px;
+                height: 40px;
                 border-radius: 50%;
                 cursor: pointer;
                 font-size: 20px;
                 line-height: 1;
+                flex-shrink: 0;
+                z-index: 10001;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
             ">×</button>
         </div>
         
@@ -5923,7 +5971,10 @@
             flex: 1;
             overflow-y: auto;
             padding: 15px;
+            padding-bottom: 80px;
             background: #f5f5f5;
+            min-height: 0;
+            box-sizing: border-box;
         "></div>
         
         <!-- 机器人聊天输入框 -->
@@ -5933,6 +5984,9 @@
             border-top: 1px solid #e0e0e0;
             display: flex;
             gap: 8px;
+            position: relative;
+            z-index: 100;
+            flex-shrink: 0;
         ">
             <input type="text" id="bot-chat-input" placeholder="问小突..." style="
                 flex: 1;
@@ -6048,12 +6102,12 @@
                         font-size: 16px;
                         line-height: 1;
                     " title="我的信息">👤</button>
-                    <button onclick="chatManager.toggleChat()" style="
+                    <button onclick="chatManager.toggleChat(event)" style="
                         background: rgba(255, 255, 255, 0.2);
                         border: none;
                         color: white;
-                        width: 40px;
-                        height: 40px;
+                        width: 44px;
+                        height: 44px;
                         border-radius: 50%;
                         cursor: pointer;
                         font-size: 20px;
@@ -6062,6 +6116,8 @@
                         z-index: 10001;
                         -webkit-tap-highlight-color: transparent;
                         touch-action: manipulation;
+                        min-width: 44px;
+                        min-height: 44px;
                     ">×</button>
                 </div>
             </div>
@@ -6090,12 +6146,12 @@
                 align-items: center;
                 gap: 15px;
             ">
-                <button onclick="chatManager.closeChat()" style="
+                <button onclick="chatManager.closeChat(event)" style="
                     background: rgba(255, 255, 255, 0.2);
                     border: none;
                     color: white;
-                    width: 40px;
-                    height: 40px;
+                    width: 44px;
+                    height: 44px;
                     border-radius: 50%;
                     cursor: pointer;
                     font-size: 20px;
@@ -6104,6 +6160,8 @@
                     z-index: 10001;
                     -webkit-tap-highlight-color: transparent;
                     touch-action: manipulation;
+                    min-width: 44px;
+                    min-height: 44px;
                 ">←</button>
                 <div id="chat-friend-avatar" style="font-size: 24px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden;"></div>
                 <div style="flex: 1;">
@@ -6129,11 +6187,19 @@
                 flex: 1;
                 overflow-y: auto;
                 padding: 20px;
+                padding-bottom: 80px;
                 background: #f5f5f5;
+                min-height: 0;
+                box-sizing: border-box;
             "></div>
 
             <!-- 输入区域 -->
-            <div style="position: relative;">
+            <div style="
+                position: relative;
+                flex-shrink: 0;
+                z-index: 100;
+                background: white;
+            ">
                 <!-- 表情选择面板 -->
                 <div id="emoji-panel" style="
                     display: none;
@@ -6166,6 +6232,9 @@
                     display: flex;
                     gap: 10px;
                     align-items: center;
+                    position: relative;
+                    z-index: 100;
+                    flex-shrink: 0;
                 ">
                     <button onclick="chatManager.shareLocation()" style="
                         background: #4FC3F7;
@@ -6461,60 +6530,76 @@
 
             <!-- DeepSeek API 配置 -->
             <div style="
-                background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+                background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
                 padding: 15px;
                 border-radius: 10px;
                 margin-top: 15px;
-                border: 2px solid #ffd699;
+                border: 2px solid #4FC3F7;
             ">
                 <h3 style="margin-bottom: 10px; color: #333; font-size: 14px; display: flex; align-items: center; gap: 5px;">
-                    🤖 DeepSeek AI 配置
+                    🤖 AI 聊天服务
                     <span id="deepseek-status" style="
                         font-size: 10px;
                         padding: 2px 6px;
                         border-radius: 10px;
-                        background: #ff9999;
-                        color: white;
-                        font-weight: normal;
-                    ">未配置</span>
-                </h3>
-                <input id="deepseek-api-key-input" type="password" placeholder="输入DeepSeek API Key (sk-...)" style="
-                    width: 100%;
-                    padding: 10px;
-                    border: 2px solid #ffd699;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    margin-bottom: 8px;
-                    font-family: monospace;
-                    box-sizing: border-box;
-                ">
-                <div style="display: flex; gap: 8px;">
-                    <button onclick="chatManager.saveDeepSeekApiKey()" style="
-                        flex: 1;
-                        padding: 8px;
-                        background: #4FC3F7;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        font-weight: bold;
-                    ">💾 保存</button>
-                    <button onclick="chatManager.testDeepSeekApi()" style="
-                        flex: 1;
-                        padding: 8px;
                         background: #22C55E;
                         color: white;
-                        border: none;
+                        font-weight: normal;
+                    ">已启用</span>
+                </h3>
+                <div style="
+                    padding: 10px;
+                    background: rgba(255, 255, 255, 0.7);
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: #666;
+                    line-height: 1.6;
+                    margin-bottom: 8px;
+                ">
+                    ✅ 聊天功能已启用，无需配置API Key<br>
+                    💡 使用服务器AI服务，安全便捷<br>
+                    🎮 直接和小突聊天即可使用AI功能
+                </div>
+                <!-- 隐藏的API Key输入（保留用于高级用户，默认隐藏） -->
+                <div style="display: none;">
+                    <input id="deepseek-api-key-input" type="password" placeholder="输入DeepSeek API Key (sk-...)" style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 2px solid #ffd699;
                         border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        font-weight: bold;
-                    ">🧪 测试</button>
+                        font-size: 13px;
+                        margin-bottom: 8px;
+                        font-family: monospace;
+                        box-sizing: border-box;
+                    ">
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="chatManager.saveDeepSeekApiKey()" style="
+                            flex: 1;
+                            padding: 8px;
+                            background: #4FC3F7;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            font-weight: bold;
+                        ">💾 保存</button>
+                        <button onclick="chatManager.testDeepSeekApi()" style="
+                            flex: 1;
+                            padding: 8px;
+                            background: #22C55E;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            font-weight: bold;
+                        ">🧪 测试</button>
+                    </div>
                 </div>
                 <p style="font-size: 11px; color: #666; margin-top: 8px; line-height: 1.4;">
-                    💡 配置后，机器人"小突"将使用DeepSeek AI进行智能回复<br>
-                    🔗 获取API Key: <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color: #4FC3F7;">platform.deepseek.com</a>
+                    💡 AI服务由服务器提供，API Key安全保存在后端<br>
+                    🔒 您的隐私和数据安全受到保护
                 </p>
             </div>
             
