@@ -5490,16 +5490,16 @@
 
             // 初始化机器人聊天窗口
             initBotChat() {
-                // 默认隐藏机器人聊天窗口，点击时才打开
+                // 默认隐藏机器人聊天窗口，显示头像按钮
                 const botChatContainer = document.getElementById('bot-chat-container');
                 const botAvatarButton = document.getElementById('bot-avatar-button');
                 if (botChatContainer) {
-                    // 默认隐藏，不自动显示
+                    // 默认隐藏聊天窗口，不自动显示
                     botChatContainer.style.display = 'none';
-                    // 显示头像按钮，让用户可以点击打开
-                    if (botAvatarButton) {
-                        botAvatarButton.style.display = 'block';
-                    }
+                }
+                // 确保头像按钮显示（让用户可以点击打开机器人聊天）
+                if (botAvatarButton) {
+                    botAvatarButton.style.display = 'block';
                 }
             },
 
@@ -5836,7 +5836,7 @@
         height: 160px;
         z-index: 9996;
         cursor: pointer;
-        display: none;
+        display: block;
         transition: transform 0.3s ease, filter 0.3s ease;
         border: none !important;
         padding: 0 !important;
@@ -6565,6 +6565,7 @@
             box-shadow: none !important;
             line-height: 0 !important;
             opacity: 1 !important;
+            display: block !important; /* 确保默认显示 */
         }
         
         #bot-avatar-button img {
