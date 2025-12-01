@@ -3587,12 +3587,22 @@
                     // 获取fallback emoji（如果是机器人，使用🤖，否则使用👤）
                     const fallbackEmoji = avatar.includes('xiaotu') || avatar.includes('totofun_bot') ? '🤖' : '👤';
                     
+                    // 检测是否是机器人头像（需要透明背景）
+                    const isBotAvatar = avatar.includes('xiaotu') || avatar.includes('totofun_bot');
+                    
+                    // 机器人头像放大一倍
+                    const actualSize = isBotAvatar ? size * 2 : size;
+                    
+                    // 机器人头像使用透明背景和contain模式，普通头像使用灰色背景和cover模式
+                    const containerBg = isBotAvatar ? 'transparent' : '#f0f0f0';
+                    const objectFit = isBotAvatar ? 'contain' : 'cover';
+                    
                     // 使用onerror处理图片加载失败的情况，自动fallback到emoji
-                    return `<div style="position: relative; width: ${size}px; height: ${size}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f0f0f0;">
-                        <img src="${imagePath}" alt="头像" style="width: 100%; height: 100%; object-fit: cover; display: block;" 
+                    return `<div style="position: relative; width: ${actualSize}px; height: ${actualSize}px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: ${containerBg};">
+                        <img src="${imagePath}" alt="头像" style="width: 100%; height: 100%; object-fit: ${objectFit}; display: block; background: transparent;" 
                              onerror="console.error('❌ 图片加载失败:', '${imagePath}'); this.style.display='none'; const fallback = this.parentElement.querySelector('.avatar-fallback'); if(fallback) fallback.style.display='flex';" 
                              onload="console.log('✅ 图片加载成功:', '${imagePath}'); const fallback = this.parentElement.querySelector('.avatar-fallback'); if(fallback) fallback.style.display='none';">
-                        <span class="avatar-fallback" style="font-size: ${size * 0.7}px; display: flex; text-align: center; line-height: ${size}px; width: ${size}px; height: ${size}px; align-items: center; justify-content: center;">${fallbackEmoji}</span>
+                        <span class="avatar-fallback" style="font-size: ${actualSize * 0.7}px; display: flex; text-align: center; line-height: ${actualSize}px; width: ${actualSize}px; height: ${actualSize}px; align-items: center; justify-content: center;">${fallbackEmoji}</span>
                     </div>`;
                 }
                 
@@ -5384,8 +5394,8 @@
                     botMessagesContainer.innerHTML = `
                         <div style="text-align: center; color: #999; padding: 20px;">
                             <div style="
-                                width: 64px;
-                                height: 64px;
+                                width: 128px;
+                                height: 128px;
                                 margin: 0 auto 10px;
                                 background-image: url('assets/images/xiaotu-bot.png');
                                 background-size: contain;
@@ -5416,8 +5426,8 @@
                     if (!isMe) {
                         messageDiv.innerHTML += `
                             <div style="
-                                width: 32px;
-                                height: 32px;
+                                width: 64px;
+                                height: 64px;
                                 background-image: url('assets/images/xiaotu-bot.png');
                                 background-size: contain;
                                 background-repeat: no-repeat;
@@ -5662,8 +5672,8 @@
         position: fixed;
         bottom: 30px;
         left: 30px;
-        width: 80px;
-        height: 80px;
+        width: 160px;
+        height: 160px;
         z-index: 9996;
         cursor: pointer;
         display: none;
@@ -5718,8 +5728,8 @@
         ">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div style="
-                    width: 32px;
-                    height: 32px;
+                    width: 64px;
+                    height: 64px;
                     background-image: url('assets/images/xiaotu-bot.png');
                     background-size: contain;
                     background-repeat: no-repeat;
@@ -6528,16 +6538,20 @@
         @media (max-width: 768px) {
             /* 小突头像按钮移动端适配 */
             #bot-avatar-button {
-                width: 70px !important;
-                height: 70px !important;
+                width: 140px !important;
+                height: 140px !important;
                 bottom: 20px !important;
                 left: 20px !important;
                 background-color: transparent !important;
-                background-image: url('assets/images/xiaotu-bot.png') !important;
-                background-size: 70px auto !important;
-                background-repeat: no-repeat !important;
-                background-position: center !important;
                 border: none !important;
+            }
+            
+            /* 确保移动端图片正确显示 */
+            #bot-avatar-button img {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: contain !important;
+                background: transparent !important;
             }
 
             /* 机器人聊天窗口移动端适配 */
