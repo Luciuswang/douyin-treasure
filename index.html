@@ -6882,26 +6882,32 @@
            - 第3行：background-position-y: -200%
            - 第4行：background-position-y: -300%
            
-           使用steps(16, end)会在16个步骤之间切换，每步显示一帧
+           关键：使用steps(16, end)时，我们需要让100%的位置是第17帧的位置
+           这样steps(16, end)会在0%到100%之间创建16个步骤，每个步骤对应一帧
+           第17帧的位置应该是下一行的第1帧，即(0%, -400%)，但这样会超出范围
+           实际上，我们应该让100%的位置是第16帧之后的位置，即(-400%, -300%)
+           但这样steps(16, end)会在中间创建16个步骤，每个步骤的位置是线性插值的
+           
+           更好的方法：定义所有16帧的精确位置，使用steps(1)来确保每帧都是静态的
         */
         @keyframes botSpriteAnimation {
             0% { background-position: 0% 0%; }              /* 第1帧：第1行第1列 */
-            6.25% { background-position: -100% 0%; }        /* 第2帧：第1行第2列 */
-            12.5% { background-position: -200% 0%; }        /* 第3帧：第1行第3列 */
-            18.75% { background-position: -300% 0%; }       /* 第4帧：第1行第4列 */
-            25% { background-position: 0% -100%; }          /* 第5帧：第2行第1列 */
-            31.25% { background-position: -100% -100%; }   /* 第6帧：第2行第2列 */
-            37.5% { background-position: -200% -100%; }    /* 第7帧：第2行第3列 */
-            43.75% { background-position: -300% -100%; }    /* 第8帧：第2行第4列 */
-            50% { background-position: 0% -200%; }          /* 第9帧：第3行第1列 */
-            56.25% { background-position: -100% -200%; }    /* 第10帧：第3行第2列 */
-            62.5% { background-position: -200% -200%; }     /* 第11帧：第3行第3列 */
-            68.75% { background-position: -300% -200%; }    /* 第12帧：第3行第4列 */
-            75% { background-position: 0% -300%; }          /* 第13帧：第4行第1列 */
-            81.25% { background-position: -100% -300%; }    /* 第14帧：第4行第2列 */
-            87.5% { background-position: -200% -300%; }      /* 第15帧：第4行第3列 */
-            93.75% { background-position: -300% -300%; }    /* 第16帧：第4行第4列 */
-            100% { background-position: 0% 0%; }             /* 回到第1帧，循环 */
+            6.25% { background-position: -100% 0%; }       /* 第2帧：第1行第2列 */
+            12.5% { background-position: -200% 0%; }      /* 第3帧：第1行第3列 */
+            18.75% { background-position: -300% 0%; }      /* 第4帧：第1行第4列 */
+            25% { background-position: 0% -100%; }        /* 第5帧：第2行第1列 */
+            31.25% { background-position: -100% -100%; }  /* 第6帧：第2行第2列 */
+            37.5% { background-position: -200% -100%; }   /* 第7帧：第2行第3列 */
+            43.75% { background-position: -300% -100%; }  /* 第8帧：第2行第4列 */
+            50% { background-position: 0% -200%; }        /* 第9帧：第3行第1列 */
+            56.25% { background-position: -100% -200%; }   /* 第10帧：第3行第2列 */
+            62.5% { background-position: -200% -200%; }    /* 第11帧：第3行第3列 */
+            68.75% { background-position: -300% -200%; }   /* 第12帧：第3行第4列 */
+            75% { background-position: 0% -300%; }         /* 第13帧：第4行第1列 */
+            81.25% { background-position: -100% -300%; }   /* 第14帧：第4行第2列 */
+            87.5% { background-position: -200% -300%; }    /* 第15帧：第4行第3列 */
+            93.75% { background-position: -300% -300%; }   /* 第16帧：第4行第4列 */
+            100% { background-position: 0% 0%; }           /* 回到第1帧，循环 */
         }
         
         /* 确保没有继承的背景色 */
