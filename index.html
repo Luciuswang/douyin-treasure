@@ -6870,27 +6870,31 @@
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
-           4列：0%, -25%, -50%, -75%
-           4行：0%, -25%, -50%, -75%
+           当background-size为400%时，每帧的偏移计算：
+           - 第1列：0% (显示图片的0-25%)
+           - 第2列：-33.333% (显示图片的25-50%，需要向左移动1/3)
+           - 第3列：-66.666% (显示图片的50-75%，需要向左移动2/3)
+           - 第4列：-100% (显示图片的75-100%，需要向左移动3/3)
+           行同理
         */
         @keyframes botSpriteAnimation {
-            0% { background-position: 0% 0%; }           /* 第1帧：第1行第1列 */
-            6.25% { background-position: -25% 0%; }     /* 第2帧：第1行第2列 */
-            12.5% { background-position: -50% 0%; }     /* 第3帧：第1行第3列 */
-            18.75% { background-position: -75% 0%; }    /* 第4帧：第1行第4列 */
-            25% { background-position: 0% -25%; }       /* 第5帧：第2行第1列 */
-            31.25% { background-position: -25% -25%; }  /* 第6帧：第2行第2列 */
-            37.5% { background-position: -50% -25%; }   /* 第7帧：第2行第3列 */
-            43.75% { background-position: -75% -25%; }  /* 第8帧：第2行第4列 */
-            50% { background-position: 0% -50%; }       /* 第9帧：第3行第1列 */
-            56.25% { background-position: -25% -50%; } /* 第10帧：第3行第2列 */
-            62.5% { background-position: -50% -50%; }  /* 第11帧：第3行第3列 */
-            68.75% { background-position: -75% -50%; }  /* 第12帧：第3行第4列 */
-            75% { background-position: 0% -75%; }      /* 第13帧：第4行第1列 */
-            81.25% { background-position: -25% -75%; } /* 第14帧：第4行第2列 */
-            87.5% { background-position: -50% -75%; }   /* 第15帧：第4行第3列 */
-            93.75% { background-position: -75% -75%; }  /* 第16帧：第4行第4列 */
-            100% { background-position: 0% 0%; }       /* 回到第1帧，循环 */
+            0% { background-position: 0% 0%; }              /* 第1帧：第1行第1列 */
+            6.25% { background-position: -33.333% 0%; }     /* 第2帧：第1行第2列 */
+            12.5% { background-position: -66.666% 0%; }     /* 第3帧：第1行第3列 */
+            18.75% { background-position: -100% 0%; }       /* 第4帧：第1行第4列 */
+            25% { background-position: 0% -33.333%; }      /* 第5帧：第2行第1列 */
+            31.25% { background-position: -33.333% -33.333%; } /* 第6帧：第2行第2列 */
+            37.5% { background-position: -66.666% -33.333%; }  /* 第7帧：第2行第3列 */
+            43.75% { background-position: -100% -33.333%; }    /* 第8帧：第2行第4列 */
+            50% { background-position: 0% -66.666%; }      /* 第9帧：第3行第1列 */
+            56.25% { background-position: -33.333% -66.666%; } /* 第10帧：第3行第2列 */
+            62.5% { background-position: -66.666% -66.666%; }  /* 第11帧：第3行第3列 */
+            68.75% { background-position: -100% -66.666%; }    /* 第12帧：第3行第4列 */
+            75% { background-position: 0% -100%; }         /* 第13帧：第4行第1列 */
+            81.25% { background-position: -33.333% -100%; }    /* 第14帧：第4行第2列 */
+            87.5% { background-position: -66.666% -100%; }     /* 第15帧：第4行第3列 */
+            93.75% { background-position: -100% -100%; }       /* 第16帧：第4行第4列 */
+            100% { background-position: 0% 0%; }            /* 回到第1帧，循环 */
         }
         
         /* 确保没有继承的背景色 */
