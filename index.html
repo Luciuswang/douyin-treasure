@@ -6859,7 +6859,7 @@
             background-repeat: no-repeat;
             background-size: 400% 400%; /* 4x4网格：宽度400%（每列占1/4），高度400%（每行占1/4） */
             background-position: 0% 0%;
-            animation: botSpriteAnimation 1.6s steps(15) infinite;
+            animation: botSpriteAnimation 1.6s steps(16, end) infinite;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             display: block !important;
@@ -6870,12 +6870,16 @@
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
-           当background-size为400% x 400%时，background-position的计算：
-           - 背景图片宽度 = 容器宽度 × 4，高度 = 容器高度 × 4
-           - 要显示第2列，需要向左移动容器宽度的1倍 = 移动(背景-容器)的33.333% = -33.333%
-           - 要显示第3列，需要向左移动容器宽度的2倍 = 移动(背景-容器)的66.666% = -66.666%
-           - 要显示第4列，需要向左移动容器宽度的3倍 = 移动(背景-容器)的100% = -100%
-           - 行同理
+           当background-size为400%时，每帧的偏移计算：
+           - 4列：每列占图片宽度的25%，移动距离 = 列索引 × 100% / (4-1) = 列索引 × 33.333%
+           - 4行：每行占图片高度的25%，移动距离 = 行索引 × 100% / (4-1) = 行索引 × 33.333%
+           但更简单的方式是直接使用像素值或calc，或者使用正确的百分比计算
+           
+           实际上，当background-size为400%时：
+           - 第1列：0%
+           - 第2列：需要移动容器宽度的1倍，相对于(400%-100%)=300%的范围，移动1/3 = -33.333%
+           - 第3列：移动2倍，-66.666%
+           - 第4列：移动3倍，-100%
         */
         @keyframes botSpriteAnimation {
             0% { background-position: 0% 0%; }              /* 第1帧：第1行第1列 */
