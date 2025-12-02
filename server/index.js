@@ -82,6 +82,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/treasures', authenticateToken, treasureRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
+app.use('/api/ai', require('./routes/ai')); // AI代理路由（不需要认证，但有限流保护）
 
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
