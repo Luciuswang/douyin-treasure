@@ -6859,7 +6859,7 @@
             background-repeat: no-repeat;
             background-size: 400% 400%; /* 4x4网格：整个sprite图是容器尺寸的4倍，每帧占容器尺寸的100% */
             background-position: 0% 0%; /* 显示左上角第一帧 */
-            animation: botSpriteAnimation 1.6s steps(16) infinite;
+            animation: botSpriteAnimation 1.6s steps(16, end) infinite;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             display: block !important;
@@ -6916,23 +6916,26 @@
            然后使用steps(1)来确保每帧都是静态的
         */
         @keyframes botSpriteAnimation {
-            0% { background-position: 0% 0%; }              /* 第1帧：第1行第1列 */
-            6.25% { background-position: -100% 0%; }      /* 第2帧：第1行第2列 */
-            12.5% { background-position: -200% 0%; }      /* 第3帧：第1行第3列 */
-            18.75% { background-position: -300% 0%; }      /* 第4帧：第1行第4列 */
-            25% { background-position: 0% -100%; }         /* 第5帧：第2行第1列 */
-            31.25% { background-position: -100% -100%; }   /* 第6帧：第2行第2列 */
-            37.5% { background-position: -200% -100%; }   /* 第7帧：第2行第3列 */
-            43.75% { background-position: -300% -100%; }  /* 第8帧：第2行第4列 */
-            50% { background-position: 0% -200%; }         /* 第9帧：第3行第1列 */
-            56.25% { background-position: -100% -200%; }   /* 第10帧：第3行第2列 */
-            62.5% { background-position: -200% -200%; }   /* 第11帧：第3行第3列 */
-            68.75% { background-position: -300% -200%; }   /* 第12帧：第3行第4列 */
-            75% { background-position: 0% -300%; }          /* 第13帧：第4行第1列 */
-            81.25% { background-position: -100% -300%; }  /* 第14帧：第4行第2列 */
-            87.5% { background-position: -200% -300%; }   /* 第15帧：第4行第3列 */
-            93.75% { background-position: -300% -300%; }   /* 第16帧：第4行第4列 */
-            100% { background-position: 0% 0%; }            /* 回到第1帧，循环 */
+            0% { 
+                background-position: 0% 0%; /* 第1帧：第1行第1列 */
+            }
+            100% { 
+                /* 第17帧的位置（即第1帧位置，用于循环）
+                   对于4x4的sprite，16帧的排列是：
+                   - 第1帧：(0%, 0%)
+                   - 第2帧：(-100%, 0%)
+                   - 第3帧：(-200%, 0%)
+                   - 第4帧：(-300%, 0%)
+                   - 第5帧：(0%, -100%)
+                   - ...
+                   - 第16帧：(-300%, -300%)
+                   
+                   第17帧应该是下一行的第1帧，即(0%, -400%)
+                   使用steps(16, end)会在0%到100%之间创建16个步骤
+                   每个步骤对应一帧，从第1帧到第16帧
+                */
+                background-position: 0% -400%; /* 第17帧的位置（下一行的第1帧） */
+            }
         }
         
         /* 确保没有继承的背景色 */
