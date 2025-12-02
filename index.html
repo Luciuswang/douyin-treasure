@@ -5646,6 +5646,31 @@
                 if (botAvatarButton) {
                     botAvatarButton.style.display = 'block';
                 }
+                
+                // 检测sprite图片是否加载成功
+                this.checkBotSpriteImage();
+            },
+            
+            // 检测机器人sprite图片是否加载成功
+            checkBotSpriteImage() {
+                const spriteImage = new Image();
+                spriteImage.onload = () => {
+                    console.log('✅ 机器人sprite图片加载成功');
+                };
+                spriteImage.onerror = () => {
+                    console.warn('⚠️ 机器人sprite图片加载失败，使用fallback');
+                    // 如果sprite图片加载失败，将所有bot-sprite-animation改为使用静态图片
+                    const spriteElements = document.querySelectorAll('.bot-sprite-animation');
+                    spriteElements.forEach(el => {
+                        el.classList.remove('bot-sprite-animation');
+                        el.style.backgroundImage = "url('assets/images/xiaotu-bot.png')";
+                        el.style.backgroundSize = 'contain';
+                        el.style.backgroundPosition = 'center';
+                        el.style.backgroundRepeat = 'no-repeat';
+                        el.style.animation = 'none';
+                    });
+                };
+                spriteImage.src = 'assets/images/xiaotu-bot01.png';
             },
 
             // 打开机器人聊天窗口
@@ -6055,7 +6080,8 @@
             width: 100%;
             height: 100%;
             filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
-        "></div>
+        " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
+        </div>
     </div>
 
     <!-- 机器人聊天窗口（左下角） -->
@@ -6836,6 +6862,33 @@
             animation: botSpriteAnimation 1.6s steps(15) infinite;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
+            /* 如果图片加载失败，显示fallback */
+            position: relative;
+        }
+        
+        /* 图片加载失败时的fallback */
+        .bot-sprite-animation::after {
+            content: '🤖';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            display: none; /* 默认隐藏，只有图片加载失败时显示 */
+            z-index: -1;
+        }
+        
+        /* 如果背景图片加载失败，显示fallback */
+        .bot-sprite-animation:not([style*="background-image"])::after,
+        .bot-sprite-animation[data-error="true"]::after {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);
+            border-radius: 50%;
+            color: white;
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
@@ -7057,12 +7110,12 @@
                 border: none !important;
             }
             
-            /* 确保移动端图片正确显示 */
-            #bot-avatar-button img {
+            /* 确保移动端sprite动画正确显示 */
+            #bot-avatar-button .bot-sprite-animation {
                 width: 100% !important;
                 height: 100% !important;
-                object-fit: contain !important;
-                background: transparent !important;
+                background-size: 400% 400% !important;
+                background-repeat: no-repeat !important;
             }
 
             /* 机器人聊天窗口移动端适配 */
