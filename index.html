@@ -5656,6 +5656,8 @@
                 const spriteImage = new Image();
                 spriteImage.onload = () => {
                     console.log('✅ 机器人sprite图片加载成功');
+                    // 启动sprite动画
+                    this.startBotSpriteAnimation();
                 };
                 spriteImage.onerror = () => {
                     console.warn('⚠️ 机器人sprite图片加载失败，使用fallback');
@@ -5671,6 +5673,58 @@
                     });
                 };
                 spriteImage.src = 'assets/images/xiaotu-bot01.png';
+            },
+            
+            // 启动机器人sprite动画（使用JavaScript控制）
+            startBotSpriteAnimation() {
+                const spriteElements = document.querySelectorAll('.bot-sprite-animation');
+                if (spriteElements.length === 0) return;
+                
+                // 4x4 sprite的16帧位置
+                const frames = [
+                    { x: 0, y: 0 },      // 第1帧：第1行第1列
+                    { x: 1, y: 0 },      // 第2帧：第1行第2列
+                    { x: 2, y: 0 },      // 第3帧：第1行第3列
+                    { x: 3, y: 0 },      // 第4帧：第1行第4列
+                    { x: 0, y: 1 },      // 第5帧：第2行第1列
+                    { x: 1, y: 1 },      // 第6帧：第2行第2列
+                    { x: 2, y: 1 },      // 第7帧：第2行第3列
+                    { x: 3, y: 1 },      // 第8帧：第2行第4列
+                    { x: 0, y: 2 },      // 第9帧：第3行第1列
+                    { x: 1, y: 2 },      // 第10帧：第3行第2列
+                    { x: 2, y: 2 },      // 第11帧：第3行第3列
+                    { x: 3, y: 2 },      // 第12帧：第3行第4列
+                    { x: 0, y: 3 },      // 第13帧：第4行第1列
+                    { x: 1, y: 3 },      // 第14帧：第4行第2列
+                    { x: 2, y: 3 },      // 第15帧：第4行第3列
+                    { x: 3, y: 3 }       // 第16帧：第4行第4列
+                ];
+                
+                let currentFrame = 0;
+                const frameDuration = 100; // 每帧100ms，总共1.6s
+                
+                // 更新每一帧的函数
+                const updateFrame = () => {
+                    const frame = frames[currentFrame];
+                    // 计算background-position：每帧移动-100%（相对于容器尺寸）
+                    const x = frame.x * -100;
+                    const y = frame.y * -100;
+                    
+                    spriteElements.forEach(el => {
+                        el.style.backgroundPosition = `${x}% ${y}%`;
+                    });
+                    
+                    currentFrame = (currentFrame + 1) % frames.length;
+                };
+                
+                // 立即显示第一帧
+                updateFrame();
+                
+                // 启动动画循环
+                const animationInterval = setInterval(updateFrame, frameDuration);
+                
+                // 保存interval ID以便后续清理
+                this.botSpriteAnimationInterval = animationInterval;
             },
 
             // 打开机器人聊天窗口
@@ -6859,7 +6913,7 @@
             background-repeat: no-repeat;
             background-size: 400% 400%; /* 4x4网格：整个sprite图是容器尺寸的4倍，每帧占容器尺寸的100% */
             background-position: 0% 0%; /* 显示左上角第一帧 */
-            animation: botSpriteAnimation 1.6s steps(16, end) infinite;
+            /* animation: botSpriteAnimation 1.6s steps(16, end) infinite; */ /* 使用JavaScript控制动画 */
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             display: block !important;
