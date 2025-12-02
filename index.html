@@ -6855,40 +6855,18 @@
         
         /* 机器人sprite动画样式 - 4x4网格，16帧动画 */
         .bot-sprite-animation {
-            background-image: url('assets/images/xiaotu-bot01.png');
+            background-image: url('./assets/images/xiaotu-bot01.png');
             background-repeat: no-repeat;
             background-size: 400% 400%; /* 4x4网格，每帧占25% */
             background-position: 0% 0%;
             animation: botSpriteAnimation 1.6s steps(15) infinite;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
-            /* 如果图片加载失败，显示fallback */
-            position: relative;
-        }
-        
-        /* 图片加载失败时的fallback */
-        .bot-sprite-animation::after {
-            content: '🤖';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 48px;
-            display: none; /* 默认隐藏，只有图片加载失败时显示 */
-            z-index: -1;
-        }
-        
-        /* 如果背景图片加载失败，显示fallback */
-        .bot-sprite-animation:not([style*="background-image"])::after,
-        .bot-sprite-animation[data-error="true"]::after {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: block !important;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);
-            border-radius: 50%;
-            color: white;
+            min-width: 32px;
+            min-height: 32px;
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
