@@ -5677,54 +5677,71 @@
             
             // 启动机器人sprite动画（使用JavaScript控制）
             startBotSpriteAnimation() {
-                const spriteElements = document.querySelectorAll('.bot-sprite-animation');
-                if (spriteElements.length === 0) return;
-                
-                // 4x4 sprite的16帧位置
-                const frames = [
-                    { x: 0, y: 0 },      // 第1帧：第1行第1列
-                    { x: 1, y: 0 },      // 第2帧：第1行第2列
-                    { x: 2, y: 0 },      // 第3帧：第1行第3列
-                    { x: 3, y: 0 },      // 第4帧：第1行第4列
-                    { x: 0, y: 1 },      // 第5帧：第2行第1列
-                    { x: 1, y: 1 },      // 第6帧：第2行第2列
-                    { x: 2, y: 1 },      // 第7帧：第2行第3列
-                    { x: 3, y: 1 },      // 第8帧：第2行第4列
-                    { x: 0, y: 2 },      // 第9帧：第3行第1列
-                    { x: 1, y: 2 },      // 第10帧：第3行第2列
-                    { x: 2, y: 2 },      // 第11帧：第3行第3列
-                    { x: 3, y: 2 },      // 第12帧：第3行第4列
-                    { x: 0, y: 3 },      // 第13帧：第4行第1列
-                    { x: 1, y: 3 },      // 第14帧：第4行第2列
-                    { x: 2, y: 3 },      // 第15帧：第4行第3列
-                    { x: 3, y: 3 }       // 第16帧：第4行第4列
-                ];
-                
-                let currentFrame = 0;
-                const frameDuration = 100; // 每帧100ms，总共1.6s
-                
-                // 更新每一帧的函数
-                const updateFrame = () => {
-                    const frame = frames[currentFrame];
-                    // 计算background-position：每帧移动-100%（相对于容器尺寸）
-                    const x = frame.x * -100;
-                    const y = frame.y * -100;
+                // 延迟启动，确保DOM元素已经创建
+                setTimeout(() => {
+                    const spriteElements = document.querySelectorAll('.bot-sprite-animation');
+                    console.log('🎬 启动sprite动画，找到元素数量:', spriteElements.length);
                     
-                    spriteElements.forEach(el => {
-                        el.style.backgroundPosition = `${x}% ${y}%`;
-                    });
+                    if (spriteElements.length === 0) {
+                        console.warn('⚠️ 未找到.bot-sprite-animation元素，延迟重试...');
+                        // 如果没找到，再延迟重试一次
+                        setTimeout(() => this.startBotSpriteAnimation(), 500);
+                        return;
+                    }
                     
-                    currentFrame = (currentFrame + 1) % frames.length;
-                };
-                
-                // 立即显示第一帧
-                updateFrame();
-                
-                // 启动动画循环
-                const animationInterval = setInterval(updateFrame, frameDuration);
-                
-                // 保存interval ID以便后续清理
-                this.botSpriteAnimationInterval = animationInterval;
+                    // 如果已经有动画在运行，先清除
+                    if (this.botSpriteAnimationInterval) {
+                        clearInterval(this.botSpriteAnimationInterval);
+                    }
+                    
+                    // 4x4 sprite的16帧位置
+                    const frames = [
+                        { x: 0, y: 0 },      // 第1帧：第1行第1列
+                        { x: 1, y: 0 },      // 第2帧：第1行第2列
+                        { x: 2, y: 0 },      // 第3帧：第1行第3列
+                        { x: 3, y: 0 },      // 第4帧：第1行第4列
+                        { x: 0, y: 1 },      // 第5帧：第2行第1列
+                        { x: 1, y: 1 },      // 第6帧：第2行第2列
+                        { x: 2, y: 1 },      // 第7帧：第2行第3列
+                        { x: 3, y: 1 },      // 第8帧：第2行第4列
+                        { x: 0, y: 2 },      // 第9帧：第3行第1列
+                        { x: 1, y: 2 },      // 第10帧：第3行第2列
+                        { x: 2, y: 2 },      // 第11帧：第3行第3列
+                        { x: 3, y: 2 },      // 第12帧：第3行第4列
+                        { x: 0, y: 3 },      // 第13帧：第4行第1列
+                        { x: 1, y: 3 },      // 第14帧：第4行第2列
+                        { x: 2, y: 3 },      // 第15帧：第4行第3列
+                        { x: 3, y: 3 }       // 第16帧：第4行第4列
+                    ];
+                    
+                    let currentFrame = 0;
+                    const frameDuration = 100; // 每帧100ms，总共1.6s
+                    
+                    // 更新每一帧的函数
+                    const updateFrame = () => {
+                        const frame = frames[currentFrame];
+                        // 计算background-position：每帧移动-100%（相对于容器尺寸）
+                        const x = frame.x * -100;
+                        const y = frame.y * -100;
+                        
+                        spriteElements.forEach(el => {
+                            el.style.backgroundPosition = `${x}% ${y}%`;
+                            console.log(`🎬 更新帧 ${currentFrame + 1}/16: background-position = ${x}% ${y}%`);
+                        });
+                        
+                        currentFrame = (currentFrame + 1) % frames.length;
+                    };
+                    
+                    // 立即显示第一帧
+                    updateFrame();
+                    
+                    // 启动动画循环
+                    const animationInterval = setInterval(updateFrame, frameDuration);
+                    
+                    // 保存interval ID以便后续清理
+                    this.botSpriteAnimationInterval = animationInterval;
+                    console.log('✅ Sprite动画已启动');
+                }, 100);
             },
 
             // 打开机器人聊天窗口
@@ -6063,6 +6080,13 @@
         // 初始化聊天系统
         chatManager.init();
         chatManager.checkUrlParams();
+        
+        // 延迟启动sprite动画，确保DOM元素已创建
+        setTimeout(() => {
+            if (chatManager.startBotSpriteAnimation) {
+                chatManager.startBotSpriteAnimation();
+            }
+        }, 500);
         
         // 移动端：添加触摸事件监听器确保按钮可点击
         if (window.innerWidth <= 768) {
