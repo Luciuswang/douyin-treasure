@@ -6857,7 +6857,7 @@
         .bot-sprite-animation {
             background-image: url('./assets/images/xiaotu-bot01.png');
             background-repeat: no-repeat;
-            background-size: 300% 400%; /* 3列4行：宽度300%（每列33.333%），高度400%（每行25%） */
+            background-size: 300% 400%; /* 3列4行：宽度300%（每列占1/3），高度400%（每行占1/4） */
             background-position: 0% 0%;
             animation: botSpriteAnimation 1.2s steps(11) infinite;
             image-rendering: -webkit-optimize-contrast;
@@ -6871,22 +6871,22 @@
         
         /* 3列4行 sprite动画关键帧 - 从左到右，从上到下播放12帧
            当background-size为300% x 400%时：
-           - 列偏移：第1列0%，第2列-50%，第3列-100%（每列占33.333%）
-           - 行偏移：第1行0%，第2行-33.333%，第3行-66.666%，第4行-100%（每行占25%）
+           - 3列等分：第1列0%，第2列-33.333%，第3列-66.666%（每列移动1/3）
+           - 4行等分：第1行0%，第2行-25%，第3行-50%，第4行-75%（每行移动1/4）
         */
         @keyframes botSpriteAnimation {
             0% { background-position: 0% 0%; }              /* 第1帧：第1行第1列 */
-            8.33% { background-position: -50% 0%; }        /* 第2帧：第1行第2列 */
-            16.66% { background-position: -100% 0%; }      /* 第3帧：第1行第3列 */
-            25% { background-position: 0% -33.333%; }      /* 第4帧：第2行第1列 */
-            33.33% { background-position: -50% -33.333%; } /* 第5帧：第2行第2列 */
-            41.66% { background-position: -100% -33.333%; } /* 第6帧：第2行第3列 */
-            50% { background-position: 0% -66.666%; }      /* 第7帧：第3行第1列 */
-            58.33% { background-position: -50% -66.666%; } /* 第8帧：第3行第2列 */
-            66.66% { background-position: -100% -66.666%; } /* 第9帧：第3行第3列 */
-            75% { background-position: 0% -100%; }         /* 第10帧：第4行第1列 */
-            83.33% { background-position: -50% -100%; }     /* 第11帧：第4行第2列 */
-            91.66% { background-position: -100% -100%; }   /* 第12帧：第4行第3列 */
+            8.33% { background-position: -33.333% 0%; }    /* 第2帧：第1行第2列 */
+            16.66% { background-position: -66.666% 0%; }  /* 第3帧：第1行第3列 */
+            25% { background-position: 0% -25%; }           /* 第4帧：第2行第1列 */
+            33.33% { background-position: -33.333% -25%; } /* 第5帧：第2行第2列 */
+            41.66% { background-position: -66.666% -25%; } /* 第6帧：第2行第3列 */
+            50% { background-position: 0% -50%; }           /* 第7帧：第3行第1列 */
+            58.33% { background-position: -33.333% -50%; } /* 第8帧：第3行第2列 */
+            66.66% { background-position: -66.666% -50%; }  /* 第9帧：第3行第3列 */
+            75% { background-position: 0% -75%; }          /* 第10帧：第4行第1列 */
+            83.33% { background-position: -33.333% -75%; }  /* 第11帧：第4行第2列 */
+            91.66% { background-position: -66.666% -75%; }  /* 第12帧：第4行第3列 */
             100% { background-position: 0% 0%; }           /* 回到第1帧，循环 */
         }
         
