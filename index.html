@@ -5550,14 +5550,10 @@
                 if (messages.length === 0) {
                     botMessagesContainer.innerHTML = `
                         <div style="text-align: center; color: #999; padding: 20px;">
-                            <div style="
+                            <div class="bot-sprite-animation" style="
                                 width: 128px;
                                 height: 128px;
                                 margin: 0 auto 10px;
-                                background-image: url('assets/images/xiaotu-bot.png');
-                                background-size: contain;
-                                background-repeat: no-repeat;
-                                background-position: center;
                                 background-color: rgba(0, 0, 0, 0) !important;
                                 border: none !important;
                                 padding: 0 !important;
@@ -5582,13 +5578,9 @@
 
                     if (!isMe) {
                         messageDiv.innerHTML += `
-                            <div style="
+                            <div class="bot-sprite-animation" style="
                                 width: 64px;
                                 height: 64px;
-                                background-image: url('assets/images/xiaotu-bot.png');
-                                background-size: contain;
-                                background-repeat: no-repeat;
-                                background-position: center;
                                 background-color: transparent !important;
                                 border: none !important;
                                 padding: 0 !important;
@@ -5842,20 +5834,11 @@
         background-color: rgba(0, 0, 0, 0) !important;
         line-height: 0 !important;
     " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
-        <img src="assets/images/xiaotu-bot.png" alt="小突" style="
+        <div class="bot-sprite-animation" style="
             width: 100%;
             height: 100%;
-            object-fit: contain;
-            display: block;
-            border: none !important;
-            outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background: none !important;
-            background-color: rgba(0, 0, 0, 0) !important;
             filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
-            vertical-align: top !important;
-        " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
+        "></div>
     </div>
 
     <!-- 机器人聊天窗口（左下角） -->
@@ -5884,18 +5867,15 @@
             font-weight: bold;
         ">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="
+                <div class="bot-sprite-animation" style="
                     width: 64px;
                     height: 64px;
-                    background-image: url('assets/images/xiaotu-bot.png');
-                    background-size: contain;
-                    background-repeat: no-repeat;
-                    background-position: center;
                     background-color: rgba(0, 0, 0, 0) !important;
                     border: none !important;
                     padding: 0 !important;
                     margin: 0 !important;
                     opacity: 1 !important;
+                    flex-shrink: 0;
                 "></div>
                 <div>
                     <div style="font-size: 16px;">小突 AI助手</div>
@@ -6573,6 +6553,41 @@
             padding: 0 !important;
             margin: 0 !important;
             display: block !important;
+        }
+        
+        /* 机器人sprite动画样式 - 4x4网格，16帧动画 */
+        .bot-sprite-animation {
+            background-image: url('assets/images/xiaotu-bot01.png');
+            background-repeat: no-repeat;
+            background-size: 400% 400%; /* 4x4网格，每帧占25% */
+            background-position: 0% 0%;
+            animation: botSpriteAnimation 1.6s steps(15) infinite;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        
+        /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
+           4列：0%, -25%, -50%, -75%
+           4行：0%, -25%, -50%, -75%
+        */
+        @keyframes botSpriteAnimation {
+            0% { background-position: 0% 0%; }           /* 第1帧：第1行第1列 */
+            6.25% { background-position: -25% 0%; }     /* 第2帧：第1行第2列 */
+            12.5% { background-position: -50% 0%; }     /* 第3帧：第1行第3列 */
+            18.75% { background-position: -75% 0%; }    /* 第4帧：第1行第4列 */
+            25% { background-position: 0% -25%; }       /* 第5帧：第2行第1列 */
+            31.25% { background-position: -25% -25%; }  /* 第6帧：第2行第2列 */
+            37.5% { background-position: -50% -25%; }   /* 第7帧：第2行第3列 */
+            43.75% { background-position: -75% -25%; }  /* 第8帧：第2行第4列 */
+            50% { background-position: 0% -50%; }       /* 第9帧：第3行第1列 */
+            56.25% { background-position: -25% -50%; } /* 第10帧：第3行第2列 */
+            62.5% { background-position: -50% -50%; }  /* 第11帧：第3行第3列 */
+            68.75% { background-position: -75% -50%; }  /* 第12帧：第3行第4列 */
+            75% { background-position: 0% -75%; }      /* 第13帧：第4行第1列 */
+            81.25% { background-position: -25% -75%; } /* 第14帧：第4行第2列 */
+            87.5% { background-position: -50% -75%; }   /* 第15帧：第4行第3列 */
+            93.75% { background-position: -75% -75%; }  /* 第16帧：第4行第4列 */
+            100% { background-position: 0% 0%; }       /* 回到第1帧，循环 */
         }
         
         /* 确保没有继承的背景色 */
