@@ -5717,8 +5717,26 @@
                     let currentFrame = 0;
                     const frameDuration = 200; // 每帧200ms，总共3.2s（慢一点便于调试）
                     
+                    // 检查所有元素是否都有有效尺寸
+                    const checkElementsReady = () => {
+                        let allReady = true;
+                        spriteElements.forEach(el => {
+                            const rect = el.getBoundingClientRect();
+                            if (rect.width === 0 || rect.height === 0) {
+                                allReady = false;
+                            }
+                        });
+                        return allReady;
+                    };
+                    
                     // 更新每一帧的函数
                     const updateFrame = () => {
+                        // 检查元素是否准备好
+                        if (!checkElementsReady()) {
+                            console.warn('⚠️ 元素尚未准备好，跳过此帧');
+                            return;
+                        }
+                        
                         const frame = frames[currentFrame];
                         
                         spriteElements.forEach(el => {
@@ -5726,12 +5744,6 @@
                             const rect = el.getBoundingClientRect();
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
-                            
-                            // 如果容器尺寸为0，跳过
-                            if (containerWidth === 0 || containerHeight === 0) {
-                                console.warn(`⚠️ 容器尺寸为0，跳过帧 ${currentFrame + 1}`);
-                                return;
-                            }
                             
                             // 对于background-size: 400%，背景图片是容器尺寸的4倍
                             // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
@@ -5745,28 +5757,42 @@
                             // 使用像素值，更准确
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
                             
-                            // 添加调试信息
-                            console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)})`);
+                            // 添加调试信息（只在第一个元素时输出，避免日志过多）
+                            if (spriteElements[0] === el) {
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)})`);
+                            }
                         });
                         
                         currentFrame = (currentFrame + 1) % frames.length;
                     };
                     
-                    // 立即显示第一帧
-                    updateFrame();
-                    
-                    // 启动动画循环
-                    const animationInterval = setInterval(() => {
-                        updateFrame();
-                        // 每帧后检查是否回到第一帧
-                        if (currentFrame === 0) {
-                            console.log('🔄 动画循环完成，重新开始');
+                    // 等待元素准备好后再启动动画
+                    const waitAndStart = () => {
+                        if (checkElementsReady()) {
+                            // 立即显示第一帧
+                            updateFrame();
+                            // 启动动画循环
+                            const animationInterval = setInterval(() => {
+                                updateFrame();
+                                // 每帧后检查是否回到第一帧
+                                if (currentFrame === 0) {
+                                    console.log('🔄 动画循环完成，重新开始');
+                                }
+                            }, frameDuration);
+                            
+                            // 保存interval ID以便后续清理
+                            this.botSpriteAnimationInterval = animationInterval;
+                            console.log('✅ Sprite动画已启动，帧间隔:', frameDuration + 'ms');
+                        } else {
+                            // 如果还没准备好，100ms后重试
+                            console.log('⏳ 等待元素准备就绪...');
+                            setTimeout(waitAndStart, 100);
                         }
-                    }, frameDuration);
+                    };
                     
-                    // 保存interval ID以便后续清理
-                    this.botSpriteAnimationInterval = animationInterval;
-                    console.log('✅ Sprite动画已启动，帧间隔:', frameDuration + 'ms');
+                    // 开始等待并启动
+                    waitAndStart();
+                    
                     
                     // 添加全局测试函数，可以在控制台手动调用
                     window.testSpriteFrame = (frameIndex) => {
