@@ -5752,11 +5752,23 @@
                             const xPx = frame.x * containerWidth * -1;
                             const yPx = frame.y * containerHeight * -1;
                             
-                            // 确保没有transition效果，让切换瞬间完成（使用!important确保覆盖所有CSS）
+                            // 彻底禁用所有transition效果（针对不同浏览器内核）
+                            // 某些移动浏览器（如Chrome/WebView）对transition处理不同，需要更彻底的禁用
                             el.style.setProperty('transition', 'none', 'important');
                             el.style.setProperty('-webkit-transition', 'none', 'important');
                             el.style.setProperty('-moz-transition', 'none', 'important');
                             el.style.setProperty('-o-transition', 'none', 'important');
+                            el.style.setProperty('transition-property', 'none', 'important');
+                            el.style.setProperty('-webkit-transition-property', 'none', 'important');
+                            el.style.setProperty('-moz-transition-property', 'none', 'important');
+                            el.style.setProperty('-o-transition-property', 'none', 'important');
+                            el.style.setProperty('transition-duration', '0s', 'important');
+                            el.style.setProperty('-webkit-transition-duration', '0s', 'important');
+                            el.style.setProperty('-moz-transition-duration', '0s', 'important');
+                            el.style.setProperty('-o-transition-duration', '0s', 'important');
+                            // 禁用will-change，防止浏览器使用硬件加速的transition
+                            el.style.setProperty('will-change', 'auto', 'important');
+                            
                             el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
                             
@@ -7095,11 +7107,20 @@
             min-height: 32px;
             object-fit: contain;
             aspect-ratio: 1 / 1; /* 保持正方形，防止变形 */
-            /* 确保没有transition效果，让逐帧切换瞬间完成 */
+            /* 彻底禁用所有transition效果，确保在所有浏览器中都能瞬间切换 */
             transition: none !important;
             -webkit-transition: none !important;
             -moz-transition: none !important;
             -o-transition: none !important;
+            transition-property: none !important;
+            -webkit-transition-property: none !important;
+            -moz-transition-property: none !important;
+            -o-transition-property: none !important;
+            transition-duration: 0s !important;
+            -webkit-transition-duration: 0s !important;
+            -moz-transition-duration: 0s !important;
+            -o-transition-duration: 0s !important;
+            will-change: auto !important; /* 禁用硬件加速的transition */
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
