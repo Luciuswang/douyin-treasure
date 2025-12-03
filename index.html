@@ -5741,14 +5741,15 @@
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
                             
-                            // 尝试两种方法：
-                            // 方法1：background-size: 400%，每帧移动一个容器宽度
-                            // 方法2：background-size: 100%，每帧移动25%
-                            // 先试试方法1，如果不行再改方法2
-                            
-                            // 方法1：background-size: 400%
-                            const xPx = frame.x * containerWidth * -1;
-                            const yPx = frame.y * containerHeight * -1;
+                            // 使用百分比方式：background-size: 400%时，每帧移动100%容器尺寸
+                            // 对于4x4 sprite：
+                            // - 第1帧：(0%, 0%)
+                            // - 第2帧：(-100%, 0%) - 向左移动一个容器宽度
+                            // - 第3帧：(-200%, 0%)
+                            // - 第4帧：(-300%, 0%)
+                            // - 第5帧：(0%, -100%) - 换行，向下移动一行
+                            const xPercent = frame.x * -100;
+                            const yPercent = frame.y * -100;
                             
                             // 确保没有transition效果，让切换瞬间完成（使用!important确保覆盖所有CSS）
                             el.style.setProperty('transition', 'none', 'important');
@@ -5756,20 +5757,14 @@
                             el.style.setProperty('-moz-transition', 'none', 'important');
                             el.style.setProperty('-o-transition', 'none', 'important');
                             el.style.backgroundSize = '400% 400%';
-                            el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
                             
                             // 强制重绘，确保样式立即生效
                             el.offsetHeight; // 触发重排
                             
-                            // 如果方法1不行，可以尝试方法2（注释掉上面的，启用下面的）：
-                            // const xPercent = frame.x * -25;
-                            // const yPercent = frame.y * -25;
-                            // el.style.backgroundSize = '100% 100%';
-                            // el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
-                            
                             // 添加调试信息（只在第一个有效元素时输出）
                             if (index === 0) {
-                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 有效元素:${validElements.length}/${spriteElements.length}`);
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${xPercent}%, ${yPercent}%) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 有效元素:${validElements.length}/${spriteElements.length}`);
                             }
                         });
                         
@@ -5831,11 +5826,11 @@
                             const containerHeight = rect.height;
                             
                             if (method === 1) {
-                                // 方法1：background-size: 400%，每帧移动一个容器宽度
-                                const xPx = frame.x * containerWidth * -1;
-                                const yPx = frame.y * containerHeight * -1;
+                                // 方法1：background-size: 400%，每帧移动100%容器尺寸（使用百分比）
+                                const xPercent = frame.x * -100;
+                                const yPercent = frame.y * -100;
                                 el.style.backgroundSize = '400% 400%';
-                                el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                                el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
                             } else {
                                 // 方法2：background-size: 100%，每帧移动25%
                                 const xPercent = frame.x * -25;
