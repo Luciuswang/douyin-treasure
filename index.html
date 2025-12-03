@@ -719,8 +719,17 @@
 
         // API配置
         const API_CONFIG = {
+            // 云服务地址配置（部署到云服务后，在这里设置你的服务器地址）
+            // 例如：'https://totofun-server.railway.app' 或 'https://totofun-server.onrender.com'
+            CLOUD_API_URL: '', // 留空则自动检测
+            
             // 自动检测API地址
             get BASE_URL() {
+                // 如果设置了云服务地址，优先使用
+                if (this.CLOUD_API_URL) {
+                    return this.CLOUD_API_URL;
+                }
+                
                 const hostname = window.location.hostname;
                 const protocol = window.location.protocol;
                 const port = window.location.port;
@@ -735,8 +744,14 @@
                     return 'http://localhost:5000';
                 }
                 
+                // GitHub Pages部署：尝试使用相同域名（如果后端也在GitHub Pages）
+                // 或者使用环境变量中配置的地址
+                const envApiUrl = window.API_BASE_URL || localStorage.getItem('API_BASE_URL');
+                if (envApiUrl) {
+                    return envApiUrl;
+                }
+                
                 // 其他情况，尝试使用相同域名和5000端口
-                // 如果前端在3000端口，后端应该在5000端口
                 return `${protocol}//${hostname}${port ? ':5000' : ''}`;
             },
             ENDPOINTS: {

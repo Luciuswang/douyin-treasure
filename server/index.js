@@ -34,7 +34,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-t
     useUnifiedTopology: true,
 })
 .then(() => console.log('✅ MongoDB 连接成功'))
-.catch(err => console.error('❌ MongoDB 连接失败:', err));
+.catch(err => {
+    console.error('❌ MongoDB 连接失败:', err.message);
+    console.log('⚠️  服务器将继续运行，但某些功能可能不可用');
+    console.log('💡 提示：请确保MongoDB正在运行，或使用MongoDB Atlas云端数据库');
+});
 
 // 中间件
 app.use(helmet({
