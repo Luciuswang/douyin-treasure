@@ -5681,13 +5681,14 @@
                 const ua = navigator.userAgent;
                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || 
                                  (window.innerWidth <= 768);
-                // iOS设备（iPad/iPhone）、WebView、鸿蒙系统、华为浏览器对像素值支持好
+                // iOS设备（iPad/iPhone）、WebView对像素值支持好
+                // 华为浏览器和鸿蒙系统对像素值支持不好，需要用百分比
                 const isIOS = /iPhone|iPad|iPod/i.test(ua);
                 const isWebView = /MicroMessenger|wxwork|Seatalk|QQ/i.test(ua);
                 const isHarmonyOS = /HarmonyOS/i.test(ua); // 鸿蒙系统
-                const isHuaweiBrowser = /HuaweiBrowser|HUAWEI/i.test(ua); // 华为浏览器
-                // iOS、WebView、鸿蒙、华为浏览器、PC都用像素值，只有Android普通浏览器用百分比
-                const usePixelForMobile = isIOS || isWebView || isHarmonyOS || isHuaweiBrowser;
+                const isHuaweiBrowser = /HuaweiBrowser|HUAWEI|HiBrowser/i.test(ua); // 华为浏览器
+                // iOS、WebView、PC用像素值，华为浏览器、鸿蒙、Android普通浏览器用百分比
+                const usePixelForMobile = isIOS || isWebView;
                 
                 // 延迟启动，确保DOM元素已经创建
                 setTimeout(() => {
@@ -5753,30 +5754,36 @@
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
                             
-                            // PC、iOS、WebView、鸿蒙、华为浏览器用像素值，只有Android普通浏览器用百分比
+                            // PC、iOS、WebView用像素值，华为浏览器、鸿蒙、Android普通浏览器用百分比
                             let bgPosition;
                             if (isMobile && !usePixelForMobile) {
-                                // Android普通浏览器：使用百分比方式，避免像素值精度问题
+                                // 华为浏览器、鸿蒙、Android普通浏览器：使用百分比方式
                                 // 对于4x4 sprite，background-size: 400%时，每帧移动100%容器尺寸
                                 const xPercent = frame.x * -100;
                                 const yPercent = frame.y * -100;
                                 bgPosition = `${xPercent}% ${yPercent}%`;
                             } else {
-                                // PC、iOS、WebView、鸿蒙、华为浏览器：使用像素值计算（更准确）
+                                // PC、iOS、WebView：使用像素值计算（更准确）
                                 const xPx = frame.x * containerWidth * -1;
                                 const yPx = frame.y * containerHeight * -1;
                                 bgPosition = `${xPx}px ${yPx}px`;
                             }
                             
                             // 彻底禁用所有transition效果，让切换瞬间完成
+                            // 华为浏览器需要更彻底的禁用
                             el.style.setProperty('transition', 'none', 'important');
                             el.style.setProperty('-webkit-transition', 'none', 'important');
                             el.style.setProperty('-moz-transition', 'none', 'important');
                             el.style.setProperty('-o-transition', 'none', 'important');
                             el.style.setProperty('transition-property', 'none', 'important');
                             el.style.setProperty('-webkit-transition-property', 'none', 'important');
+                            el.style.setProperty('-moz-transition-property', 'none', 'important');
+                            el.style.setProperty('-o-transition-property', 'none', 'important');
                             el.style.setProperty('transition-duration', '0s', 'important');
                             el.style.setProperty('-webkit-transition-duration', '0s', 'important');
+                            el.style.setProperty('-moz-transition-duration', '0s', 'important');
+                            el.style.setProperty('-o-transition-duration', '0s', 'important');
+                            el.style.setProperty('will-change', 'auto', 'important'); // 禁用硬件加速
                             
                             el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = bgPosition;
