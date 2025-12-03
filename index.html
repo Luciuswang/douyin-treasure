@@ -5677,9 +5677,13 @@
             
             // 启动机器人sprite动画（使用JavaScript控制）
             startBotSpriteAnimation() {
-                // 检测是否为移动端
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                // 检测是否为移动端，以及是否是Seatalk/企业微信（这些WebView对像素值支持好）
+                const ua = navigator.userAgent;
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || 
                                  (window.innerWidth <= 768);
+                // Seatalk/企业微信等WebView对像素值支持好，普通移动浏览器用百分比
+                const isWebView = /MicroMessenger|wxwork|Seatalk|QQ/i.test(ua);
+                const usePixelForMobile = isWebView; // 只有WebView用像素值，普通移动浏览器用百分比
                 
                 // 延迟启动，确保DOM元素已经创建
                 setTimeout(() => {
@@ -5745,27 +5749,41 @@
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
                             
-                            // 使用像素值计算：对于background-size: 400%，背景图片是容器尺寸的4倍
-                            // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
-                            // 要显示第x列，需要向左移动 x * 容器宽度（像素）
-                            // 要显示第y行，需要向上移动 y * 容器高度（像素）
-                            const xPx = frame.x * containerWidth * -1;
-                            const yPx = frame.y * containerHeight * -1;
+                            // PC版和WebView用像素值，普通移动浏览器用百分比
+                            let bgPosition;
+                            if (isMobile && !usePixelForMobile) {
+                                // 普通移动浏览器：使用百分比方式，避免像素值精度问题
+                                // 对于4x4 sprite，background-size: 400%时，每帧移动100%容器尺寸
+                                const xPercent = frame.x * -100;
+                                const yPercent = frame.y * -100;
+                                bgPosition = `${xPercent}% ${yPercent}%`;
+                            } else {
+                                // PC版和WebView：使用像素值计算（更准确）
+                                const xPx = frame.x * containerWidth * -1;
+                                const yPx = frame.y * containerHeight * -1;
+                                bgPosition = `${xPx}px ${yPx}px`;
+                            }
                             
-                            // 确保没有transition效果，让切换瞬间完成（使用!important确保覆盖所有CSS）
+                            // 彻底禁用所有transition效果，让切换瞬间完成
                             el.style.setProperty('transition', 'none', 'important');
                             el.style.setProperty('-webkit-transition', 'none', 'important');
                             el.style.setProperty('-moz-transition', 'none', 'important');
                             el.style.setProperty('-o-transition', 'none', 'important');
+                            el.style.setProperty('transition-property', 'none', 'important');
+                            el.style.setProperty('-webkit-transition-property', 'none', 'important');
+                            el.style.setProperty('transition-duration', '0s', 'important');
+                            el.style.setProperty('-webkit-transition-duration', '0s', 'important');
+                            
                             el.style.backgroundSize = '400% 400%';
-                            el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            el.style.backgroundPosition = bgPosition;
                             
                             // 强制重绘，确保样式立即生效
                             el.offsetHeight; // 触发重排
                             
                             // 添加调试信息（只在第一个有效元素时输出）
                             if (index === 0) {
-                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 有效元素:${validElements.length}/${spriteElements.length}`);
+                                const platform = isMobile ? (usePixelForMobile ? 'WebView' : '移动浏览器') : 'PC';
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${bgPosition}) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 平台:${platform} 有效元素:${validElements.length}/${spriteElements.length}`);
                             }
                         });
                         
