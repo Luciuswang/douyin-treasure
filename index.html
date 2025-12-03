@@ -5968,10 +5968,13 @@
                 botChatContainer.style.display = 'none';
                 botChatContainer.setAttribute('style', (botChatContainer.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: none !important;');
                 
-                // 显示头像按钮
+                // 显示头像按钮并重置transform和filter状态（避免超框）
                 if (botAvatarButton) {
                     botAvatarButton.style.display = 'block';
                     botAvatarButton.setAttribute('style', (botAvatarButton.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: block !important;');
+                    // 重置transform和filter，避免移动端点击后放大状态残留
+                    botAvatarButton.style.transform = 'scale(1)';
+                    botAvatarButton.style.filter = 'drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))';
                 }
                 
                 console.log('✅ 机器人聊天窗口已强制关闭');
@@ -6326,7 +6329,7 @@
         background: none !important;
         background-color: rgba(0, 0, 0, 0) !important;
         line-height: 0 !important;
-    " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
+    " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchstart="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchend="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
         <div class="bot-sprite-animation" style="
             width: 100%;
             height: 100%;
