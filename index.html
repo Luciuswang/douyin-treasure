@@ -5715,7 +5715,7 @@
                     ];
                     
                     let currentFrame = 0;
-                    const frameDuration = 200; // 每帧200ms，总共3.2s（慢一点便于调试）
+                    const frameDuration = 300; // 每帧300ms，总共4.8s（更慢，确保逐帧效果明显）
                     
                     // 过滤出有有效尺寸的元素
                     const getValidElements = () => {
@@ -5749,8 +5749,14 @@
                             // 方法1：background-size: 400%
                             const xPx = frame.x * containerWidth * -1;
                             const yPx = frame.y * containerHeight * -1;
+                            
+                            // 确保没有transition效果，让切换瞬间完成
+                            el.style.transition = 'none';
                             el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            
+                            // 强制重绘，确保样式立即生效
+                            el.offsetHeight; // 触发重排
                             
                             // 如果方法1不行，可以尝试方法2（注释掉上面的，启用下面的）：
                             // const xPercent = frame.x * -25;
@@ -7058,6 +7064,11 @@
             height: 100%;
             min-width: 32px;
             min-height: 32px;
+            /* 确保没有transition效果，让逐帧切换瞬间完成 */
+            transition: none !important;
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
         }
         
         /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
