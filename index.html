@@ -6291,7 +6291,7 @@
         background: white;
         border-radius: 20px;
         box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
-        z-index: 9997;
+        z-index: 10000;
         display: none !important;
         flex-direction: column;
         overflow: hidden;
@@ -6364,7 +6364,7 @@
             display: flex;
             gap: 8px;
             position: relative;
-            z-index: 100;
+            z-index: 10004;
             flex-shrink: 0;
         ">
             <input type="text" id="bot-chat-input" placeholder="问小突..." style="
@@ -6374,6 +6374,8 @@
                 border-radius: 20px;
                 outline: none;
                 font-size: 14px;
+                position: relative;
+                z-index: 10005;
             " onkeypress="if(event.key === 'Enter') chatManager.sendBotMessage()">
             <button onclick="chatManager.sendBotMessage()" style="
                 background: #4FC3F7;
@@ -6382,6 +6384,8 @@
                 width: 40px;
                 height: 40px;
                 border-radius: 50%;
+                position: relative;
+                z-index: 10005;
                 cursor: pointer;
                 font-size: 18px;
                 display: flex;
@@ -7341,6 +7345,11 @@
                 height: 100% !important;
                 background-size: 400% 400% !important;
                 background-repeat: no-repeat !important;
+                /* 确保移动端也没有transition效果 */
+                transition: none !important;
+                -webkit-transition: none !important;
+                -moz-transition: none !important;
+                -o-transition: none !important;
             }
 
             /* 机器人聊天窗口移动端适配 */
@@ -7371,11 +7380,21 @@
                 padding: 10px !important;
                 background: white !important;
                 border-top: 1px solid #e0e0e0 !important;
+                z-index: 10004 !important;
+                position: relative !important;
             }
             
             #bot-chat-input {
                 font-size: 16px !important; /* 防止iOS自动缩放 */
                 padding: 12px 15px !important;
+                z-index: 10005 !important;
+                position: relative !important;
+            }
+            
+            /* 确保机器人对话框输入框按钮也在最上层 */
+            #bot-chat-container > div:last-child button {
+                z-index: 10005 !important;
+                position: relative !important;
             }
 
             #chat-container {
