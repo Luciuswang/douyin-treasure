@@ -5741,17 +5741,22 @@
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
                             
-                            // 对于background-size: 400%，背景图片是容器尺寸的4倍
-                            // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
-                            // 要显示第x列，需要向左移动 x * 容器宽度（像素）
-                            // 要显示第y行，需要向上移动 y * 容器高度（像素）
+                            // 尝试两种方法：
+                            // 方法1：background-size: 400%，每帧移动一个容器宽度
+                            // 方法2：background-size: 100%，每帧移动25%
+                            // 先试试方法1，如果不行再改方法2
+                            
+                            // 方法1：background-size: 400%
                             const xPx = frame.x * containerWidth * -1;
                             const yPx = frame.y * containerHeight * -1;
-                            
-                            // 确保background-size正确设置
                             el.style.backgroundSize = '400% 400%';
-                            // 使用像素值，更准确
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            
+                            // 如果方法1不行，可以尝试方法2（注释掉上面的，启用下面的）：
+                            // const xPercent = frame.x * -25;
+                            // const yPercent = frame.y * -25;
+                            // el.style.backgroundSize = '100% 100%';
+                            // el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
                             
                             // 添加调试信息（只在第一个有效元素时输出）
                             if (index === 0) {
@@ -5800,16 +5805,55 @@
                     
                     
                     // 添加全局测试函数，可以在控制台手动调用
-                    window.testSpriteFrame = (frameIndex) => {
+                    window.testSpriteFrame = (frameIndex, method = 1) => {
                         if (frameIndex < 0 || frameIndex >= frames.length) {
                             console.error('帧索引超出范围，应该是0-15');
                             return;
                         }
-                        currentFrame = frameIndex;
-                        updateFrame();
-                        console.log(`🧪 测试显示帧 ${frameIndex + 1}/16`);
+                        const validElements = getValidElements();
+                        if (validElements.length === 0) {
+                            console.error('没有找到有效元素');
+                            return;
+                        }
+                        const frame = frames[frameIndex];
+                        validElements.forEach((el, index) => {
+                            const rect = el.getBoundingClientRect();
+                            const containerWidth = rect.width;
+                            const containerHeight = rect.height;
+                            
+                            if (method === 1) {
+                                // 方法1：background-size: 400%，每帧移动一个容器宽度
+                                const xPx = frame.x * containerWidth * -1;
+                                const yPx = frame.y * containerHeight * -1;
+                                el.style.backgroundSize = '400% 400%';
+                                el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            } else {
+                                // 方法2：background-size: 100%，每帧移动25%
+                                const xPercent = frame.x * -25;
+                                const yPercent = frame.y * -25;
+                                el.style.backgroundSize = '100% 100%';
+                                el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
+                            }
+                            
+                            if (index === 0) {
+                                const computedStyle = window.getComputedStyle(el);
+                                console.log(`🧪 测试帧 ${frameIndex + 1}/16 (方法${method}): 位置(${frame.x},${frame.y})`);
+                                console.log(`🧪 容器尺寸: ${Math.round(containerWidth)}x${Math.round(containerHeight)}`);
+                                console.log(`🧪 设置样式:`, {
+                                    backgroundSize: el.style.backgroundSize,
+                                    backgroundPosition: el.style.backgroundPosition
+                                });
+                                console.log(`🧪 计算后样式:`, {
+                                    backgroundSize: computedStyle.backgroundSize,
+                                    backgroundPosition: computedStyle.backgroundPosition,
+                                    backgroundImage: computedStyle.backgroundImage
+                                });
+                            }
+                        });
+                        console.log(`🧪 已设置帧 ${frameIndex + 1}/16 (方法${method})，请查看页面上的显示效果`);
                     };
-                    console.log('💡 提示：可以在控制台使用 testSpriteFrame(0-15) 来测试显示特定帧');
+                    console.log('💡 提示：可以在控制台使用 testSpriteFrame(0-15, 1或2) 来测试显示特定帧');
+                    console.log('💡 方法1: background-size 400%，方法2: background-size 100%');
                 }, 100);
             },
 
