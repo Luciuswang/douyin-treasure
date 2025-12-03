@@ -5750,8 +5750,11 @@
                             const xPx = frame.x * containerWidth * -1;
                             const yPx = frame.y * containerHeight * -1;
                             
-                            // 确保没有transition效果，让切换瞬间完成
-                            el.style.transition = 'none';
+                            // 确保没有transition效果，让切换瞬间完成（使用!important确保覆盖所有CSS）
+                            el.style.setProperty('transition', 'none', 'important');
+                            el.style.setProperty('-webkit-transition', 'none', 'important');
+                            el.style.setProperty('-moz-transition', 'none', 'important');
+                            el.style.setProperty('-o-transition', 'none', 'important');
                             el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
                             
@@ -6277,6 +6280,10 @@
             width: 100%;
             height: 100%;
             filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
+            transition: none !important;
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
         " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
         </div>
     </div>
@@ -6316,6 +6323,10 @@
                     margin: 0 !important;
                     opacity: 1 !important;
                     flex-shrink: 0;
+                    transition: none !important;
+                    -webkit-transition: none !important;
+                    -moz-transition: none !important;
+                    -o-transition: none !important;
                 "></div>
                 <div>
                     <div style="font-size: 16px;">小突 AI助手</div>
@@ -7340,16 +7351,27 @@
             }
             
             /* 确保移动端sprite动画正确显示 */
-            #bot-avatar-button .bot-sprite-animation {
+            #bot-avatar-button .bot-sprite-animation,
+            .bot-sprite-animation {
                 width: 100% !important;
                 height: 100% !important;
                 background-size: 400% 400% !important;
                 background-repeat: no-repeat !important;
-                /* 确保移动端也没有transition效果 */
+                /* 确保移动端也没有transition效果，强制禁用所有transition */
                 transition: none !important;
                 -webkit-transition: none !important;
                 -moz-transition: none !important;
                 -o-transition: none !important;
+                transition-property: none !important;
+                -webkit-transition-property: none !important;
+                -moz-transition-property: none !important;
+                -o-transition-property: none !important;
+            }
+            
+            /* 确保父元素也不会影响子元素的transition */
+            #bot-avatar-button {
+                transition: transform 0.3s ease, filter 0.3s ease !important;
+                /* 明确指定只transition transform和filter，不包括background-position */
             }
 
             /* 机器人聊天窗口移动端适配 */
