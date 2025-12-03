@@ -5746,28 +5746,29 @@
                             const containerWidth = rect.width;
                             const containerHeight = rect.height;
                             
-                            // PC版使用像素值，移动端使用百分比（避免位移问题）
-                            let bgPosition;
-                            if (isMobile) {
-                                // 移动端：使用百分比方式
-                                // 对于4x4 sprite，background-size: 400%时，每帧移动100%容器尺寸
-                                const xPercent = frame.x * -100;
-                                const yPercent = frame.y * -100;
-                                bgPosition = `${xPercent}% ${yPercent}%`;
-                            } else {
-                                // PC版：使用像素值计算（更准确）
-                                // 对于background-size: 400%，背景图片是容器尺寸的4倍
-                                // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
-                                const xPx = frame.x * containerWidth * -1;
-                                const yPx = frame.y * containerHeight * -1;
-                                bgPosition = `${xPx}px ${yPx}px`;
-                            }
+                            // PC和移动端都使用像素值计算（统一方式，更准确）
+                            // 对于background-size: 400%，背景图片是容器尺寸的4倍
+                            // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
+                            // 要显示第x列，需要向左移动 x * 容器宽度（像素）
+                            // 要显示第y行，需要向上移动 y * 容器高度（像素）
+                            const xPx = frame.x * containerWidth * -1;
+                            const yPx = frame.y * containerHeight * -1;
+                            const bgPosition = `${xPx}px ${yPx}px`;
                             
                             // 确保没有transition效果，让切换瞬间完成（使用!important确保覆盖所有CSS）
+                            // 移动端需要更彻底的禁用transition
                             el.style.setProperty('transition', 'none', 'important');
                             el.style.setProperty('-webkit-transition', 'none', 'important');
                             el.style.setProperty('-moz-transition', 'none', 'important');
                             el.style.setProperty('-o-transition', 'none', 'important');
+                            el.style.setProperty('transition-property', 'none', 'important');
+                            el.style.setProperty('-webkit-transition-property', 'none', 'important');
+                            el.style.setProperty('-moz-transition-property', 'none', 'important');
+                            el.style.setProperty('-o-transition-property', 'none', 'important');
+                            el.style.setProperty('transition-duration', '0s', 'important');
+                            el.style.setProperty('-webkit-transition-duration', '0s', 'important');
+                            el.style.setProperty('-moz-transition-duration', '0s', 'important');
+                            el.style.setProperty('-o-transition-duration', '0s', 'important');
                             el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = bgPosition;
                             
@@ -5776,7 +5777,7 @@
                             
                             // 添加调试信息（只在第一个有效元素时输出）
                             if (index === 0) {
-                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${bgPosition}) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 平台:${isMobile ? '移动端' : 'PC'} 有效元素:${validElements.length}/${spriteElements.length}`);
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 平台:${isMobile ? '移动端' : 'PC'} 有效元素:${validElements.length}/${spriteElements.length}`);
                             }
                         });
                         
