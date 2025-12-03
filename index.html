@@ -5672,7 +5672,9 @@
                         el.style.animation = 'none';
                     });
                 };
-                spriteImage.src = 'assets/images/xiaotu-bot01.png';
+                // 添加版本号避免缓存问题（每次代码更新时改变这个版本号）
+                const spriteVersion = 'v2.0';
+                spriteImage.src = `assets/images/xiaotu-bot01.png?${spriteVersion}`;
             },
             
             // 启动机器人sprite动画（使用JavaScript控制）
@@ -7122,7 +7124,8 @@
         
         /* 机器人sprite动画样式 - 4x4网格，16帧动画 */
         .bot-sprite-animation {
-            background-image: url('./assets/images/xiaotu-bot01.png');
+            /* 注意：CSS中的图片URL也会被缓存，如果更新后仍有问题，请清除浏览器缓存 */
+            background-image: url('./assets/images/xiaotu-bot01.png?v=2.0');
             background-repeat: no-repeat;
             background-size: 400% 400%; /* 4x4网格：整个sprite图是容器尺寸的4倍，每帧占容器尺寸的100% */
             background-position: 0% 0%; /* 显示左上角第一帧 */
