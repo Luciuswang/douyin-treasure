@@ -719,11 +719,26 @@
 
         // API配置
         const API_CONFIG = {
-            // 开发环境：本地服务器
-            // 生产环境：需要修改为实际服务器地址
-            BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-                ? 'http://localhost:5000' 
-                : 'https://your-api-domain.com', // 生产环境需要修改
+            // 自动检测API地址
+            get BASE_URL() {
+                const hostname = window.location.hostname;
+                const protocol = window.location.protocol;
+                const port = window.location.port;
+                
+                // 如果是localhost或127.0.0.1，使用本地服务器
+                if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                    return 'http://localhost:5000';
+                }
+                
+                // 如果是file://协议（本地文件），也使用localhost
+                if (window.location.protocol === 'file:') {
+                    return 'http://localhost:5000';
+                }
+                
+                // 其他情况，尝试使用相同域名和5000端口
+                // 如果前端在3000端口，后端应该在5000端口
+                return `${protocol}//${hostname}${port ? ':5000' : ''}`;
+            },
             ENDPOINTS: {
                 REGISTER: '/api/auth/register',
                 LOGIN: '/api/auth/login',
@@ -766,7 +781,10 @@
             // 注册
             async register(username, email, password) {
                 try {
-                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REGISTER, {
+                    const apiUrl = API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REGISTER;
+                    console.log('📡 注册请求URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -774,6 +792,19 @@
                         body: JSON.stringify({ username, email, password })
                     });
 
+                    // 检查响应状态
+                    if (!response.ok) {
+                        // 尝试解析错误信息
+                        let errorMessage = '注册失败';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.message || errorData.errors?.join(', ') || `服务器错误 (${response.status})`;
+                        } catch (e) {
+                            errorMessage = `服务器错误 (${response.status} ${response.statusText})`;
+                        }
+                        return { success: false, message: errorMessage };
+                    }
+
                     const data = await response.json();
                     
                     if (data.success) {
@@ -785,18 +816,30 @@
                         this.saveUser(data.data.user);
                         return { success: true, user: data.data.user };
                     } else {
-                        return { success: false, message: data.message || '注册失败' };
+                        return { success: false, message: data.message || data.errors?.join(', ') || '注册失败' };
                     }
                 } catch (error) {
                     console.error('注册错误:', error);
-                    return { success: false, message: '网络错误，请检查服务器连接' };
+                    const apiUrl = API_CONFIG.BASE_URL;
+                    let errorMessage = '网络错误，请检查服务器连接';
+                    
+                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                        errorMessage = `无法连接到服务器 (${apiUrl})。请确保后端服务器正在运行在端口5000。`;
+                    } else {
+                        errorMessage = `网络错误: ${error.message}`;
+                    }
+                    
+                    return { success: false, message: errorMessage };
                 }
             },
 
             // 登录
             async login(email, password) {
                 try {
-                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.LOGIN, {
+                    const apiUrl = API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.LOGIN;
+                    console.log('📡 登录请求URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -804,6 +847,19 @@
                         body: JSON.stringify({ email, password })
                     });
 
+                    // 检查响应状态
+                    if (!response.ok) {
+                        // 尝试解析错误信息
+                        let errorMessage = '登录失败';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.message || errorData.errors?.join(', ') || `服务器错误 (${response.status})`;
+                        } catch (e) {
+                            errorMessage = `服务器错误 (${response.status} ${response.statusText})`;
+                        }
+                        return { success: false, message: errorMessage };
+                    }
+
                     const data = await response.json();
                     
                     if (data.success) {
@@ -815,11 +871,20 @@
                         this.saveUser(data.data.user);
                         return { success: true, user: data.data.user };
                     } else {
-                        return { success: false, message: data.message || '登录失败' };
+                        return { success: false, message: data.message || data.errors?.join(', ') || '登录失败' };
                     }
                 } catch (error) {
                     console.error('登录错误:', error);
-                    return { success: false, message: '网络错误，请检查服务器连接' };
+                    const apiUrl = API_CONFIG.BASE_URL;
+                    let errorMessage = '网络错误，请检查服务器连接';
+                    
+                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                        errorMessage = `无法连接到服务器 (${apiUrl})。请确保后端服务器正在运行在端口5000。`;
+                    } else {
+                        errorMessage = `网络错误: ${error.message}`;
+                    }
+                    
+                    return { success: false, message: errorMessage };
                 }
             },
 

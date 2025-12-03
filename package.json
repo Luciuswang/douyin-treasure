@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "npx serve . --cors",
     "start": "npx serve . --cors",
+    "server": "cd server && node index.js",
+    "server:dev": "cd server && node index.js",
     "build": "echo 'Static site - no build needed'",
     "test": "echo 'Open index.html in browser to test'",
     "deploy": "echo 'Push to GitHub and enable Pages in repository settings'"

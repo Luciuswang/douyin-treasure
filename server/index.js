@@ -52,7 +52,47 @@ app.use(helmet({
 
 app.use(compression());
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: function (origin, callback) {
+        // 允许的源列表
+        const allowedOrigins = [
+            process.env.CLIENT_URL,
+            "http://localhost:3000",
+            "http://localhost:5000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5000",
+            "http://localhost",
+            "http://127.0.0.1",
+            // 允许所有本地开发环境
+            /^http:\/\/localhost(:\d+)?$/,
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/
+        ].filter(Boolean);
+        
+        // 如果没有origin（比如Postman或移动应用），允许
+        if (!origin) {
+            return callback(null, true);
+        }
+        
+        // 检查是否在允许列表中
+        const isAllowed = allowedOrigins.some(allowed => {
+            if (typeof allowed === 'string') {
+                return origin === allowed;
+            } else if (allowed instanceof RegExp) {
+                return allowed.test(origin);
+            }
+            return false;
+        });
+        
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            // 开发环境允许所有来源
+            if (process.env.NODE_ENV !== 'production') {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     credentials: true
 }));
 
