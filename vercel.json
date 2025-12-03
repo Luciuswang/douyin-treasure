@@ -4,9 +4,36 @@
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "server/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/**"]
+      }
     }
   ],
   "routes": [
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/api/users/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/api/treasures/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/api/upload/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/health",
+      "dest": "/server/index.js"
+    },
     {
       "src": "/api/ai/chat",
       "dest": "/api/ai/chat.js"

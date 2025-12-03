@@ -168,4 +168,10 @@ process.on('SIGTERM', () => {
     });
 });
 
+// 导出app供Serverless函数使用
 module.exports = { app, server, io };
+
+// 如果作为Serverless函数运行，导出app
+if (process.env.VERCEL) {
+    module.exports = app;
+}
