@@ -5721,33 +5721,32 @@
                     const updateFrame = () => {
                         const frame = frames[currentFrame];
                         
-                        // 对于background-size: 400%，背景图片是容器尺寸的4倍
-                        // CSS的background-position百分比计算方式：
-                        // 百分比值是相对于(背景图片尺寸 - 容器尺寸)来计算的
-                        // 当background-size是400%时，背景图片是容器尺寸的4倍
-                        // 要移动一个容器宽度，百分比值应该是：
-                        // 100% / (400% - 100%) = 100% / 300% = 33.333%
-                        // 
-                        // 所以正确的计算是：
-                        // 第1帧（0,0）：0% 0%
-                        // 第2帧（1,0）：-33.333% 0%
-                        // 第3帧（2,0）：-66.666% 0%
-                        // 第4帧（3,0）：-100% 0%
-                        // 第5帧（0,1）：0% -33.333%
-                        // ...
-                        
-                        const step = 100 / 3; // 33.333...
-                        const x = frame.x * -step;
-                        const y = frame.y * -step;
-                        
                         spriteElements.forEach(el => {
+                            // 获取容器的实际尺寸
+                            const rect = el.getBoundingClientRect();
+                            const containerWidth = rect.width;
+                            const containerHeight = rect.height;
+                            
+                            // 如果容器尺寸为0，跳过
+                            if (containerWidth === 0 || containerHeight === 0) {
+                                console.warn(`⚠️ 容器尺寸为0，跳过帧 ${currentFrame + 1}`);
+                                return;
+                            }
+                            
+                            // 对于background-size: 400%，背景图片是容器尺寸的4倍
+                            // 每帧占容器尺寸的100%，所以每帧的像素尺寸就是容器尺寸
+                            // 要显示第x列，需要向左移动 x * 容器宽度（像素）
+                            // 要显示第y行，需要向上移动 y * 容器高度（像素）
+                            const xPx = frame.x * containerWidth * -1;
+                            const yPx = frame.y * containerHeight * -1;
+                            
                             // 确保background-size正确设置
                             el.style.backgroundSize = '400% 400%';
-                            el.style.backgroundPosition = `${x}% ${y}%`;
+                            // 使用像素值，更准确
+                            el.style.backgroundPosition = `${xPx}px ${yPx}px`;
                             
                             // 添加调试信息
-                            const rect = el.getBoundingClientRect();
-                            console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${x.toFixed(2)}%,${y.toFixed(2)}%) 容器(${Math.round(rect.width)}x${Math.round(rect.height)})`);
+                            console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)})`);
                         });
                         
                         currentFrame = (currentFrame + 1) % frames.length;
