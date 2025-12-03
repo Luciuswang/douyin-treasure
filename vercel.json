@@ -13,38 +13,34 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/auth/(.*)",
-      "dest": "/server/index.js"
+      "source": "/api/auth/:path*",
+      "destination": "/server/index.js"
     },
     {
-      "src": "/api/users/(.*)",
-      "dest": "/server/index.js"
+      "source": "/api/users/:path*",
+      "destination": "/server/index.js"
     },
     {
-      "src": "/api/treasures/(.*)",
-      "dest": "/server/index.js"
+      "source": "/api/treasures/:path*",
+      "destination": "/server/index.js"
     },
     {
-      "src": "/api/upload/(.*)",
-      "dest": "/server/index.js"
+      "source": "/api/upload/:path*",
+      "destination": "/server/index.js"
     },
     {
-      "src": "/health",
-      "dest": "/server/index.js"
+      "source": "/health",
+      "destination": "/server/index.js"
     },
     {
-      "src": "/api/ai/chat",
-      "dest": "/api/ai/chat.js"
+      "source": "/api/ai/chat",
+      "destination": "/api/ai/chat.js"
     },
     {
-      "src": "/api/ai/status",
-      "dest": "/api/ai/status.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/api/ai/status",
+      "destination": "/api/ai/status.js"
     }
   ],
   "headers": [
