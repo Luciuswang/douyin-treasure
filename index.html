@@ -5715,18 +5715,35 @@
                     ];
                     
                     let currentFrame = 0;
-                    const frameDuration = 100; // 每帧100ms，总共1.6s
+                    const frameDuration = 200; // 每帧200ms，总共3.2s（慢一点便于调试）
                     
                     // 更新每一帧的函数
                     const updateFrame = () => {
                         const frame = frames[currentFrame];
-                        // 计算background-position：每帧移动-100%（相对于容器尺寸）
+                        
+                        // 对于background-size: 400%，背景图片是容器尺寸的4倍
+                        // CSS的background-position百分比计算：
+                        // position = (背景图片尺寸 - 容器尺寸) * percentage
+                        // 当background-size是400%时，要移动一个容器宽度（100%），
+                        // 百分比值应该是：100% / (400% - 100%) = 100% / 300% = 33.333%
+                        // 但实际上，CSS会自动处理，-100%就是移动一个容器宽度
+                        
+                        // 直接使用-100%应该是对的，但让我们试试更精确的计算
+                        // 对于4x4的sprite，每帧移动应该是：
+                        // x: frame.x * -100%
+                        // y: frame.y * -100%
+                        
                         const x = frame.x * -100;
                         const y = frame.y * -100;
                         
                         spriteElements.forEach(el => {
+                            // 确保background-size正确设置
+                            el.style.backgroundSize = '400% 400%';
                             el.style.backgroundPosition = `${x}% ${y}%`;
-                            console.log(`🎬 更新帧 ${currentFrame + 1}/16: background-position = ${x}% ${y}%`);
+                            
+                            // 添加调试信息
+                            const rect = el.getBoundingClientRect();
+                            console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${x}%,${y}%) 容器(${Math.round(rect.width)}x${Math.round(rect.height)})`);
                         });
                         
                         currentFrame = (currentFrame + 1) % frames.length;
@@ -5736,11 +5753,29 @@
                     updateFrame();
                     
                     // 启动动画循环
-                    const animationInterval = setInterval(updateFrame, frameDuration);
+                    const animationInterval = setInterval(() => {
+                        updateFrame();
+                        // 每帧后检查是否回到第一帧
+                        if (currentFrame === 0) {
+                            console.log('🔄 动画循环完成，重新开始');
+                        }
+                    }, frameDuration);
                     
                     // 保存interval ID以便后续清理
                     this.botSpriteAnimationInterval = animationInterval;
-                    console.log('✅ Sprite动画已启动');
+                    console.log('✅ Sprite动画已启动，帧间隔:', frameDuration + 'ms');
+                    
+                    // 添加全局测试函数，可以在控制台手动调用
+                    window.testSpriteFrame = (frameIndex) => {
+                        if (frameIndex < 0 || frameIndex >= frames.length) {
+                            console.error('帧索引超出范围，应该是0-15');
+                            return;
+                        }
+                        currentFrame = frameIndex;
+                        updateFrame();
+                        console.log(`🧪 测试显示帧 ${frameIndex + 1}/16`);
+                    };
+                    console.log('💡 提示：可以在控制台使用 testSpriteFrame(0-15) 来测试显示特定帧');
                 }, 100);
             },
 
