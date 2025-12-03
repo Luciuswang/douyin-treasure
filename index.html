@@ -5715,7 +5715,7 @@
                     ];
                     
                     let currentFrame = 0;
-                    const frameDuration = 300; // 每帧300ms，总共4.8s（更慢，确保逐帧效果明显）
+                    const frameDuration = 100; // 每帧100ms，总共1.6s（流畅的动画速度）
                     
                     // 过滤出有有效尺寸的元素
                     const getValidElements = () => {
@@ -5954,11 +5954,17 @@
                             <div class="bot-sprite-animation" style="
                                 width: 128px;
                                 height: 128px;
+                                min-width: 128px;
+                                min-height: 128px;
+                                max-width: 128px;
+                                max-height: 128px;
                                 margin: 0 auto 10px;
                                 background-color: rgba(0, 0, 0, 0) !important;
                                 border: none !important;
                                 padding: 0 !important;
                                 opacity: 1 !important;
+                                object-fit: contain;
+                                aspect-ratio: 1 / 1;
                             "></div>
                             <div>开始和小突聊天吧！</div>
                         </div>
@@ -5982,11 +5988,17 @@
                             <div class="bot-sprite-animation" style="
                                 width: 64px;
                                 height: 64px;
+                                min-width: 64px;
+                                min-height: 64px;
+                                max-width: 64px;
+                                max-height: 64px;
                                 background-color: transparent !important;
                                 border: none !important;
                                 padding: 0 !important;
                                 margin: 0 !important;
                                 flex-shrink: 0;
+                                object-fit: contain;
+                                aspect-ratio: 1 / 1;
                             "></div>
                         `;
                     }
@@ -6317,12 +6329,18 @@
                 <div class="bot-sprite-animation" style="
                     width: 64px;
                     height: 64px;
+                    min-width: 64px;
+                    min-height: 64px;
+                    max-width: 64px;
+                    max-height: 64px;
                     background-color: rgba(0, 0, 0, 0) !important;
                     border: none !important;
                     padding: 0 !important;
                     margin: 0 !important;
                     opacity: 1 !important;
                     flex-shrink: 0;
+                    object-fit: contain;
+                    aspect-ratio: 1 / 1;
                     transition: none !important;
                     -webkit-transition: none !important;
                     -moz-transition: none !important;
@@ -7079,6 +7097,8 @@
             height: 100%;
             min-width: 32px;
             min-height: 32px;
+            object-fit: contain;
+            aspect-ratio: 1 / 1; /* 保持正方形，防止变形 */
             /* 确保没有transition效果，让逐帧切换瞬间完成 */
             transition: none !important;
             -webkit-transition: none !important;
@@ -7357,6 +7377,8 @@
                 height: 100% !important;
                 background-size: 400% 400% !important;
                 background-repeat: no-repeat !important;
+                object-fit: contain !important;
+                aspect-ratio: 1 / 1 !important; /* 保持正方形，防止变形 */
                 /* 确保移动端也没有transition效果，强制禁用所有transition */
                 transition: none !important;
                 -webkit-transition: none !important;
