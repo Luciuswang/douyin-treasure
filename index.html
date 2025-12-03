@@ -5717,29 +5717,25 @@
                     let currentFrame = 0;
                     const frameDuration = 200; // 每帧200ms，总共3.2s（慢一点便于调试）
                     
-                    // 检查所有元素是否都有有效尺寸
-                    const checkElementsReady = () => {
-                        let allReady = true;
-                        spriteElements.forEach(el => {
+                    // 过滤出有有效尺寸的元素
+                    const getValidElements = () => {
+                        return Array.from(spriteElements).filter(el => {
                             const rect = el.getBoundingClientRect();
-                            if (rect.width === 0 || rect.height === 0) {
-                                allReady = false;
-                            }
+                            return rect.width > 0 && rect.height > 0;
                         });
-                        return allReady;
                     };
                     
                     // 更新每一帧的函数
                     const updateFrame = () => {
-                        // 检查元素是否准备好
-                        if (!checkElementsReady()) {
-                            console.warn('⚠️ 元素尚未准备好，跳过此帧');
+                        const frame = frames[currentFrame];
+                        const validElements = getValidElements();
+                        
+                        if (validElements.length === 0) {
+                            // 如果没有有效元素，不输出警告（避免日志过多）
                             return;
                         }
                         
-                        const frame = frames[currentFrame];
-                        
-                        spriteElements.forEach(el => {
+                        validElements.forEach((el, index) => {
                             // 获取容器的实际尺寸
                             const rect = el.getBoundingClientRect();
                             const containerWidth = rect.width;
@@ -5757,18 +5753,20 @@
                             // 使用像素值，更准确
                             el.style.backgroundPosition = `${xPx}px ${yPx}px`;
                             
-                            // 添加调试信息（只在第一个元素时输出，避免日志过多）
-                            if (spriteElements[0] === el) {
-                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)})`);
+                            // 添加调试信息（只在第一个有效元素时输出）
+                            if (index === 0) {
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${Math.round(xPx)}px,${Math.round(yPx)}px) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 有效元素:${validElements.length}/${spriteElements.length}`);
                             }
                         });
                         
                         currentFrame = (currentFrame + 1) % frames.length;
                     };
                     
-                    // 等待元素准备好后再启动动画
+                    // 等待至少有一个有效元素后再启动动画
                     const waitAndStart = () => {
-                        if (checkElementsReady()) {
+                        const validElements = getValidElements();
+                        if (validElements.length > 0) {
+                            console.log(`✅ 找到 ${validElements.length} 个有效元素，启动动画`);
                             // 立即显示第一帧
                             updateFrame();
                             // 启动动画循环
@@ -5784,9 +5782,16 @@
                             this.botSpriteAnimationInterval = animationInterval;
                             console.log('✅ Sprite动画已启动，帧间隔:', frameDuration + 'ms');
                         } else {
-                            // 如果还没准备好，100ms后重试
-                            console.log('⏳ 等待元素准备就绪...');
-                            setTimeout(waitAndStart, 100);
+                            // 如果还没准备好，100ms后重试（最多重试10次）
+                            if (!this._spriteRetryCount) {
+                                this._spriteRetryCount = 0;
+                            }
+                            if (this._spriteRetryCount < 10) {
+                                this._spriteRetryCount++;
+                                setTimeout(waitAndStart, 100);
+                            } else {
+                                console.warn('⚠️ 10次重试后仍未找到有效元素，停止尝试');
+                            }
                         }
                     };
                     
