@@ -460,6 +460,74 @@
 <body>
     <div class="container">
         <div class="header">
+            <!-- 用户信息栏（右上角） -->
+            <div id="user-info-bar" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                display: none;
+                align-items: center;
+                gap: 15px;
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(10px);
+                padding: 10px 20px;
+                border-radius: 25px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                z-index: 1000;
+            ">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="user-avatar-display" style="
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 20px;
+                        color: white;
+                        border: 2px solid rgba(255, 255, 255, 0.5);
+                    ">👤</div>
+                    <div>
+                        <div id="user-display-name" style="color: white; font-weight: 600; font-size: 14px;">游客</div>
+                        <div id="user-display-level" style="color: rgba(255, 255, 255, 0.8); font-size: 12px;">LV.1</div>
+                    </div>
+                </div>
+                <button onclick="authManager.handleLogout()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 15px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+                   onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">登出</button>
+            </div>
+            
+            <!-- 登录按钮（未登录时显示） -->
+            <div id="login-button-container" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                z-index: 1000;
+            ">
+                <button onclick="authManager.showModal()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 25px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+                   onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">🔐 登录/注册</button>
+            </div>
+            
             <div class="logo-container">
                 <img src="assets/images/totofun-logo.png" alt="Totofun Logo" class="logo">
             </div>
@@ -646,6 +714,225 @@
                     console.error('删除失败:', error);
                     return false;
                 }
+            }
+        };
+
+        // API配置
+        const API_CONFIG = {
+            // 开发环境：本地服务器
+            // 生产环境：需要修改为实际服务器地址
+            BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:5000' 
+                : 'https://your-api-domain.com', // 生产环境需要修改
+            ENDPOINTS: {
+                REGISTER: '/api/auth/register',
+                LOGIN: '/api/auth/login',
+                REFRESH: '/api/auth/refresh',
+                PROFILE: '/api/users/profile',
+                FRIENDS: '/api/users/friends',
+                CONVERSATIONS: '/api/users/conversations'
+            }
+        };
+
+        // 用户认证服务
+        const authService = {
+            // 获取当前token
+            getToken() {
+                return storageManager.load('auth_token');
+            },
+
+            // 保存token
+            saveToken(token) {
+                storageManager.save('auth_token', token);
+            },
+
+            // 获取用户信息
+            getUser() {
+                return storageManager.load('auth_user');
+            },
+
+            // 保存用户信息
+            saveUser(user) {
+                storageManager.save('auth_user', user);
+            },
+
+            // 检查是否已登录
+            isLoggedIn() {
+                const token = this.getToken();
+                const user = this.getUser();
+                return !!(token && user);
+            },
+
+            // 注册
+            async register(username, email, password) {
+                try {
+                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REGISTER, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, email, password })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存token和用户信息
+                        this.saveToken(data.data.tokens.accessToken);
+                        if (data.data.tokens.refreshToken) {
+                            this.saveRefreshToken(data.data.tokens.refreshToken);
+                        }
+                        this.saveUser(data.data.user);
+                        return { success: true, user: data.data.user };
+                    } else {
+                        return { success: false, message: data.message || '注册失败' };
+                    }
+                } catch (error) {
+                    console.error('注册错误:', error);
+                    return { success: false, message: '网络错误，请检查服务器连接' };
+                }
+            },
+
+            // 登录
+            async login(email, password) {
+                try {
+                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.LOGIN, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存token和用户信息
+                        this.saveToken(data.data.tokens.accessToken);
+                        if (data.data.tokens.refreshToken) {
+                            this.saveRefreshToken(data.data.tokens.refreshToken);
+                        }
+                        this.saveUser(data.data.user);
+                        return { success: true, user: data.data.user };
+                    } else {
+                        return { success: false, message: data.message || '登录失败' };
+                    }
+                } catch (error) {
+                    console.error('登录错误:', error);
+                    return { success: false, message: '网络错误，请检查服务器连接' };
+                }
+            },
+
+            // 登出
+            async logout() {
+                try {
+                    const token = this.getToken();
+                    if (token) {
+                        // 调用后端登出API
+                        try {
+                            await fetch(API_CONFIG.BASE_URL + '/api/auth/logout', {
+                                method: 'POST',
+                                headers: this.getAuthHeaders()
+                            });
+                        } catch (error) {
+                            console.error('登出API调用失败:', error);
+                            // 即使API调用失败，也清除本地数据
+                        }
+                    }
+                    
+                    // 清除本地存储
+                    storageManager.remove('auth_token');
+                    storageManager.remove('auth_user');
+                    storageManager.remove('refresh_token');
+                    
+                    // 刷新页面
+                    location.reload();
+                } catch (error) {
+                    console.error('登出错误:', error);
+                    // 即使出错也清除本地数据
+                    storageManager.remove('auth_token');
+                    storageManager.remove('auth_user');
+                    storageManager.remove('refresh_token');
+                    location.reload();
+                }
+            },
+
+            // 获取当前用户信息（从服务器）
+            async getCurrentUser() {
+                try {
+                    const token = this.getToken();
+                    if (!token) {
+                        return null;
+                    }
+
+                    const response = await fetch(API_CONFIG.BASE_URL + '/api/auth/me', {
+                        method: 'GET',
+                        headers: this.getAuthHeaders()
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.user) {
+                        // 更新本地用户信息
+                        this.saveUser(data.data.user);
+                        return data.data.user;
+                    } else {
+                        // token可能已过期，清除本地数据
+                        if (response.status === 401) {
+                            this.logout();
+                        }
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('获取用户信息错误:', error);
+                    return null;
+                }
+            },
+
+            // 刷新token
+            async refreshToken() {
+                try {
+                    const refreshToken = storageManager.load('refresh_token');
+                    if (!refreshToken) {
+                        return false;
+                    }
+
+                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REFRESH, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ refreshToken })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.accessToken) {
+                        this.saveToken(data.data.accessToken);
+                        return true;
+                    } else {
+                        // 刷新失败，需要重新登录
+                        this.logout();
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('刷新token错误:', error);
+                    return false;
+                }
+            },
+
+            // 保存刷新token
+            saveRefreshToken(token) {
+                storageManager.save('refresh_token', token);
+            },
+
+            // 获取认证请求头
+            getAuthHeaders() {
+                const token = this.getToken();
+                return {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                };
             }
         };
 
@@ -2447,7 +2734,60 @@
         }
 
         // 页面加载时的初始化
+        // 初始化用户认证状态
+        async function initAuth() {
+            try {
+                if (authService.isLoggedIn()) {
+                    // 已登录，获取最新用户信息
+                    const user = await authService.getCurrentUser();
+                    if (user) {
+                        authManager.updateUserDisplay();
+                        console.log('✅ 用户已登录:', user.username);
+                    } else {
+                        // 获取用户信息失败，可能token已过期
+                        console.log('⚠️ 获取用户信息失败，需要重新登录');
+                        authManager.updateUserDisplay();
+                    }
+                } else {
+                    // 未登录，显示登录按钮
+                    authManager.updateUserDisplay();
+                }
+            } catch (error) {
+                console.error('初始化认证状态错误:', error);
+                authManager.updateUserDisplay();
+            }
+        }
+
+        // Token自动刷新机制
+        function setupTokenRefresh() {
+            // 每5分钟检查一次token是否即将过期（提前1小时刷新）
+            setInterval(async () => {
+                if (authService.isLoggedIn()) {
+                    try {
+                        // 尝试获取用户信息，如果失败则刷新token
+                        const user = await authService.getCurrentUser();
+                        if (!user) {
+                            // 尝试刷新token
+                            const refreshed = await authService.refreshToken();
+                            if (refreshed) {
+                                console.log('✅ Token已自动刷新');
+                                // 重新获取用户信息
+                                await authService.getCurrentUser();
+                                authManager.updateUserDisplay();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Token自动刷新错误:', error);
+                    }
+                }
+            }, 5 * 60 * 1000); // 5分钟
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化认证状态
+            initAuth();
+            // 设置token自动刷新
+            setupTokenRefresh();
             // 加载用户数据
             loadUserData();
             
@@ -2657,6 +2997,210 @@
         // ==================== 聊天功能 ====================
         
         // 聊天数据管理
+        // 认证管理器
+        const authManager = {
+            // 显示登录表单
+            showLoginForm() {
+                document.getElementById('auth-login-form').style.display = 'block';
+                document.getElementById('auth-register-form').style.display = 'none';
+                document.getElementById('auth-login-error').style.display = 'none';
+                document.getElementById('auth-register-error').style.display = 'none';
+            },
+
+            // 显示注册表单
+            showRegisterForm() {
+                document.getElementById('auth-login-form').style.display = 'none';
+                document.getElementById('auth-register-form').style.display = 'block';
+                document.getElementById('auth-login-error').style.display = 'none';
+                document.getElementById('auth-register-error').style.display = 'none';
+            },
+
+            // 显示模态框
+            showModal() {
+                const modal = document.getElementById('auth-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    this.showLoginForm();
+                }
+            },
+
+            // 关闭模态框
+            closeModal() {
+                const modal = document.getElementById('auth-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            },
+
+            // 处理登录
+            async handleLogin() {
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                const errorDiv = document.getElementById('auth-login-error');
+
+                if (!email || !password) {
+                    errorDiv.textContent = '请填写邮箱和密码';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '登录中...';
+                errorDiv.style.background = '#e3f2fd';
+                errorDiv.style.color = '#1976d2';
+                errorDiv.style.display = 'block';
+
+                const result = await authService.login(email, password);
+
+                if (result.success) {
+                    errorDiv.textContent = '登录成功！';
+                    errorDiv.style.background = '#e8f5e9';
+                    errorDiv.style.color = '#2e7d32';
+                    
+                    // 更新用户信息显示
+                    this.updateUserDisplay();
+                    
+                    // 延迟关闭，让用户看到成功消息
+                    setTimeout(() => {
+                        this.closeModal();
+                        // 刷新页面以加载用户数据
+                        location.reload();
+                    }, 1000);
+                } else {
+                    errorDiv.textContent = result.message || '登录失败';
+                    errorDiv.style.background = '#fee';
+                    errorDiv.style.color = '#c33';
+                }
+            },
+
+            // 处理注册
+            async handleRegister() {
+                const username = document.getElementById('register-username').value.trim();
+                const email = document.getElementById('register-email').value.trim();
+                const password = document.getElementById('register-password').value;
+                const errorDiv = document.getElementById('auth-register-error');
+
+                if (!username || !email || !password) {
+                    errorDiv.textContent = '请填写所有字段';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                if (username.length < 3 || username.length > 20) {
+                    errorDiv.textContent = '用户名长度应在3-20个字符之间';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                if (password.length < 6) {
+                    errorDiv.textContent = '密码长度至少6个字符';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '注册中...';
+                errorDiv.style.background = '#e3f2fd';
+                errorDiv.style.color = '#1976d2';
+                errorDiv.style.display = 'block';
+
+                const result = await authService.register(username, email, password);
+
+                if (result.success) {
+                    errorDiv.textContent = '注册成功！正在登录...';
+                    errorDiv.style.background = '#e8f5e9';
+                    errorDiv.style.color = '#2e7d32';
+                    
+                    // 更新用户信息显示
+                    this.updateUserDisplay();
+                    
+                    // 延迟关闭，让用户看到成功消息
+                    setTimeout(() => {
+                        this.closeModal();
+                        // 刷新页面以加载用户数据
+                        location.reload();
+                    }, 1500);
+                } else {
+                    errorDiv.textContent = result.message || '注册失败';
+                    errorDiv.style.background = '#fee';
+                    errorDiv.style.color = '#c33';
+                }
+            },
+
+            // 检查登录状态，如果未登录则显示登录框
+            checkLoginStatus() {
+                if (!authService.isLoggedIn()) {
+                    // 延迟显示，让页面先加载
+                    setTimeout(() => {
+                        this.showModal();
+                    }, 500);
+                    return false;
+                }
+                return true;
+            },
+
+            // 处理登出
+            async handleLogout() {
+                if (confirm('确定要登出吗？')) {
+                    await authService.logout();
+                }
+            },
+
+            // 更新用户信息显示
+            updateUserDisplay() {
+                const user = authService.getUser();
+                const userInfoBar = document.getElementById('user-info-bar');
+                const loginButtonContainer = document.getElementById('login-button-container');
+                
+                if (user && authService.isLoggedIn()) {
+                    // 显示用户信息栏，隐藏登录按钮
+                    if (userInfoBar) {
+                        userInfoBar.style.display = 'flex';
+                    }
+                    if (loginButtonContainer) {
+                        loginButtonContainer.style.display = 'none';
+                    }
+                    
+                    // 更新用户信息
+                    const avatarDisplay = document.getElementById('user-avatar-display');
+                    const displayName = document.getElementById('user-display-name');
+                    const displayLevel = document.getElementById('user-display-level');
+                    
+                    if (avatarDisplay) {
+                        avatarDisplay.textContent = user.avatar || '👤';
+                        if (user.avatar && user.avatar.startsWith('http')) {
+                            avatarDisplay.style.backgroundImage = `url(${user.avatar})`;
+                            avatarDisplay.style.backgroundSize = 'cover';
+                            avatarDisplay.style.backgroundPosition = 'center';
+                            avatarDisplay.textContent = '';
+                        }
+                    }
+                    if (displayName) {
+                        displayName.textContent = user.username || '游客';
+                    }
+                    if (displayLevel) {
+                        displayLevel.textContent = `LV.${user.level?.currentLevel || 1}`;
+                    }
+                    
+                    // 更新页面中的用户信息
+                    if (document.getElementById('user-name')) {
+                        document.getElementById('user-name').textContent = user.username || '游客';
+                    }
+                    if (document.getElementById('user-level')) {
+                        document.getElementById('user-level').textContent = `LV.${user.level?.currentLevel || 1}`;
+                    }
+                } else {
+                    // 隐藏用户信息栏，显示登录按钮
+                    if (userInfoBar) {
+                        userInfoBar.style.display = 'none';
+                    }
+                    if (loginButtonContainer) {
+                        loginButtonContainer.style.display = 'block';
+                    }
+                }
+            }
+        };
+
         const chatManager = {
             currentUser: null,
             friends: [],
@@ -2664,51 +3208,69 @@
             unreadCount: 0,
 
             // 初始化当前用户
-            init() {
+            async init() {
                 console.log('🔧 开始初始化聊天系统...');
                 
-                // 尝试加载已有的聊天用户
-                let savedChatUser = storageManager.load('chatUser');
-                
-                if (!savedChatUser) {
-                    console.log('📝 未找到已有用户，创建新用户...');
-                    // 如果没有聊天用户，创建一个持久的ID
-                    // 使用固定的ID生成方式，确保用户ID不会改变
-                    const userId = this.generatePersistentUserId();
-                    
-                    // 尝试从游戏数据中获取昵称
-                    const gameUserData = storageManager.load('totofun-treasure-user');
-                    const username = gameUserData?.username || '游客';
-                    
-                    savedChatUser = {
-                        id: userId,
-                        name: username,
-                        avatar: '👤',
+                // 检查是否已登录
+                if (authService.isLoggedIn()) {
+                    console.log('✅ 用户已登录，使用服务器数据');
+                    const serverUser = authService.getUser();
+                    this.currentUser = {
+                        id: serverUser._id || serverUser.id,
+                        name: serverUser.username,
+                        avatar: serverUser.avatar || '👤',
                         online: true,
-                        createdAt: new Date().toISOString()
+                        createdAt: serverUser.createdAt || new Date().toISOString()
                     };
                     
-                    storageManager.save('chatUser', savedChatUser);
-                    console.log('✅ 新用户已创建:', userId, '昵称:', username);
+                    // 从服务器加载好友列表和聊天记录（异步，不阻塞）
+                    this.loadServerData();
                 } else {
-                    console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
+                    console.log('📝 用户未登录，使用本地数据');
+                    // 尝试加载已有的聊天用户
+                    let savedChatUser = storageManager.load('chatUser');
                     
-                    // 检查ID格式，如果是旧的长ID，提示用户（但不强制迁移，避免破坏好友关系）
-                    if (savedChatUser.id && (savedChatUser.id.length > 10 || !/^\d+$/.test(savedChatUser.id))) {
-                        console.log('⚠️ 检测到旧格式ID（长度>10或包含非数字字符）:', savedChatUser.id);
-                        // 可选：在这里可以提示用户迁移到短ID，但为了不破坏好友关系，暂时保持原ID
-                    }
-                    
-                    // 同步游戏昵称到聊天昵称
-                    const gameUserData = storageManager.load('totofun-treasure-user');
-                    if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
-                        savedChatUser.name = gameUserData.username;
+                    if (!savedChatUser) {
+                        console.log('📝 未找到已有用户，创建新用户...');
+                        // 如果没有聊天用户，创建一个持久的ID
+                        // 使用固定的ID生成方式，确保用户ID不会改变
+                        const userId = this.generatePersistentUserId();
+                        
+                        // 尝试从游戏数据中获取昵称
+                        const gameUserData = storageManager.load('totofun-treasure-user');
+                        const username = gameUserData?.username || '游客';
+                        
+                        savedChatUser = {
+                            id: userId,
+                            name: username,
+                            avatar: '👤',
+                            online: true,
+                            createdAt: new Date().toISOString()
+                        };
+                        
                         storageManager.save('chatUser', savedChatUser);
-                        console.log('✅ 昵称已同步:', gameUserData.username);
+                        console.log('✅ 新用户已创建:', userId, '昵称:', username);
+                    } else {
+                        console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
+                        
+                        // 检查ID格式，如果是旧的长ID，提示用户（但不强制迁移，避免破坏好友关系）
+                        if (savedChatUser.id && (savedChatUser.id.length > 10 || !/^\d+$/.test(savedChatUser.id))) {
+                            console.log('⚠️ 检测到旧格式ID（长度>10或包含非数字字符）:', savedChatUser.id);
+                            // 可选：在这里可以提示用户迁移到短ID，但为了不破坏好友关系，暂时保持原ID
+                        }
+                        
+                        // 同步游戏昵称到聊天昵称
+                        const gameUserData = storageManager.load('totofun-treasure-user');
+                        if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
+                            savedChatUser.name = gameUserData.username;
+                            storageManager.save('chatUser', savedChatUser);
+                            console.log('✅ 昵称已同步:', gameUserData.username);
+                        }
                     }
+                    
+                    this.currentUser = savedChatUser;
                 }
                 
-                this.currentUser = savedChatUser;
                 console.log('👤 当前用户:', this.currentUser.id, this.currentUser.name);
                 
                 // 如果ID是短ID（10位数字），在控制台显示友好提示
@@ -2716,13 +3278,22 @@
                     console.log('✅ 用户ID格式正确（10位数字）');
                 }
                 
-                // 加载好友列表
-                const savedFriends = storageManager.load('chatFriends');
-                if (savedFriends && Array.isArray(savedFriends) && savedFriends.length > 0) {
-                    this.friends = savedFriends;
-                } else {
-                    // 如果没有保存的好友列表，使用默认好友（包含机器人）
+                // 加载好友列表和对话记录
+                if (authService.isLoggedIn()) {
+                    // 已登录：从服务器加载（异步，不阻塞）
+                    this.loadServerData();
+                    // 先使用默认好友列表（包含机器人）
                     this.friends = this.getDefaultFriends();
+                    this.conversations = {};
+                } else {
+                    // 未登录：使用本地数据
+                    const savedFriends = storageManager.load('chatFriends');
+                    if (savedFriends && Array.isArray(savedFriends) && savedFriends.length > 0) {
+                        this.friends = savedFriends;
+                    } else {
+                        this.friends = this.getDefaultFriends();
+                    }
+                    this.conversations = storageManager.load('chatConversations') || {};
                 }
                 
                 // 确保机器人好友存在（如果不存在则添加，如果存在则更新头像）
@@ -2734,31 +3305,30 @@
                     const botFriend = {
                         id: 'totofun_bot',
                         name: '小突',
-                        avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径
-                        avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
+                        avatar: 'assets/images/xiaotu-bot.png',
+                        avatarFallback: '🤖',
                         online: true,
                         isBot: true,
                         lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
                         lastTime: new Date().toISOString()
                     };
-                    this.friends.unshift(botFriend); // 添加到列表开头
+                    this.friends.unshift(botFriend);
                     isNewBot = true;
                     console.log('✅ 已添加AI机器人好友"小突"');
                 } else {
-                    // 已存在，更新头像（确保使用图片而不是emoji）
+                    // 已存在，更新头像
                     const botFriend = this.friends[botIndex];
                     if (!botFriend.avatar || botFriend.avatar === '🤖' || !botFriend.avatar.includes('.png')) {
                         botFriend.avatar = 'assets/images/xiaotu-bot.png';
                         botFriend.avatarFallback = '🤖';
-                        botFriend.isBot = true; // 确保标记为机器人
+                        botFriend.isBot = true;
                         console.log('✅ 已更新机器人好友"小突"的头像为图片');
                     }
                 }
                 
-                storageManager.save('chatFriends', this.friends);
-                
-                // 加载对话记录
-                this.conversations = storageManager.load('chatConversations') || {};
+                if (!authService.isLoggedIn()) {
+                    storageManager.save('chatFriends', this.friends);
+                }
                 
                 // 如果是新添加的机器人好友，添加欢迎消息
                 if (isNewBot) {
@@ -4059,6 +4629,12 @@
 
             // 发送消息
             sendMessage(friendId, content, type = 'text') {
+                // 检查登录状态
+                if (!authService.isLoggedIn()) {
+                    authManager.showModal();
+                    return null;
+                }
+
                 const message = {
                     id: 'msg_' + Date.now(),
                     from: this.currentUser.id,
@@ -4207,8 +4783,14 @@
             
             // 获取AI回复（使用后端代理，API Key不暴露）
             async getAIReply(message) {
+                // 检查登录状态
+                if (!authService.isLoggedIn()) {
+                    console.warn('⚠️ 未登录，无法使用AI功能');
+                    return null;
+                }
+
                 // 使用后端API代理，避免在前端暴露API Key
-                const apiProxyUrl = '/api/ai/chat'; // 相对路径，自动使用当前域名
+                const apiProxyUrl = API_CONFIG.BASE_URL + '/api/ai/chat';
                 
                 try {
                     // 构建上下文（最近5条消息）
@@ -4228,7 +4810,8 @@
                     const response = await fetch(apiProxyUrl, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            ...authService.getAuthHeaders()
                         },
                         body: JSON.stringify({
                             message: message,
@@ -5907,6 +6490,12 @@
 
             // 打开机器人聊天窗口
             openBotChat() {
+                // 检查登录状态
+                if (!authService.isLoggedIn()) {
+                    authManager.showModal();
+                    return;
+                }
+
                 const botChatContainer = document.getElementById('bot-chat-container');
                 const botAvatarButton = document.getElementById('bot-avatar-button');
                 if (botChatContainer) {
@@ -6311,6 +6900,165 @@
             }
         });
     </script>
+
+    <!-- 登录/注册模态框 -->
+    <div id="auth-modal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        z-index: 100000;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+        ">
+            <!-- 关闭按钮 -->
+            <button id="auth-modal-close" onclick="authManager.closeModal()" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #999;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">×</button>
+
+            <!-- 登录表单 -->
+            <div id="auth-login-form">
+                <h2 style="margin-bottom: 20px; color: #333; text-align: center;">🔐 登录</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">邮箱</label>
+                    <input type="email" id="login-email" placeholder="请输入邮箱" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <button onclick="authManager.handleLogin()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-bottom: 15px;
+                ">登录</button>
+                <div style="text-align: center; color: #999; font-size: 14px;">
+                    还没有账号？<a href="#" onclick="authManager.showRegisterForm(); return false;" style="color: #4FC3F7; text-decoration: none;">立即注册</a>
+                </div>
+                <div id="auth-login-error" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: #fee;
+                    color: #c33;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    display: none;
+                "></div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="auth-register-form" style="display: none;">
+                <h2 style="margin-bottom: 20px; color: #333; text-align: center;">✨ 注册</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">用户名</label>
+                    <input type="text" id="register-username" placeholder="3-20个字符，支持中文、英文、数字" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">邮箱</label>
+                    <input type="email" id="register-email" placeholder="请输入邮箱" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">密码</label>
+                    <input type="password" id="register-password" placeholder="至少6个字符" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <button onclick="authManager.handleRegister()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-bottom: 15px;
+                ">注册</button>
+                <div style="text-align: center; color: #999; font-size: 14px;">
+                    已有账号？<a href="#" onclick="authManager.showLoginForm(); return false;" style="color: #4FC3F7; text-decoration: none;">立即登录</a>
+                </div>
+                <div id="auth-register-error" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: #fee;
+                    color: #c33;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    display: none;
+                "></div>
+            </div>
+        </div>
+    </div>
 
     <!-- 小突头像按钮（左下角，关闭聊天窗口时显示） -->
     <div id="bot-avatar-button" onclick="chatManager.openBotChat()" style="
