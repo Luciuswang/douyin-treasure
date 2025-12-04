@@ -58,6 +58,10 @@ app.use(helmet({
 }));
 
 app.use(compression());
+
+// 处理OPTIONS预检请求
+app.options('*', cors());
+
 app.use(cors({
     origin: function (origin, callback) {
         // 允许的源列表
