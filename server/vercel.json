@@ -1,0 +1,80 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/server.js"
+    },
+    {
+      "source": "/api/users/:path*",
+      "destination": "/api/server.js"
+    },
+    {
+      "source": "/api/treasures/:path*",
+      "destination": "/api/server.js"
+    },
+    {
+      "source": "/api/upload/:path*",
+      "destination": "/api/server.js"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/server.js"
+    },
+    {
+      "source": "/api/ai/chat",
+      "destination": "/api/ai/chat.js"
+    },
+    {
+      "source": "/api/ai/status",
+      "destination": "/api/ai/status.js"
+    },
+    {
+      "source": "/api/test",
+      "destination": "/api/test.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://luciuswang.github.io"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Max-Age",
+          "value": "86400"
+        }
+      ]
+    },
+    {
+      "source": "/health",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}
+
