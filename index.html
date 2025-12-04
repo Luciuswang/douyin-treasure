@@ -852,11 +852,22 @@
                     }
                 } catch (error) {
                     console.error('注册错误:', error);
-                    const apiUrl = API_CONFIG.BASE_URL;
+                    console.error('错误详情:', {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    });
+                    
+                    const baseUrl = API_CONFIG.BASE_URL;
                     let errorMessage = '网络错误，请检查服务器连接';
                     
+                    // 检查是否是CORS错误
                     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                        errorMessage = `无法连接到服务器 (${apiUrl})。请确保后端服务器正在运行在端口5000。`;
+                        if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+                            errorMessage = `CORS错误：无法连接到服务器 (${baseUrl})。\n\n可能的原因：\n1. 服务器未正确配置CORS\n2. 服务器地址不正确\n3. 网络连接问题\n\n请检查控制台中的API配置信息。`;
+                        } else {
+                            errorMessage = `无法连接到服务器 (${baseUrl})。\n\n请确保：\n1. 后端服务器正在运行\n2. API地址配置正确\n3. 网络连接正常`;
+                        }
                     } else {
                         errorMessage = `网络错误: ${error.message}`;
                     }
