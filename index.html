@@ -725,8 +725,22 @@
             
             // 自动检测API地址
             get BASE_URL() {
+                // 优先检查localStorage中的配置（用于临时覆盖）
+                const localStorageApiUrl = localStorage.getItem('API_BASE_URL');
+                if (localStorageApiUrl && localStorageApiUrl !== 'your-api-domain.com') {
+                    console.log('📌 使用localStorage中的API地址:', localStorageApiUrl);
+                    return localStorageApiUrl;
+                }
+                
+                // 检查window全局变量
+                if (window.API_BASE_URL && window.API_BASE_URL !== 'your-api-domain.com') {
+                    console.log('📌 使用window中的API地址:', window.API_BASE_URL);
+                    return window.API_BASE_URL;
+                }
+                
                 // 如果设置了云服务地址，优先使用
-                if (this.CLOUD_API_URL) {
+                if (this.CLOUD_API_URL && this.CLOUD_API_URL !== 'your-api-domain.com') {
+                    console.log('📌 使用CLOUD_API_URL:', this.CLOUD_API_URL);
                     return this.CLOUD_API_URL;
                 }
                 
@@ -744,11 +758,9 @@
                     return 'http://localhost:5000';
                 }
                 
-                // GitHub Pages部署：尝试使用相同域名（如果后端也在GitHub Pages）
-                // 或者使用环境变量中配置的地址
-                const envApiUrl = window.API_BASE_URL || localStorage.getItem('API_BASE_URL');
-                if (envApiUrl) {
-                    return envApiUrl;
+                // GitHub Pages部署：使用配置的云服务地址
+                if (this.CLOUD_API_URL) {
+                    return this.CLOUD_API_URL;
                 }
                 
                 // 其他情况，尝试使用相同域名和5000端口
@@ -796,8 +808,13 @@
             // 注册
             async register(username, email, password) {
                 try {
-                    const apiUrl = API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REGISTER;
-                    console.log('📡 注册请求URL:', apiUrl);
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const apiUrl = baseUrl + API_CONFIG.ENDPOINTS.REGISTER;
+                    console.log('📡 API配置信息:');
+                    console.log('  - CLOUD_API_URL:', API_CONFIG.CLOUD_API_URL);
+                    console.log('  - BASE_URL:', baseUrl);
+                    console.log('  - 完整请求URL:', apiUrl);
+                    console.log('  - 当前页面:', window.location.href);
                     
                     const response = await fetch(apiUrl, {
                         method: 'POST',

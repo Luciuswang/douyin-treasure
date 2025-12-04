@@ -63,6 +63,7 @@ app.use(cors({
         // 允许的源列表
         const allowedOrigins = [
             process.env.CLIENT_URL,
+            "https://luciuswang.github.io",
             "http://localhost:3000",
             "http://localhost:5000",
             "http://127.0.0.1:3000",
@@ -71,7 +72,9 @@ app.use(cors({
             "http://127.0.0.1",
             // 允许所有本地开发环境
             /^http:\/\/localhost(:\d+)?$/,
-            /^http:\/\/127\.0\.0\.1(:\d+)?$/
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+            // 允许GitHub Pages域名（包括子路径）
+            /^https:\/\/.*\.github\.io$/
         ].filter(Boolean);
         
         // 如果没有origin（比如Postman或移动应用），允许
@@ -96,11 +99,19 @@ app.use(cors({
             if (process.env.NODE_ENV !== 'production') {
                 callback(null, true);
             } else {
-                callback(new Error('Not allowed by CORS'));
+                // 生产环境也允许GitHub Pages（更宽松的策略）
+                if (/^https:\/\/.*\.github\.io/.test(origin)) {
+                    callback(null, true);
+                } else {
+                    console.warn(`⚠️  CORS blocked origin: ${origin}`);
+                    callback(new Error('Not allowed by CORS'));
+                }
             }
         }
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // 限流
