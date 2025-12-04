@@ -32,6 +32,9 @@ const io = socketIo(server, {
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000, // 10秒超时
+    socketTimeoutMS: 45000, // 45秒socket超时
+    connectTimeoutMS: 10000, // 10秒连接超时
 })
 .then(() => console.log('✅ MongoDB 连接成功'))
 .catch(err => {
