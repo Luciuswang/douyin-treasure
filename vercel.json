@@ -41,6 +41,10 @@
     {
       "source": "/api/ai/status",
       "destination": "/api/ai/status.js"
+    },
+    {
+      "source": "/api/test",
+      "destination": "/api/test.js"
     }
   ],
   "headers": [
