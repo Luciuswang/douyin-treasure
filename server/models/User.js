@@ -227,9 +227,9 @@ const userSchema = new mongoose.Schema({
 });
 
 // 索引
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ 'location.coordinates': '2dsphere' });
+// 注意：username和email已经有unique:true，会自动创建索引
+// location.coordinates已经有index: '2dsphere'，会自动创建索引
+// 只添加其他需要的索引
 userSchema.index({ 'stats.treasuresCreated': -1 });
 userSchema.index({ 'stats.treasuresDiscovered': -1 });
 userSchema.index({ createdAt: -1 });
