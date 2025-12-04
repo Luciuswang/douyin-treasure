@@ -29,9 +29,8 @@ const io = socketIo(server, {
 });
 
 // 数据库连接
+// 注意：Mongoose 6+ 不再需要 useNewUrlParser 和 useUnifiedTopology
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 10000, // 10秒超时
     socketTimeoutMS: 45000, // 45秒socket超时
     connectTimeoutMS: 10000, // 10秒连接超时
@@ -58,9 +57,6 @@ app.use(helmet({
 }));
 
 app.use(compression());
-
-// 处理OPTIONS预检请求
-app.options('*', cors());
 
 app.use(cors({
     origin: function (origin, callback) {
