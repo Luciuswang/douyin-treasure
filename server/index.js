@@ -161,11 +161,12 @@ if (io) {
 // 错误处理中间件
 app.use(errorHandler);
 
-// 404处理
-app.use('*', (req, res) => {
+// 404处理（必须在所有路由之后）
+app.use((req, res) => {
     res.status(404).json({
         success: false,
-        message: '接口不存在'
+        message: '接口不存在',
+        path: req.originalUrl
     });
 });
 
