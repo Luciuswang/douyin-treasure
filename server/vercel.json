@@ -9,35 +9,23 @@
   "rewrites": [
     {
       "source": "/api/auth/:path*",
-      "destination": "/api/server.js"
+      "destination": "/index.js"
     },
     {
       "source": "/api/users/:path*",
-      "destination": "/api/server.js"
+      "destination": "/index.js"
     },
     {
       "source": "/api/treasures/:path*",
-      "destination": "/api/server.js"
+      "destination": "/index.js"
     },
     {
       "source": "/api/upload/:path*",
-      "destination": "/api/server.js"
+      "destination": "/index.js"
     },
     {
       "source": "/health",
-      "destination": "/api/server.js"
-    },
-    {
-      "source": "/api/ai/chat",
-      "destination": "/api/ai/chat.js"
-    },
-    {
-      "source": "/api/ai/status",
-      "destination": "/api/ai/status.js"
-    },
-    {
-      "source": "/api/test",
-      "destination": "/api/test.js"
+      "destination": "/index.js"
     }
   ],
   "headers": [
