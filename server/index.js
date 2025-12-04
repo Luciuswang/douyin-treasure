@@ -14,7 +14,7 @@ const userRoutes = require('./routes/users');
 const treasureRoutes = require('./routes/treasures');
 const uploadRoutes = require('./routes/upload');
 const { authenticateToken } = require('./middleware/auth');
-const errorHandler = require('./middleware/errorHandler');
+const { errorHandler } = require('./middleware/errorHandler');
 
 // 导入WebSocket处理器
 const socketHandler = require('./sockets/socketHandler');
@@ -145,11 +145,13 @@ app.use('/api/ai', require('./routes/ai')); // AI代理路由（不需要认证�
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
 
-// WebSocket处理
-io.on('connection', (socket) => {
-    console.log(`🔌 用户连接: ${socket.id}`);
-    socketHandler(io, socket);
-});
+// WebSocket处理（仅在非Serverless环境中）
+if (io) {
+    io.on('connection', (socket) => {
+        console.log(`🔌 用户连接: ${socket.id}`);
+        socketHandler(io, socket);
+    });
+}
 
 // 错误处理中间件
 app.use(errorHandler);
@@ -162,13 +164,15 @@ app.use('*', (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, () => {
-    console.log(`🚀 Totofun 突突翻服务器运行在端口 ${PORT}`);
-    console.log(`🌐 环境: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📱 客户端地址: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
-});
+// 仅在非Serverless环境中启动HTTP服务器
+if (!process.env.VERCEL && !process.env.VERCEL_ENV && server) {
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+        console.log(`🚀 Totofun 突突翻服务器运行在端口 ${PORT}`);
+        console.log(`🌐 环境: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`📱 客户端地址: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+    });
+}
 
 // 优雅关闭
 process.on('SIGTERM', () => {
