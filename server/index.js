@@ -20,13 +20,18 @@ const { errorHandler } = require('./middleware/errorHandler');
 const socketHandler = require('./sockets/socketHandler');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST"]
-    }
-});
+
+// 在Serverless环境中，不需要HTTP服务器和WebSocket
+let server, io;
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+    server = http.createServer(app);
+    io = socketIo(server, {
+        cors: {
+            origin: process.env.CLIENT_URL || "http://localhost:3000",
+            methods: ["GET", "POST"]
+        }
+    });
+}
 
 // 数据库连接
 // 注意：Mongoose 6+ 不再需要 useNewUrlParser 和 useUnifiedTopology
