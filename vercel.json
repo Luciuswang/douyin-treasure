@@ -6,7 +6,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "server/index.js",
+      "src": "api/server.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": ["server/**"]
@@ -16,23 +16,23 @@
   "rewrites": [
     {
       "source": "/api/auth/:path*",
-      "destination": "/server/index.js"
+      "destination": "/api/server.js"
     },
     {
       "source": "/api/users/:path*",
-      "destination": "/server/index.js"
+      "destination": "/api/server.js"
     },
     {
       "source": "/api/treasures/:path*",
-      "destination": "/server/index.js"
+      "destination": "/api/server.js"
     },
     {
       "source": "/api/upload/:path*",
-      "destination": "/server/index.js"
+      "destination": "/api/server.js"
     },
     {
       "source": "/health",
-      "destination": "/server/index.js"
+      "destination": "/api/server.js"
     },
     {
       "source": "/api/ai/chat",
