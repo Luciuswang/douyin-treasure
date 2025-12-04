@@ -193,10 +193,5 @@ process.on('SIGTERM', () => {
 });
 
 // 导出app供Serverless函数使用
-// Vercel Serverless环境
-if (process.env.VERCEL || process.env.VERCEL_ENV) {
-    module.exports = app;
-} else {
-    // 普通Node.js环境
-    module.exports = { app, server, io };
-}
+// Vercel Serverless环境 - 直接导出app
+module.exports = app;

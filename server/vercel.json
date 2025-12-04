@@ -6,26 +6,18 @@
       "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/auth/:path*",
-      "destination": "/index.js"
+      "src": "/api/(.*)",
+      "dest": "/index.js"
     },
     {
-      "source": "/api/users/:path*",
-      "destination": "/index.js"
+      "src": "/health",
+      "dest": "/index.js"
     },
     {
-      "source": "/api/treasures/:path*",
-      "destination": "/index.js"
-    },
-    {
-      "source": "/api/upload/:path*",
-      "destination": "/index.js"
-    },
-    {
-      "source": "/health",
-      "destination": "/index.js"
+      "src": "/(.*)",
+      "dest": "/index.js"
     }
   ],
   "headers": [
