@@ -52,6 +52,16 @@ const mongooseOptions = {
 
 // 在连接字符串中添加超时参数（确保生效）
 let mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure';
+
+// 调试：检查连接字符串格式
+if (mongoUri) {
+    console.log('📋 MongoDB URI 长度:', mongoUri.length);
+    console.log('📋 MongoDB URI 开头:', mongoUri.substring(0, 20));
+    if (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://')) {
+        console.error('❌ MongoDB URI 格式错误:', mongoUri.substring(0, 50));
+    }
+}
+
 if (mongoUri && !mongoUri.includes('serverSelectionTimeoutMS')) {
     // 如果URI中没有超时参数，添加它们
     const separator = mongoUri.includes('?') ? '&' : '?';

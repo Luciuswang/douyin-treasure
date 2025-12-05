@@ -103,8 +103,15 @@ router.post('/register', async (req, res) => {
             // 如果未连接，尝试连接
             if (mongoose.connection.readyState === 0) {
                 console.log('🔄 尝试建立MongoDB连接...');
+                const mongoUri = process.env.MONGODB_URI;
+                console.log('📋 连接字符串长度:', mongoUri ? mongoUri.length : 0);
+                console.log('📋 连接字符串开头:', mongoUri ? mongoUri.substring(0, 30) : 'undefined');
+                if (!mongoUri || (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://'))) {
+                    console.error('❌ MongoDB URI 格式错误:', mongoUri);
+                    throw new Error('MongoDB连接字符串格式错误');
+                }
                 try {
-                    await mongoose.connect(process.env.MONGODB_URI, {
+                    await mongoose.connect(mongoUri, {
                         serverSelectionTimeoutMS: 30000,
                         socketTimeoutMS: 45000,
                         connectTimeoutMS: 30000
