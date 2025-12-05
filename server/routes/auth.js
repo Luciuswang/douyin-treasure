@@ -96,19 +96,32 @@ router.post('/register', async (req, res) => {
 
         const { username, email, password, bio, interests } = value;
 
-        // 检查MongoDB连接状态
+        // 检查MongoDB连接状态，确保连接已建立
         if (mongoose.connection.readyState !== 1) {
             console.warn('⚠️  MongoDB连接未就绪，状态:', mongoose.connection.readyState);
-            // 尝试重新连接
+            // 如果未连接，尝试连接
             if (mongoose.connection.readyState === 0) {
-                await mongoose.connect(process.env.MONGODB_URI);
+                console.log('🔄 尝试建立MongoDB连接...');
+                try {
+                    await mongoose.connect(process.env.MONGODB_URI, {
+                        serverSelectionTimeoutMS: 30000,
+                        socketTimeoutMS: 45000,
+                        connectTimeoutMS: 30000,
+                        bufferMaxEntries: 0,
+                        bufferCommands: false
+                    });
+                    console.log('✅ MongoDB连接已建立');
+                } catch (connectError) {
+                    console.error('❌ MongoDB连接失败:', connectError.message);
+                    throw new Error('数据库连接失败，请稍后重试');
+                }
             }
         }
 
-        // 检查用户是否已存在
+        // 检查用户是否已存在（使用更长的超时时间）
         const existingUser = await User.findOne({
             $or: [{ email }, { username }]
-        }).maxTimeMS(20000); // 设置20秒超时
+        }).maxTimeMS(25000); // 设置25秒超时
 
         if (existingUser) {
             return res.status(409).json({

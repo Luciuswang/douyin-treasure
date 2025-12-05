@@ -46,7 +46,15 @@ const mongooseOptions = {
     bufferCommands: false, // 禁用命令缓冲
 };
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', mongooseOptions)
+// 在连接字符串中添加超时参数（确保生效）
+let mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure';
+if (mongoUri && !mongoUri.includes('serverSelectionTimeoutMS')) {
+    // 如果URI中没有超时参数，添加它们
+    const separator = mongoUri.includes('?') ? '&' : '?';
+    mongoUri = `${mongoUri}${separator}serverSelectionTimeoutMS=30000&socketTimeoutMS=45000&connectTimeoutMS=30000`;
+}
+
+mongoose.connect(mongoUri, mongooseOptions)
 .then(() => {
     console.log('✅ MongoDB 连接成功');
     console.log('📊 MongoDB连接状态:', mongoose.connection.readyState);
