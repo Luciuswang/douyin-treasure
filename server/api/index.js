@@ -3,7 +3,7 @@
 
 const app = require('../index.js');
 
-// Vercel Serverless函数格式
+// Vercel Serverless函数格式 - 导出为handler
 module.exports = app;
 
 
