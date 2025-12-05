@@ -3791,6 +3791,137 @@
                 });
             },
             
+            // 从服务器加载好友列表和聊天记录
+            async loadServerData() {
+                if (!authService.isLoggedIn()) {
+                    console.warn('⚠️ 用户未登录，无法加载服务器数据');
+                    return;
+                }
+                
+                try {
+                    console.log('📡 开始从服务器加载数据...');
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const authHeaders = authService.getAuthHeaders();
+                    
+                    // 1. 加载好友列表
+                    try {
+                        const friendsResponse = await fetch(baseUrl + API_CONFIG.ENDPOINTS.FRIENDS, {
+                            method: 'GET',
+                            headers: authHeaders
+                        });
+                        
+                        if (friendsResponse.ok) {
+                            const friendsData = await friendsResponse.json();
+                            if (friendsData.success && Array.isArray(friendsData.data)) {
+                                console.log('✅ 从服务器加载到', friendsData.data.length, '个好友');
+                                
+                                // 转换服务器数据格式为本地格式
+                                const serverFriends = friendsData.data.map(friend => {
+                                    const friendUser = friend.user || friend;
+                                    return {
+                                        id: friendUser._id || friendUser.id,
+                                        name: friendUser.username || friendUser.name || '未知用户',
+                                        avatar: friendUser.avatar || '👤',
+                                        online: false, // 服务器数据可能不包含在线状态
+                                        lastMessage: '',
+                                        lastTime: new Date().toISOString()
+                                    };
+                                });
+                                
+                                // 合并服务器好友列表（保留机器人好友）
+                                const botFriend = this.friends.find(f => f.id === 'totofun_bot');
+                                this.friends = serverFriends;
+                                
+                                // 确保机器人好友存在
+                                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
+                                if (botIndex === -1) {
+                                    // 如果机器人好友不存在，添加它
+                                    const defaultBotFriend = botFriend || {
+                                        id: 'totofun_bot',
+                                        name: '小突',
+                                        avatar: 'assets/images/xiaotu-bot.png',
+                                        avatarFallback: '🤖',
+                                        online: true,
+                                        isBot: true,
+                                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
+                                        lastTime: new Date().toISOString()
+                                    };
+                                    this.friends.unshift(defaultBotFriend);
+                                    console.log('✅ 已确保机器人好友存在');
+                                }
+                                
+                                this.updateFriendsList();
+                                console.log('✅ 好友列表已更新');
+                            }
+                        } else {
+                            console.warn('⚠️ 加载好友列表失败:', friendsResponse.status);
+                        }
+                    } catch (error) {
+                        console.error('❌ 加载好友列表出错:', error);
+                    }
+                    
+                    // 2. 加载对话记录
+                    try {
+                        const conversationsResponse = await fetch(baseUrl + API_CONFIG.ENDPOINTS.CONVERSATIONS, {
+                            method: 'GET',
+                            headers: authHeaders
+                        });
+                        
+                        if (conversationsResponse.ok) {
+                            const conversationsData = await conversationsResponse.json();
+                            if (conversationsData.success && conversationsData.data) {
+                                console.log('✅ 从服务器加载到对话记录');
+                                
+                                // 转换服务器数据格式为本地格式
+                                // 服务器返回的格式可能是数组或对象
+                                if (Array.isArray(conversationsData.data)) {
+                                    // 如果是数组，转换为对象格式
+                                    const conversationsObj = {};
+                                    conversationsData.data.forEach(conv => {
+                                        const friendId = conv.friendId || conv.userId;
+                                        if (friendId && conv.messages && Array.isArray(conv.messages)) {
+                                            conversationsObj[friendId] = conv.messages.map(msg => ({
+                                                id: msg.id || 'msg_' + Date.now(),
+                                                from: msg.from || friendId,
+                                                to: msg.to || this.currentUser.id,
+                                                content: msg.content || '',
+                                                type: msg.type || 'text',
+                                                timestamp: msg.timestamp || new Date().toISOString(),
+                                                read: msg.read || false,
+                                                status: msg.status || 'received'
+                                            }));
+                                        }
+                                    });
+                                    this.conversations = conversationsObj;
+                                } else if (typeof conversationsData.data === 'object') {
+                                    // 如果已经是对象格式，直接使用
+                                    this.conversations = conversationsData.data;
+                                }
+                                
+                                // 确保机器人对话存在
+                                if (!this.conversations['totofun_bot']) {
+                                    this.conversations['totofun_bot'] = [];
+                                }
+                                
+                                this.updateUnreadCount();
+                                console.log('✅ 对话记录已更新');
+                            }
+                        } else {
+                            console.warn('⚠️ 加载对话记录失败:', conversationsResponse.status);
+                        }
+                    } catch (error) {
+                        console.error('❌ 加载对话记录出错:', error);
+                    }
+                    
+                    // 保存数据
+                    this.saveData();
+                    console.log('✅ 服务器数据加载完成');
+                    
+                } catch (error) {
+                    console.error('❌ 加载服务器数据失败:', error);
+                }
+            },
+            
             // 监听好友在线状态变化
             watchFriendsOnlineStatus() {
                 if (!firebaseEnabled || !database) return;
