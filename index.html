@@ -4774,28 +4774,45 @@
                     // 延迟一下，模拟思考时间，然后获取AI回复
                     setTimeout(() => {
                         this.getBotReply(content, friendId).then(reply => {
-                            if (reply) {
-                                // 模拟机器人发送消息
-                                const botMessage = {
-                                    id: 'msg_' + Date.now(),
-                                    from: friendId,
-                                    to: this.currentUser.id,
-                                    content: reply,
-                                    type: 'text',
-                                    timestamp: new Date().toISOString(),
-                                    read: false,
-                                    status: 'received'
-                                };
-                                
-                                // 添加到对话记录
-                                this.addMessageToConversation(botMessage, true);
-                                
-                                // 更新消息状态为已发送
-                                this.updateMessageStatus(friendId, message.id, 'sent');
-                                
-                                // 更新机器人聊天窗口显示
-                                this.updateBotChatMessages();
-                            }
+                            // 确保有回复（即使AI失败也应该有默认回复）
+                            const finalReply = reply || this.getDefaultBotReply() || '我在呢！有什么问题吗？😊';
+                            
+                            // 模拟机器人发送消息
+                            const botMessage = {
+                                id: 'msg_' + Date.now(),
+                                from: friendId,
+                                to: this.currentUser.id,
+                                content: finalReply,
+                                type: 'text',
+                                timestamp: new Date().toISOString(),
+                                read: false,
+                                status: 'received'
+                            };
+                            
+                            // 添加到对话记录
+                            this.addMessageToConversation(botMessage, true);
+                            
+                            // 更新消息状态为已发送
+                            this.updateMessageStatus(friendId, message.id, 'sent');
+                            
+                            // 更新机器人聊天窗口显示
+                            this.updateBotChatMessages();
+                        }).catch(error => {
+                            console.error('❌ 获取机器人回复异常:', error);
+                            // 即使出错也显示默认回复
+                            const defaultReply = this.getDefaultBotReply() || '抱歉，我现在有点累，稍后再聊吧~ 😴';
+                            const botMessage = {
+                                id: 'msg_' + Date.now(),
+                                from: friendId,
+                                to: this.currentUser.id,
+                                content: defaultReply,
+                                type: 'text',
+                                timestamp: new Date().toISOString(),
+                                read: false,
+                                status: 'received'
+                            };
+                            this.addMessageToConversation(botMessage, true);
+                            this.updateBotChatMessages();
                         });
                     }, 500); // 500ms延迟，模拟思考时间
                 } else {
@@ -4819,17 +4836,24 @@
                     }
                     
                     // 如果没有匹配的规则，尝试调用AI API
-                    const aiReply = await this.getAIReply(userMessage);
-                    if (aiReply) {
-                        console.log('🤖 使用AI回复:', aiReply);
-                        return aiReply;
+                    try {
+                        const aiReply = await this.getAIReply(userMessage);
+                        if (aiReply && aiReply.trim()) {
+                            console.log('🤖 使用AI回复:', aiReply.substring(0, 50) + '...');
+                            return aiReply;
+                        }
+                    } catch (aiError) {
+                        console.error('❌ AI API调用失败:', aiError);
+                        // 继续执行，使用默认回复
                     }
                     
-                    // 如果AI API不可用，返回默认回复
-                    return this.getDefaultBotReply();
+                    // 如果AI API不可用或返回空，返回默认回复
+                    const defaultReply = this.getDefaultBotReply();
+                    console.log('🤖 使用默认回复:', defaultReply);
+                    return defaultReply;
                 } catch (error) {
                     console.error('❌ 获取机器人回复失败:', error);
-                    return '抱歉，我现在有点累，稍后再聊吧~ 😴';
+                    return this.getDefaultBotReply() || '抱歉，我现在有点累，稍后再聊吧~ 😴';
                 }
             },
             
