@@ -493,6 +493,18 @@
                         <div id="user-display-level" style="color: rgba(255, 255, 255, 0.8); font-size: 12px;">LV.1</div>
                     </div>
                 </div>
+                <button id="admin-panel-btn" onclick="adminManager.showPanel()" style="
+                    display: none;
+                    background: rgba(255, 193, 7, 0.3);
+                    border: 1px solid rgba(255, 193, 7, 0.5);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 15px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 193, 7, 0.4)'" 
+                   onmouseout="this.style.background='rgba(255, 193, 7, 0.3)'" title="管理后台">⚙️ 管理</button>
                 <button onclick="authManager.handleLogout()" style="
                     background: rgba(255, 255, 255, 0.2);
                     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -3273,6 +3285,7 @@
                     const avatarDisplay = document.getElementById('user-avatar-display');
                     const displayName = document.getElementById('user-display-name');
                     const displayLevel = document.getElementById('user-display-level');
+                    const adminBtn = document.getElementById('admin-panel-btn');
                     
                     if (avatarDisplay) {
                         avatarDisplay.textContent = user.avatar || '👤';
@@ -3288,6 +3301,10 @@
                     }
                     if (displayLevel) {
                         displayLevel.textContent = `LV.${user.level?.currentLevel || 1}`;
+                    }
+                    // 如果是管理员，显示管理按钮
+                    if (adminBtn) {
+                        adminBtn.style.display = (user.role === 'admin') ? 'block' : 'none';
                     }
                     
                     // 更新页面中的用户信息
@@ -6753,17 +6770,21 @@
 
             // 打开机器人聊天窗口
             openBotChat() {
+                // 检查登录状态 - 只有登录用户才能使用机器人聊天
+                if (!authService.isLoggedIn()) {
+                    console.log('⚠️ 请先登录才能使用AI机器人聊天功能');
+                    authManager.showModal();
+                    return;
+                }
+                
                 // 确保friends数组存在
                 if (!this.friends) {
                     this.friends = [];
                 }
                 
-                // 检查登录状态（机器人聊天不需要登录，但已登录用户可以使用服务器数据）
-                const isLoggedIn = authService.isLoggedIn();
-                
-                // 如果已登录但还没有加载服务器数据，先加载
-                if (isLoggedIn && (this.friends.length === 0 || !this.friends.find(f => f.id === 'totofun_bot'))) {
-                    console.log('📡 检测到已登录但数据未加载，开始加载服务器数据...');
+                // 如果还没有加载服务器数据，先加载
+                if (this.friends.length === 0 || !this.friends.find(f => f.id === 'totofun_bot')) {
+                    console.log('📡 开始加载服务器数据...');
                     this.loadServerData();
                 }
                 
@@ -7141,6 +7162,215 @@
             }
         };
 
+        // 管理员管理器
+        const adminManager = {
+            currentPage: 1,
+            pageSize: 50,
+            allUsers: [],
+            filteredUsers: [],
+            
+            // 显示管理面板
+            async showPanel() {
+                const panel = document.getElementById('admin-panel');
+                if (!panel) {
+                    alert('❌ 管理面板未找到');
+                    return;
+                }
+                
+                // 检查是否是管理员
+                const user = authService.getUser();
+                if (!user || user.role !== 'admin') {
+                    alert('❌ 您没有管理员权限');
+                    return;
+                }
+                
+                panel.style.display = 'block';
+                await this.loadUsers();
+            },
+            
+            // 关闭管理面板
+            closePanel() {
+                const panel = document.getElementById('admin-panel');
+                if (panel) {
+                    panel.style.display = 'none';
+                }
+            },
+            
+            // 加载用户列表
+            async loadUsers() {
+                try {
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const authHeaders = authService.getAuthHeaders();
+                    
+                    const response = await fetch(`${baseUrl}/api/users/all?page=${this.currentPage}&limit=${this.pageSize}`, {
+                        method: 'GET',
+                        headers: authHeaders
+                    });
+                    
+                    if (!response.ok) {
+                        if (response.status === 403) {
+                            alert('❌ 您没有管理员权限');
+                            this.closePanel();
+                            return;
+                        }
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        this.allUsers = data.data.users || [];
+                        this.filteredUsers = [...this.allUsers];
+                        this.updateStats(data.data.pagination);
+                        this.renderUsers();
+                        this.renderPagination(data.data.pagination);
+                    }
+                } catch (error) {
+                    console.error('❌ 加载用户列表失败:', error);
+                    alert('❌ 加载用户列表失败: ' + error.message);
+                }
+            },
+            
+            // 搜索用户
+            searchUsers() {
+                const searchInput = document.getElementById('admin-search-input');
+                const query = searchInput.value.toLowerCase().trim();
+                
+                if (!query) {
+                    this.filteredUsers = [...this.allUsers];
+                } else {
+                    this.filteredUsers = this.allUsers.filter(user => 
+                        (user.username && user.username.toLowerCase().includes(query)) ||
+                        (user.email && user.email.toLowerCase().includes(query))
+                    );
+                }
+                
+                this.renderUsers();
+            },
+            
+            // 更新统计信息
+            updateStats(pagination) {
+                const statsContainer = document.getElementById('admin-stats');
+                if (!statsContainer) return;
+                
+                const totalUsers = pagination.total || 0;
+                const adminCount = this.allUsers.filter(u => u.role === 'admin').length;
+                const activeCount = this.allUsers.filter(u => u.isActive !== false).length;
+                const premiumCount = this.allUsers.filter(u => u.isPremium).length;
+                
+                statsContainer.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${totalUsers}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">总用户数</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${activeCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">活跃用户</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${adminCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">管理员</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${premiumCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">会员用户</div>
+                    </div>
+                `;
+            },
+            
+            // 渲染用户列表
+            renderUsers() {
+                const listContainer = document.getElementById('admin-users-list');
+                if (!listContainer) return;
+                
+                if (this.filteredUsers.length === 0) {
+                    listContainer.innerHTML = '<tr><td colspan="8" style="padding: 40px; text-align: center; color: #999;">暂无用户数据</td></tr>';
+                    return;
+                }
+                
+                listContainer.innerHTML = this.filteredUsers.map(user => {
+                    const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleString('zh-CN') : '-';
+                    const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('zh-CN') : '从未登录';
+                    const level = user.level?.currentLevel || 1;
+                    const role = user.role || 'user';
+                    const isActive = user.isActive !== false;
+                    const isPremium = user.isPremium || false;
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 15px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                                        ${(user.username || 'U')[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: bold; color: #333;">${user.username || '未知'}</div>
+                                        ${isPremium ? '<span style="font-size: 10px; color: #9C27B0;">⭐ 会员</span>' : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding: 15px; color: #666;">${user.email || '-'}</td>
+                            <td style="padding: 15px;">
+                                <span style="background: #4FC3F7; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">LV.${level}</span>
+                            </td>
+                            <td style="padding: 15px;">
+                                <span style="background: ${role === 'admin' ? '#f44336' : '#22C55E'}; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">
+                                    ${role === 'admin' ? '👑 管理员' : '👤 用户'}
+                                </span>
+                            </td>
+                            <td style="padding: 15px; color: #666; font-size: 12px;">${createdAt}</td>
+                            <td style="padding: 15px; color: #666; font-size: 12px;">${lastLogin}</td>
+                            <td style="padding: 15px; color: #666; text-align: center;">${user.loginCount || 0}</td>
+                            <td style="padding: 15px;">
+                                <span style="background: ${isActive ? '#22C55E' : '#999'}; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">
+                                    ${isActive ? '✓ 活跃' : '✗ 禁用'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+            
+            // 渲染分页
+            renderPagination(pagination) {
+                const paginationContainer = document.getElementById('admin-pagination');
+                if (!paginationContainer || !pagination) return;
+                
+                const { page, pages, total } = pagination;
+                
+                if (pages <= 1) {
+                    paginationContainer.innerHTML = `<div style="color: #666;">共 ${total} 条记录</div>`;
+                    return;
+                }
+                
+                let html = `<div style="color: #666; margin-right: 20px;">共 ${total} 条记录，第 ${page}/${pages} 页</div>`;
+                
+                // 上一页
+                if (page > 1) {
+                    html += `<button onclick="adminManager.goToPage(${page - 1})" style="padding: 8px 16px; background: #4FC3F7; color: white; border: none; border-radius: 5px; cursor: pointer;">上一页</button>`;
+                }
+                
+                // 页码
+                for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) {
+                    html += `<button onclick="adminManager.goToPage(${i})" style="padding: 8px 16px; background: ${i === page ? '#22C55E' : '#f0f0f0'}; color: ${i === page ? 'white' : '#333'}; border: none; border-radius: 5px; cursor: pointer; margin: 0 2px;">${i}</button>`;
+                }
+                
+                // 下一页
+                if (page < pages) {
+                    html += `<button onclick="adminManager.goToPage(${page + 1})" style="padding: 8px 16px; background: #4FC3F7; color: white; border: none; border-radius: 5px; cursor: pointer;">下一页</button>`;
+                }
+                
+                paginationContainer.innerHTML = html;
+            },
+            
+            // 跳转到指定页
+            async goToPage(page) {
+                this.currentPage = page;
+                await this.loadUsers();
+                // 滚动到顶部
+                document.getElementById('admin-panel').scrollTop = 0;
+            }
+        };
+        
         // 初始化聊天系统
         chatManager.init();
         chatManager.checkUrlParams();
@@ -8126,6 +8356,128 @@
                 ">
                     <!-- 好友列表将在这里动态生成 -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员面板 -->
+    <div id="admin-panel" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(5px);
+        z-index: 100000;
+        overflow-y: auto;
+        padding: 20px;
+    ">
+        <div style="
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #e0e0e0;
+            ">
+                <h2 style="margin: 0; color: #333; font-size: 24px;">⚙️ 管理后台 - 用户管理</h2>
+                <button onclick="adminManager.closePanel()" style="
+                    background: #f44336;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                ">✕ 关闭</button>
+            </div>
+            
+            <!-- 搜索和筛选 -->
+            <div style="
+                display: flex;
+                gap: 15px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            ">
+                <input type="text" id="admin-search-input" placeholder="搜索用户名或邮箱..." style="
+                    flex: 1;
+                    min-width: 200px;
+                    padding: 12px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 10px;
+                    font-size: 14px;
+                " onkeyup="adminManager.searchUsers()">
+                <button onclick="adminManager.loadUsers()" style="
+                    padding: 12px 24px;
+                    background: #4FC3F7;
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                ">🔄 刷新</button>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div id="admin-stats" style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            ">
+                <!-- 统计卡片将在这里动态生成 -->
+            </div>
+            
+            <!-- 用户列表 -->
+            <div style="
+                overflow-x: auto;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+            ">
+                <table style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                ">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">用户名</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">邮箱</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">等级</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">角色</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">注册时间</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">最后登录</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">登录次数</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-list">
+                        <!-- 用户列表将在这里动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <div id="admin-pagination" style="
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
+                margin-top: 20px;
+            ">
+                <!-- 分页按钮将在这里动态生成 -->
             </div>
         </div>
     </div>

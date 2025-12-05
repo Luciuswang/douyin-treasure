@@ -126,7 +126,8 @@ const requireAdmin = async (req, res, next) => {
             });
         }
 
-        const user = await User.findById(req.user.userId);
+        const userId = req.user.userId || req.user.id;
+        const user = await User.findById(userId);
         if (!user || user.role !== 'admin') {
             return res.status(403).json({
                 success: false,

@@ -139,6 +139,11 @@ const userSchema = new mongoose.Schema({
     }],
     
     // 账户状态
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
     isVerified: {
         type: Boolean,
         default: false
