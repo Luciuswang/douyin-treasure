@@ -21,6 +21,12 @@ const socketHandler = require('./sockets/socketHandler');
 
 const app = express();
 
+// 在 Vercel 等 Serverless 环境中，需要信任代理以正确获取客户端 IP
+// 这对于 express-rate-limit 等中间件很重要
+if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    app.set('trust proxy', true);
+}
+
 // 在Serverless环境中，不需要HTTP服务器和WebSocket
 let server, io;
 if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
@@ -140,10 +146,23 @@ app.use(cors({
 }));
 
 // 限流
+// 在 Vercel 环境中，使用标准化的 keyGenerator 来处理代理头
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15分钟
     max: 100, // 限制每个IP 15分钟内最多100个请求
-    message: '请求过于频繁，请稍后再试'
+    message: '请求过于频繁，请稍后再试',
+    // 在 Serverless 环境中正确处理代理头
+    standardHeaders: true,
+    legacyHeaders: false,
+    // 使用自定义 keyGenerator 来处理 Forwarded 头
+    keyGenerator: (req) => {
+        // 优先使用 X-Forwarded-For（Vercel 会设置）
+        return req.headers['x-forwarded-for']?.split(',')[0] || 
+               req.headers['x-real-ip'] || 
+               req.ip || 
+               req.socket.remoteAddress || 
+               'unknown';
+    }
 });
 app.use('/api/', limiter);
 
