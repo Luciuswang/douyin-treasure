@@ -9,7 +9,14 @@ const router = express.Router();
 
 // 验证schemas
 const registerSchema = Joi.object({
-    username: Joi.string().alphanum().min(3).max(20).required(),
+    username: Joi.string()
+        .pattern(/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/)
+        .min(3)
+        .max(20)
+        .required()
+        .messages({
+            'string.pattern.base': '用户名只能包含字母、数字、下划线和中文'
+        }),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).max(128).required(),
     bio: Joi.string().max(200).optional(),
@@ -143,10 +150,13 @@ router.post('/register', async (req, res) => {
 
     } catch (error) {
         console.error('注册错误:', error);
+        console.error('错误堆栈:', error.stack);
+        // 在Vercel环境中也显示错误信息，方便调试
         res.status(500).json({
             success: false,
             message: '服务器内部错误',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: error.message,
+            stack: (process.env.NODE_ENV === 'development' || process.env.VERCEL) ? error.stack : undefined
         });
     }
 });
