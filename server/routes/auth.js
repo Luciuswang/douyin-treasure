@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Joi = require('joi');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -136,9 +137,13 @@ router.post('/register', async (req, res) => {
             email,
             password, // 密码会在User模型的pre-save中间件中自动加密
             bio: bio || '',
-            'preferences.interests': interests || [],
-            'level.currentLevel': 1,
-            'level.experience': 0,
+            preferences: {
+                interests: interests || []
+            },
+            level: {
+                currentLevel: 1,
+                experience: 0
+            },
             loginCount: 0
         });
 
