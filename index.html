@@ -3421,45 +3421,10 @@
                     this.conversations = storageManager.load('chatConversations') || {};
                 }
                 
-                // 确保机器人好友存在（如果不存在则添加，如果存在则更新头像）
-                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
-                let isNewBot = false;
-                
-                if (botIndex === -1) {
-                    // 不存在，添加机器人好友
-                    const botFriend = {
-                        id: 'totofun_bot',
-                        name: '小突',
-                        avatar: 'assets/images/xiaotu-bot.png',
-                        avatarFallback: '🤖',
-                        online: true,
-                        isBot: true,
-                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                        lastTime: new Date().toISOString()
-                    };
-                    this.friends.unshift(botFriend);
-                    isNewBot = true;
-                    console.log('✅ 已添加AI机器人好友"小突"');
-                } else {
-                    // 已存在，更新头像
-                    const botFriend = this.friends[botIndex];
-                    if (!botFriend.avatar || botFriend.avatar === '🤖' || !botFriend.avatar.includes('.png')) {
-                        botFriend.avatar = 'assets/images/xiaotu-bot.png';
-                        botFriend.avatarFallback = '🤖';
-                        botFriend.isBot = true;
-                        console.log('✅ 已更新机器人好友"小突"的头像为图片');
-                    }
-                }
-                
-                if (!authService.isLoggedIn()) {
-                    storageManager.save('chatFriends', this.friends);
-                }
-                
-                // 如果是新添加的机器人好友，添加欢迎消息
-                if (isNewBot) {
-                    if (!this.conversations['totofun_bot']) {
-                        this.conversations['totofun_bot'] = [];
-                    }
+                // 机器人不再添加到好友列表，通过左下角头像按钮访问
+                // 但确保机器人对话记录存在
+                if (!this.conversations['totofun_bot']) {
+                    this.conversations['totofun_bot'] = [];
                     // 检查是否已有欢迎消息
                     const hasWelcomeMsg = this.conversations['totofun_bot'].some(m => m.id === 'welcome_msg');
                     if (!hasWelcomeMsg) {
@@ -3476,6 +3441,13 @@
                         console.log('✅ 已添加机器人欢迎消息');
                         this.saveData();
                     }
+                }
+                
+                // 从好友列表中移除机器人（如果存在）
+                this.friends = this.friends.filter(f => f.id !== 'totofun_bot');
+                
+                if (!authService.isLoggedIn()) {
+                    storageManager.save('chatFriends', this.friends);
                 }
 
                 // 初始化机器人聊天窗口
@@ -3845,27 +3817,11 @@
                                     };
                                 });
                                 
-                                // 合并服务器好友列表（保留机器人好友）
-                                const botFriend = this.friends.find(f => f.id === 'totofun_bot');
+                                // 合并服务器好友列表（不包含机器人，机器人通过左下角头像按钮访问）
                                 this.friends = serverFriends;
                                 
-                                // 确保机器人好友存在
-                                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
-                                if (botIndex === -1) {
-                                    // 如果机器人好友不存在，添加它
-                                    const defaultBotFriend = botFriend || {
-                                        id: 'totofun_bot',
-                                        name: '小突',
-                                        avatar: 'assets/images/xiaotu-bot.png',
-                                        avatarFallback: '🤖',
-                                        online: true,
-                                        isBot: true,
-                                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                                        lastTime: new Date().toISOString()
-                                    };
-                                    this.friends.unshift(defaultBotFriend);
-                                    console.log('✅ 已确保机器人好友存在');
-                                }
+                                // 从好友列表中移除机器人（如果存在）
+                                this.friends = this.friends.filter(f => f.id !== 'totofun_bot');
                                 
                                 this.updateFriendsList();
                                 console.log('✅ 好友列表已更新');
@@ -4436,20 +4392,10 @@
                 return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">${avatar}</span>`;
             },
             
-            // 获取默认好友（包含AI机器人"小突"）
+            // 获取默认好友（不包含AI机器人，机器人通过左下角头像按钮访问）
             getDefaultFriends() {
-                // 添加AI机器人"小突"作为默认好友
-                // 使用图片路径（如果图片不存在，会fallback到emoji）
-                return [{
-                    id: 'totofun_bot',
-                    name: '小突',
-                    avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径（使用相对路径，不带./）
-                    avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
-                    online: true,
-                    isBot: true, // 标记为机器人
-                    lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                    lastTime: new Date().toISOString()
-                }];
+                // 机器人不再显示在好友列表中，通过左下角的头像按钮访问
+                return [];
             },
 
             // 显示添加好友面板
@@ -6783,29 +6729,12 @@
                 }
                 
                 // 如果还没有加载服务器数据，先加载
-                if (this.friends.length === 0 || !this.friends.find(f => f.id === 'totofun_bot')) {
+                if (this.friends.length === 0) {
                     console.log('📡 开始加载服务器数据...');
                     this.loadServerData();
                 }
                 
-                // 确保机器人好友存在
-                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
-                if (botIndex === -1) {
-                    const botFriend = {
-                        id: 'totofun_bot',
-                        name: '小突',
-                        avatar: 'assets/images/xiaotu-bot.png',
-                        avatarFallback: '🤖',
-                        online: true,
-                        isBot: true,
-                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                        lastTime: new Date().toISOString()
-                    };
-                    this.friends.unshift(botFriend);
-                    console.log('✅ 已确保机器人好友存在');
-                }
-                
-                // 确保对话记录存在
+                // 确保对话记录存在（机器人不显示在好友列表中）
                 if (!this.conversations) {
                     this.conversations = {};
                 }
