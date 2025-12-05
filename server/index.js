@@ -23,8 +23,13 @@ const app = express();
 
 // 在 Vercel 等 Serverless 环境中，需要信任代理以正确获取客户端 IP
 // 这对于 express-rate-limit 等中间件很重要
-if (process.env.VERCEL || process.env.VERCEL_ENV) {
+// 检查是否在 Vercel 环境中（通过环境变量或请求头）
+if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL) {
     app.set('trust proxy', true);
+} else {
+    // 即使不在 Vercel，如果检测到代理头，也启用 trust proxy
+    // 这样可以兼容其他 Serverless 平台
+    app.set('trust proxy', 1);
 }
 
 // 在Serverless环境中，不需要HTTP服务器和WebSocket
