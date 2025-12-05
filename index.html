@@ -6753,10 +6753,43 @@
 
             // 打开机器人聊天窗口
             openBotChat() {
-                // 检查登录状态
-                if (!authService.isLoggedIn()) {
-                    authManager.showModal();
-                    return;
+                // 确保friends数组存在
+                if (!this.friends) {
+                    this.friends = [];
+                }
+                
+                // 检查登录状态（机器人聊天不需要登录，但已登录用户可以使用服务器数据）
+                const isLoggedIn = authService.isLoggedIn();
+                
+                // 如果已登录但还没有加载服务器数据，先加载
+                if (isLoggedIn && (this.friends.length === 0 || !this.friends.find(f => f.id === 'totofun_bot'))) {
+                    console.log('📡 检测到已登录但数据未加载，开始加载服务器数据...');
+                    this.loadServerData();
+                }
+                
+                // 确保机器人好友存在
+                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
+                if (botIndex === -1) {
+                    const botFriend = {
+                        id: 'totofun_bot',
+                        name: '小突',
+                        avatar: 'assets/images/xiaotu-bot.png',
+                        avatarFallback: '🤖',
+                        online: true,
+                        isBot: true,
+                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
+                        lastTime: new Date().toISOString()
+                    };
+                    this.friends.unshift(botFriend);
+                    console.log('✅ 已确保机器人好友存在');
+                }
+                
+                // 确保对话记录存在
+                if (!this.conversations) {
+                    this.conversations = {};
+                }
+                if (!this.conversations['totofun_bot']) {
+                    this.conversations['totofun_bot'] = [];
                 }
 
                 const botChatContainer = document.getElementById('bot-chat-container');
@@ -6768,6 +6801,9 @@
                     if (botAvatarButton) {
                         botAvatarButton.style.display = 'none';
                     }
+                    console.log('✅ 机器人聊天窗口已打开');
+                } else {
+                    console.error('❌ bot-chat-container 元素不存在');
                 }
             },
 
