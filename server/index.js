@@ -35,16 +35,28 @@ if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
 
 // 数据库连接
 // 注意：Mongoose 6+ 不再需要 useNewUrlParser 和 useUnifiedTopology
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', {
-    serverSelectionTimeoutMS: 10000, // 10秒超时
+// Serverless环境需要更长的超时时间
+const mongooseOptions = {
+    serverSelectionTimeoutMS: 30000, // 30秒超时（Serverless环境需要更长时间）
     socketTimeoutMS: 45000, // 45秒socket超时
-    connectTimeoutMS: 10000, // 10秒连接超时
+    connectTimeoutMS: 30000, // 30秒连接超时
+    maxPoolSize: 10, // 连接池大小
+    minPoolSize: 1, // 最小连接数
+    bufferMaxEntries: 0, // 禁用缓冲，立即失败而不是等待连接
+    bufferCommands: false, // 禁用命令缓冲
+};
+
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure', mongooseOptions)
+.then(() => {
+    console.log('✅ MongoDB 连接成功');
+    console.log('📊 MongoDB连接状态:', mongoose.connection.readyState);
 })
-.then(() => console.log('✅ MongoDB 连接成功'))
 .catch(err => {
     console.error('❌ MongoDB 连接失败:', err.message);
+    console.error('❌ 连接错误详情:', err);
     console.log('⚠️  服务器将继续运行，但某些功能可能不可用');
     console.log('💡 提示：请确保MongoDB正在运行，或使用MongoDB Atlas云端数据库');
+    console.log('💡 检查：MongoDB Atlas的IP白名单是否包含 0.0.0.0/0');
 });
 
 // 中间件

@@ -96,10 +96,19 @@ router.post('/register', async (req, res) => {
 
         const { username, email, password, bio, interests } = value;
 
+        // 检查MongoDB连接状态
+        if (mongoose.connection.readyState !== 1) {
+            console.warn('⚠️  MongoDB连接未就绪，状态:', mongoose.connection.readyState);
+            // 尝试重新连接
+            if (mongoose.connection.readyState === 0) {
+                await mongoose.connect(process.env.MONGODB_URI);
+            }
+        }
+
         // 检查用户是否已存在
         const existingUser = await User.findOne({
             $or: [{ email }, { username }]
-        });
+        }).maxTimeMS(20000); // 设置20秒超时
 
         if (existingUser) {
             return res.status(409).json({
