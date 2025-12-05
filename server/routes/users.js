@@ -40,6 +40,12 @@ router.get('/friends', async (req, res) => {
     try {
         const userId = req.user.userId || req.user.id;
         const user = await User.findById(userId).populate('friends.user', 'username avatar level');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: '用户不存在'
+            });
+        }
         res.json({
             success: true,
             data: user.friends || []
@@ -62,6 +68,12 @@ router.get('/conversations', async (req, res) => {
     try {
         const userId = req.user.userId || req.user.id;
         const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: '用户不存在'
+            });
+        }
         res.json({
             success: true,
             data: user.conversations || []
