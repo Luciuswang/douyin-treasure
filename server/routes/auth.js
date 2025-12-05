@@ -107,9 +107,8 @@ router.post('/register', async (req, res) => {
                     await mongoose.connect(process.env.MONGODB_URI, {
                         serverSelectionTimeoutMS: 30000,
                         socketTimeoutMS: 45000,
-                        connectTimeoutMS: 30000,
-                        bufferMaxEntries: 0,
-                        bufferCommands: false
+                        connectTimeoutMS: 30000
+                        // 注意：Mongoose 9+ 已移除 bufferMaxEntries 和 bufferCommands 选项
                     });
                     console.log('✅ MongoDB连接已建立');
                 } catch (connectError) {

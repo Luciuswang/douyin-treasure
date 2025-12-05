@@ -47,8 +47,7 @@ const mongooseOptions = {
     connectTimeoutMS: 30000, // 30秒连接超时
     maxPoolSize: 10, // 连接池大小
     minPoolSize: 1, // 最小连接数
-    bufferMaxEntries: 0, // 禁用缓冲，立即失败而不是等待连接
-    bufferCommands: false, // 禁用命令缓冲
+    // 注意：Mongoose 9+ 已移除 bufferMaxEntries 和 bufferCommands 选项
 };
 
 // 在连接字符串中添加超时参数（确保生效）
