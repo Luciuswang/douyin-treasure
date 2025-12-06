@@ -7001,14 +7001,63 @@
             // 发送机器人消息
             sendBotMessage() {
                 const input = document.getElementById('bot-chat-input');
+                if (!input) {
+                    console.error('❌ 找不到输入框元素');
+                    return;
+                }
+                
                 const content = input.value.trim();
-                if (!content) return;
+                if (!content) {
+                    console.log('⚠️ 消息内容为空');
+                    return;
+                }
+
+                // 检查登录状态
+                if (!authService || !authService.isLoggedIn || !authService.isLoggedIn()) {
+                    console.warn('⚠️ 用户未登录，显示登录提示');
+                    // 显示提示消息
+                    const botId = 'totofun_bot';
+                    const promptMessage = {
+                        id: 'msg_' + Date.now(),
+                        from: botId,
+                        to: this.currentUser?.id || 'guest',
+                        content: '🔒 请先登录后再使用AI聊天功能哦~ 😊\n\n点击右上角登录按钮即可开始使用！',
+                        type: 'text',
+                        timestamp: new Date().toISOString(),
+                        read: false,
+                        status: 'received'
+                    };
+                    
+                    if (!this.conversations[botId]) {
+                        this.conversations[botId] = [];
+                    }
+                    this.conversations[botId].push(promptMessage);
+                    this.updateBotChatMessages();
+                    
+                    // 显示登录模态框
+                    if (typeof authManager !== 'undefined' && authManager.showModal) {
+                        setTimeout(() => {
+                            authManager.showModal();
+                        }, 500);
+                    }
+                    
+                    // 清空输入框
+                    input.value = '';
+                    return;
+                }
 
                 DEBUG_MODE.log('📤 发送消息给AI机器人:', content);
                 console.log('📤 发送消息给AI机器人:', content); // 始终输出
 
                 const botId = 'totofun_bot';
                 const message = this.sendMessage(botId, content, 'text');
+                
+                // 如果sendMessage返回null（可能是登录检查失败），不继续处理
+                if (!message) {
+                    console.warn('⚠️ sendMessage返回null，可能未登录');
+                    input.value = '';
+                    return;
+                }
                 
                 // 更新机器人聊天消息显示
                 this.updateBotChatMessages();
@@ -7734,7 +7783,7 @@
                 font-size: 14px;
                 position: relative;
                 z-index: 10005;
-            " onkeypress="if(event.key === 'Enter') chatManager.sendBotMessage()">
+            " onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if(typeof chatManager !== 'undefined' && chatManager.sendBotMessage) chatManager.sendBotMessage(); }">
             <button onclick="chatManager.sendBotMessage()" style="
                 background: #4FC3F7;
                 border: none;
@@ -8014,7 +8063,7 @@
                         border-radius: 20px;
                         outline: none;
                         font-size: 14px;
-                    " onkeypress="if(event.key==='Enter') chatManager.sendTextMessage()">
+                    " onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); if(typeof chatManager !== 'undefined' && chatManager.sendTextMessage) chatManager.sendTextMessage(); }">
                     <button onclick="chatManager.sendTextMessage()" style="
                         background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
                         border: none;
