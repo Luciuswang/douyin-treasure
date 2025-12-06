@@ -6530,8 +6530,59 @@
                     botAvatarButton.style.display = 'block';
                 }
                 
+                // 初始化输入框事件监听器
+                this.initBotChatInput();
+                
                 // 检测sprite图片是否加载成功
                 this.checkBotSpriteImage();
+            },
+            
+            // 初始化机器人聊天输入框事件
+            initBotChatInput() {
+                // 等待DOM加载完成
+                setTimeout(() => {
+                    const input = document.getElementById('bot-chat-input');
+                    const sendButton = document.querySelector('#bot-chat-container button[onclick*="sendBotMessage"]');
+                    
+                    if (input) {
+                        // 移除旧的事件监听器（如果存在）
+                        const newInput = input.cloneNode(true);
+                        input.parentNode.replaceChild(newInput, input);
+                        
+                        // 添加键盘事件监听器
+                        newInput.addEventListener('keydown', (event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (this.sendBotMessage) {
+                                    this.sendBotMessage();
+                                }
+                            }
+                        });
+                        
+                        // 添加点击事件监听器（确保输入框获得焦点）
+                        newInput.addEventListener('focus', () => {
+                            console.log('✅ 输入框获得焦点');
+                        });
+                        
+                        console.log('✅ 机器人聊天输入框事件已初始化');
+                    } else {
+                        console.warn('⚠️ 找不到bot-chat-input元素，稍后重试');
+                        // 如果找不到，延迟重试
+                        setTimeout(() => this.initBotChatInput(), 500);
+                    }
+                    
+                    // 确保发送按钮也有事件监听
+                    if (sendButton) {
+                        sendButton.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (this.sendBotMessage) {
+                                this.sendBotMessage();
+                            }
+                        });
+                    }
+                }, 100);
             },
             
             // 检测机器人sprite图片是否加载成功
@@ -6829,6 +6880,15 @@
                     if (botAvatarButton) {
                         botAvatarButton.style.display = 'none';
                     }
+                    // 重新初始化输入框事件（确保事件绑定正确）
+                    this.initBotChatInput();
+                    // 聚焦到输入框
+                    setTimeout(() => {
+                        const input = document.getElementById('bot-chat-input');
+                        if (input) {
+                            input.focus();
+                        }
+                    }, 100);
                     console.log('✅ 机器人聊天窗口已打开');
                 } else {
                     console.error('❌ bot-chat-container 元素不存在');
@@ -7783,8 +7843,8 @@
                 font-size: 14px;
                 position: relative;
                 z-index: 10005;
-            " onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if(typeof chatManager !== 'undefined' && chatManager.sendBotMessage) chatManager.sendBotMessage(); }">
-            <button onclick="chatManager.sendBotMessage()" style="
+            ">
+            <button id="bot-chat-send-btn" style="
                 background: #4FC3F7;
                 border: none;
                 color: white;
