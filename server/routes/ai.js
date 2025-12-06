@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
+const { authenticateToken } = require('../middleware/auth');
+const User = require('../models/User');
 
 // DeepSeek API配置（从环境变量读取，不暴露给前端）
 // 如果环境变量未设置，使用默认API key（仅用于开发/测试）
@@ -20,8 +22,9 @@ const aiLimiter = rateLimit({
  * POST /api/ai/chat
  * DeepSeek AI聊天接口（代理）
  * 安全：API Key在后端，不暴露给前端
+ * 需要用户登录认证
  */
-router.post('/chat', aiLimiter, async (req, res) => {
+router.post('/chat', authenticateToken, aiLimiter, async (req, res) => {
     try {
         // 检查是否配置了API Key
         if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === '') {
@@ -32,7 +35,14 @@ router.post('/chat', aiLimiter, async (req, res) => {
             });
         }
 
-        const { message, context = [], username = '用户', userLevel = 1 } = req.body;
+        // 从认证中间件获取用户信息
+        const userId = req.user.userId;
+        const user = await User.findById(userId);
+        
+        // 使用认证用户的信息，如果没有则使用请求体中的信息
+        const { message, context = [], username: reqUsername, userLevel: reqUserLevel } = req.body;
+        const username = user?.username || reqUsername || '用户';
+        const userLevel = user?.level?.currentLevel || reqUserLevel || 1;
 
         // 验证输入
         if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -80,9 +90,11 @@ router.post('/chat', aiLimiter, async (req, res) => {
         ];
 
         console.log('🤖 [AI代理] 调用DeepSeek API:', {
+            userId: userId,
+            username: username,
+            userLevel: userLevel,
             messageLength: message.length,
-            contextLength: contextMessages.length,
-            username
+            contextLength: contextMessages.length
         });
 
         // 调用DeepSeek API
@@ -123,6 +135,23 @@ router.post('/chat', aiLimiter, async (req, res) => {
         }
 
         console.log('✅ [AI代理] DeepSeek API回复成功:', reply.substring(0, 50) + '...');
+
+        // 记录聊天日志（便于监控）
+        console.log('💬 [聊天日志]', {
+            userId: userId,
+            username: username,
+            userLevel: userLevel,
+            userMessage: message.substring(0, 100), // 只记录前100个字符
+            botReply: reply.substring(0, 100), // 只记录前100个字符
+            timestamp: new Date().toISOString(),
+            usage: data.usage || {}
+        });
+
+        // 更新用户最后活跃时间
+        if (user) {
+            user.lastActiveAt = new Date();
+            await user.save().catch(err => console.error('更新用户活跃时间失败:', err));
+        }
 
         res.json({
             success: true,
