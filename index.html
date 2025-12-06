@@ -4205,25 +4205,26 @@
                 return null;
             },
             
-            // 获取AI回复（使用后端代理，API Key不暴露）
+            // 获取AI回复（优先使用后端代理，GitHub Pages时自动降级到直接调用）
             async getAIReply(message) {
-                // 使用后端API代理，避免在前端暴露API Key
-                const apiProxyUrl = '/api/ai/chat'; // 相对路径，自动使用当前域名
+                // 构建上下文（最近5条消息）
+                const recentMessages = this.conversations['totofun_bot'] || [];
+                const contextMessages = recentMessages.slice(-5).map(m => ({
+                    role: m.from === this.currentUser.id ? 'user' : 'assistant',
+                    content: m.content
+                }));
+                
+                // 获取用户游戏数据，用于上下文
+                const gameUserData = storageManager.load('totofun-treasure-user');
+                const userLevel = gameUserData?.level?.currentLevel || 1;
+                const username = gameUserData?.username || this.currentUser.name;
+                
+                // 优先尝试后端API代理（如果可用）
+                const apiProxyUrl = '/api/ai/chat';
+                let useDirectCall = false;
                 
                 try {
-                    // 构建上下文（最近5条消息）
-                    const recentMessages = this.conversations['totofun_bot'] || [];
-                    const contextMessages = recentMessages.slice(-5).map(m => ({
-                        role: m.from === this.currentUser.id ? 'user' : 'assistant',
-                        content: m.content
-                    }));
-                    
-                    // 获取用户游戏数据，用于上下文
-                    const gameUserData = storageManager.load('totofun-treasure-user');
-                    const userLevel = gameUserData?.level?.currentLevel || 1;
-                    const username = gameUserData?.username || this.currentUser.name;
-                    
-                    console.log('🤖 调用AI代理API:', { message, contextLength: contextMessages.length });
+                    DEBUG_MODE.log('🤖 尝试调用后端AI代理API...');
                     
                     const response = await fetch(apiProxyUrl, {
                         method: 'POST',
@@ -4241,47 +4242,37 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success && data.reply) {
-                            console.log('✅ AI代理API回复成功:', data.reply.substring(0, 50) + '...');
+                            DEBUG_MODE.log('✅ 后端AI代理API回复成功');
                             return data.reply;
-                        } else {
-                            console.warn('⚠️ AI代理API返回失败:', data.message);
-                            return null; // 返回null会使用默认回复
-                        }
-                    } else {
-                        const errorData = await response.json().catch(() => ({}));
-                        console.error('❌ AI代理API调用失败:', response.status, errorData);
-                        
-                        // 如果后端服务不可用（404/405），尝试直接调用DeepSeek API（使用编码的API key）
-                        if (response.status === 404 || response.status === 405) {
-                            console.log('⚠️ 后端API不可用，尝试直接调用DeepSeek API');
-                            return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
-                        }
-                        
-                        // 如果后端服务未配置，返回null使用默认回复
-                        if (response.status === 503) {
-                            console.log('⚠️ AI服务未配置，使用默认回复');
                         }
                     }
+                    
+                    // 404/405表示后端不可用（GitHub Pages静态托管）
+                    if (response.status === 404 || response.status === 405) {
+                        DEBUG_MODE.log('⚠️ 后端API不可用（GitHub Pages），切换到直接调用DeepSeek API');
+                        useDirectCall = true;
+                    }
                 } catch (error) {
-                    console.error('❌ AI代理API调用异常:', error);
-                    // 网络错误时，尝试直接调用DeepSeek API
-                    console.log('⚠️ 网络错误，尝试直接调用DeepSeek API');
+                    // 网络错误（CORS、连接失败等），使用直接调用
+                    DEBUG_MODE.warn('⚠️ 后端API调用失败，切换到直接调用DeepSeek API:', error.message);
+                    useDirectCall = true;
+                }
+                
+                // 如果后端不可用，直接调用DeepSeek API
+                if (useDirectCall) {
                     try {
-                        const recentMessages = this.conversations['totofun_bot'] || [];
-                        const contextMessages = recentMessages.slice(-5).map(m => ({
-                            role: m.from === this.currentUser.id ? 'user' : 'assistant',
-                            content: m.content
-                        }));
-                        const gameUserData = storageManager.load('totofun-treasure-user');
-                        const userLevel = gameUserData?.level?.currentLevel || 1;
-                        const username = gameUserData?.username || this.currentUser.name;
-                        return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                        DEBUG_MODE.log('🤖 直接调用DeepSeek API...');
+                        const reply = await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                        if (reply) {
+                            return reply;
+                        }
                     } catch (directError) {
-                        console.error('❌ 直接调用DeepSeek API也失败:', directError);
+                        DEBUG_MODE.error('❌ 直接调用DeepSeek API失败:', directError);
                     }
                 }
                 
-                return null; // 返回null会使用默认回复逻辑
+                // 如果都失败，返回null使用默认回复
+                return null;
             },
             
             // 直接调用DeepSeek API（后备方案，API key已编码）
@@ -4342,15 +4333,22 @@
                         const data = await response.json();
                         const reply = data.choices?.[0]?.message?.content || null;
                         if (reply) {
-                            console.log('✅ 直接调用DeepSeek API成功:', reply.substring(0, 50) + '...');
+                            DEBUG_MODE.log('✅ 直接调用DeepSeek API成功:', reply.substring(0, 50) + '...');
                             return reply;
+                        } else {
+                            DEBUG_MODE.warn('⚠️ DeepSeek API返回空回复');
                         }
                     } else {
                         const errorData = await response.json().catch(() => ({}));
-                        console.error('❌ 直接调用DeepSeek API失败:', response.status, errorData);
+                        DEBUG_MODE.error('❌ 直接调用DeepSeek API失败:', response.status, errorData);
+                        
+                        // 如果是401/403，可能是API Key问题
+                        if (response.status === 401 || response.status === 403) {
+                            DEBUG_MODE.error('❌ API Key可能无效或已过期');
+                        }
                     }
                 } catch (error) {
-                    console.error('❌ 直接调用DeepSeek API异常:', error);
+                    DEBUG_MODE.error('❌ 直接调用DeepSeek API异常:', error);
                 }
                 return null;
             },
@@ -4493,31 +4491,37 @@
             },
             
             // 更新DeepSeek API状态显示
-            // 检查AI服务状态（使用后端代理，不需要前端配置）
+            // 检查AI服务状态（GitHub Pages静态托管时直接使用DeepSeek API）
             async checkAIServiceStatus() {
                 try {
-                    const response = await fetch('/api/ai/status');
-                    if (response.ok) {
+                    const response = await fetch('/api/ai/status').catch(() => null);
+                    if (response && response.ok) {
                         const data = await response.json();
                         return data.available;
                     }
                 } catch (error) {
-                    console.warn('⚠️ 无法检查AI服务状态:', error);
+                    DEBUG_MODE.warn('⚠️ 无法检查AI服务状态（GitHub Pages静态托管），将使用直接调用:', error);
                 }
-                return false;
+                // GitHub Pages没有后端，返回true表示可以使用直接调用
+                return true;
             },
             
             updateDeepSeekApiStatus() {
                 const statusEl = document.getElementById('deepseek-status');
                 if (!statusEl) return;
                 
-                // 由于使用后端代理，始终显示"已启用"
+                // GitHub Pages静态托管，直接显示已启用（使用直接调用DeepSeek API）
                 statusEl.textContent = '已启用';
                 statusEl.style.background = '#22C55E';
                 
-                // 检查后端API是否可用（可选）
+                // 尝试检查后端API是否可用（可选，失败不影响）
                 fetch('/api/ai/status')
-                    .then(res => res.json())
+                    .then(res => {
+                        if (res.ok) {
+                            return res.json();
+                        }
+                        throw new Error('Backend not available');
+                    })
                     .then(data => {
                         if (data.success && data.available) {
                             statusEl.textContent = '已启用';
@@ -4528,7 +4532,7 @@
                         }
                     })
                     .catch(() => {
-                        // 网络错误时仍显示已启用（使用默认回复）
+                        // GitHub Pages静态托管，后端不可用，但可以使用直接调用
                         statusEl.textContent = '已启用';
                         statusEl.style.background = '#22C55E';
                     });
