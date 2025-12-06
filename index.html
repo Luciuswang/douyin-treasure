@@ -460,6 +460,86 @@
 <body>
     <div class="container">
         <div class="header">
+            <!-- 用户信息栏（右上角） -->
+            <div id="user-info-bar" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                display: none;
+                align-items: center;
+                gap: 15px;
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(10px);
+                padding: 10px 20px;
+                border-radius: 25px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                z-index: 1000;
+            ">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="user-avatar-display" style="
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 20px;
+                        color: white;
+                        border: 2px solid rgba(255, 255, 255, 0.5);
+                    ">👤</div>
+                    <div>
+                        <div id="user-display-name" style="color: white; font-weight: 600; font-size: 14px;">游客</div>
+                        <div id="user-display-level" style="color: rgba(255, 255, 255, 0.8); font-size: 12px;">LV.1</div>
+                    </div>
+                </div>
+                <button id="admin-panel-btn" onclick="adminManager.showPanel()" style="
+                    display: none;
+                    background: rgba(255, 193, 7, 0.3);
+                    border: 1px solid rgba(255, 193, 7, 0.5);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 15px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 193, 7, 0.4)'" 
+                   onmouseout="this.style.background='rgba(255, 193, 7, 0.3)'" title="管理后台">⚙️ 管理</button>
+                <button onclick="authManager.handleLogout()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 15px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+                   onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">登出</button>
+            </div>
+            
+            <!-- 登录按钮（未登录时显示） -->
+            <div id="login-button-container" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                z-index: 1000;
+            ">
+                <button onclick="authManager.showModal()" style="
+                    background: rgba(255, 255, 255, 0.2);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 25px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'" 
+                   onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">🔐 登录/注册</button>
+            </div>
+            
             <div class="logo-container">
                 <img src="assets/images/totofun-logo.png" alt="Totofun Logo" class="logo">
             </div>
@@ -646,6 +726,333 @@
                     console.error('删除失败:', error);
                     return false;
                 }
+            }
+        };
+
+        // API配置
+        const API_CONFIG = {
+            // 云服务地址配置（部署到云服务后，在这里设置你的服务器地址）
+            // 例如：'https://totofun-server.railway.app' 或 'https://totofun-server.onrender.com'
+            CLOUD_API_URL: 'https://totofun-server-production.up.railway.app', // Railway部署地址
+            
+            // 自动检测API地址
+            get BASE_URL() {
+                // 优先检查localStorage中的配置（用于临时覆盖）
+                const localStorageApiUrl = localStorage.getItem('API_BASE_URL');
+                if (localStorageApiUrl && localStorageApiUrl !== 'your-api-domain.com') {
+                    console.log('📌 使用localStorage中的API地址:', localStorageApiUrl);
+                    return localStorageApiUrl;
+                }
+                
+                // 检查window全局变量
+                if (window.API_BASE_URL && window.API_BASE_URL !== 'your-api-domain.com') {
+                    console.log('📌 使用window中的API地址:', window.API_BASE_URL);
+                    return window.API_BASE_URL;
+                }
+                
+                // 如果设置了云服务地址，优先使用
+                if (this.CLOUD_API_URL && this.CLOUD_API_URL !== 'your-api-domain.com') {
+                    console.log('📌 使用CLOUD_API_URL:', this.CLOUD_API_URL);
+                    return this.CLOUD_API_URL;
+                }
+                
+                const hostname = window.location.hostname;
+                const protocol = window.location.protocol;
+                const port = window.location.port;
+                
+                // 如果是localhost或127.0.0.1，使用本地服务器
+                if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                    return 'http://localhost:5000';
+                }
+                
+                // 如果是file://协议（本地文件），也使用localhost
+                if (window.location.protocol === 'file:') {
+                    return 'http://localhost:5000';
+                }
+                
+                // GitHub Pages部署：使用配置的云服务地址
+                if (this.CLOUD_API_URL) {
+                    return this.CLOUD_API_URL;
+                }
+                
+                // 其他情况，尝试使用相同域名和5000端口
+                return `${protocol}//${hostname}${port ? ':5000' : ''}`;
+            },
+            ENDPOINTS: {
+                REGISTER: '/api/auth/register',
+                LOGIN: '/api/auth/login',
+                REFRESH: '/api/auth/refresh',
+                PROFILE: '/api/users/profile',
+                FRIENDS: '/api/users/friends',
+                CONVERSATIONS: '/api/users/conversations'
+            }
+        };
+
+        // 用户认证服务
+        const authService = {
+            // 获取当前token
+            getToken() {
+                return storageManager.load('auth_token');
+            },
+
+            // 保存token
+            saveToken(token) {
+                storageManager.save('auth_token', token);
+            },
+
+            // 获取用户信息
+            getUser() {
+                return storageManager.load('auth_user');
+            },
+
+            // 保存用户信息
+            saveUser(user) {
+                storageManager.save('auth_user', user);
+            },
+
+            // 检查是否已登录
+            isLoggedIn() {
+                const token = this.getToken();
+                const user = this.getUser();
+                return !!(token && user);
+            },
+
+            // 注册
+            async register(username, email, password) {
+                try {
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const apiUrl = baseUrl + API_CONFIG.ENDPOINTS.REGISTER;
+                    console.log('📡 API配置信息:');
+                    console.log('  - CLOUD_API_URL:', API_CONFIG.CLOUD_API_URL);
+                    console.log('  - BASE_URL:', baseUrl);
+                    console.log('  - 完整请求URL:', apiUrl);
+                    console.log('  - 当前页面:', window.location.href);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, email, password })
+                    });
+
+                    // 检查响应状态
+                    if (!response.ok) {
+                        // 尝试解析错误信息
+                        let errorMessage = '注册失败';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.message || errorData.errors?.join(', ') || `服务器错误 (${response.status})`;
+                        } catch (e) {
+                            errorMessage = `服务器错误 (${response.status} ${response.statusText})`;
+                        }
+                        return { success: false, message: errorMessage };
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存token和用户信息
+                        this.saveToken(data.data.tokens.accessToken);
+                        if (data.data.tokens.refreshToken) {
+                            this.saveRefreshToken(data.data.tokens.refreshToken);
+                        }
+                        this.saveUser(data.data.user);
+                        return { success: true, user: data.data.user };
+                    } else {
+                        return { success: false, message: data.message || data.errors?.join(', ') || '注册失败' };
+                    }
+                } catch (error) {
+                    console.error('注册错误:', error);
+                    console.error('错误详情:', {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    });
+                    
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    let errorMessage = '网络错误，请检查服务器连接';
+                    
+                    // 检查是否是CORS错误
+                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                        if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+                            errorMessage = `CORS错误：无法连接到服务器 (${baseUrl})。\n\n可能的原因：\n1. 服务器未正确配置CORS\n2. 服务器地址不正确\n3. 网络连接问题\n\n请检查控制台中的API配置信息。`;
+                        } else {
+                            errorMessage = `无法连接到服务器 (${baseUrl})。\n\n请确保：\n1. 后端服务器正在运行\n2. API地址配置正确\n3. 网络连接正常`;
+                        }
+                    } else {
+                        errorMessage = `网络错误: ${error.message}`;
+                    }
+                    
+                    return { success: false, message: errorMessage };
+                }
+            },
+
+            // 登录
+            async login(email, password) {
+                try {
+                    const apiUrl = API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.LOGIN;
+                    console.log('📡 登录请求URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    // 检查响应状态
+                    if (!response.ok) {
+                        // 尝试解析错误信息
+                        let errorMessage = '登录失败';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.message || errorData.errors?.join(', ') || `服务器错误 (${response.status})`;
+                        } catch (e) {
+                            errorMessage = `服务器错误 (${response.status} ${response.statusText})`;
+                        }
+                        return { success: false, message: errorMessage };
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存token和用户信息
+                        this.saveToken(data.data.tokens.accessToken);
+                        if (data.data.tokens.refreshToken) {
+                            this.saveRefreshToken(data.data.tokens.refreshToken);
+                        }
+                        this.saveUser(data.data.user);
+                        return { success: true, user: data.data.user };
+                    } else {
+                        return { success: false, message: data.message || data.errors?.join(', ') || '登录失败' };
+                    }
+                } catch (error) {
+                    console.error('登录错误:', error);
+                    const apiUrl = API_CONFIG.BASE_URL;
+                    let errorMessage = '网络错误，请检查服务器连接';
+                    
+                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                        errorMessage = `无法连接到服务器 (${apiUrl})。请确保后端服务器正在运行在端口5000。`;
+                    } else {
+                        errorMessage = `网络错误: ${error.message}`;
+                    }
+                    
+                    return { success: false, message: errorMessage };
+                }
+            },
+
+            // 登出
+            async logout() {
+                try {
+                    const token = this.getToken();
+                    if (token) {
+                        // 调用后端登出API
+                        try {
+                            await fetch(API_CONFIG.BASE_URL + '/api/auth/logout', {
+                                method: 'POST',
+                                headers: this.getAuthHeaders()
+                            });
+                        } catch (error) {
+                            console.error('登出API调用失败:', error);
+                            // 即使API调用失败，也清除本地数据
+                        }
+                    }
+                    
+                    // 清除本地存储
+                    storageManager.remove('auth_token');
+                    storageManager.remove('auth_user');
+                    storageManager.remove('refresh_token');
+                    
+                    // 刷新页面
+                    location.reload();
+                } catch (error) {
+                    console.error('登出错误:', error);
+                    // 即使出错也清除本地数据
+                    storageManager.remove('auth_token');
+                    storageManager.remove('auth_user');
+                    storageManager.remove('refresh_token');
+                    location.reload();
+                }
+            },
+
+            // 获取当前用户信息（从服务器）
+            async getCurrentUser() {
+                try {
+                    const token = this.getToken();
+                    if (!token) {
+                        return null;
+                    }
+
+                    const response = await fetch(API_CONFIG.BASE_URL + '/api/auth/me', {
+                        method: 'GET',
+                        headers: this.getAuthHeaders()
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.user) {
+                        // 更新本地用户信息
+                        this.saveUser(data.data.user);
+                        return data.data.user;
+                    } else {
+                        // token可能已过期，清除本地数据
+                        if (response.status === 401) {
+                            this.logout();
+                        }
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('获取用户信息错误:', error);
+                    return null;
+                }
+            },
+
+            // 刷新token
+            async refreshToken() {
+                try {
+                    const refreshToken = storageManager.load('refresh_token');
+                    if (!refreshToken) {
+                        return false;
+                    }
+
+                    const response = await fetch(API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.REFRESH, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ refreshToken })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.accessToken) {
+                        this.saveToken(data.data.accessToken);
+                        return true;
+                    } else {
+                        // 刷新失败，需要重新登录
+                        this.logout();
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('刷新token错误:', error);
+                    return false;
+                }
+            },
+
+            // 保存刷新token
+            saveRefreshToken(token) {
+                storageManager.save('refresh_token', token);
+            },
+
+            // 获取认证请求头
+            getAuthHeaders() {
+                const token = this.getToken();
+                return {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                };
             }
         };
 
@@ -2447,7 +2854,60 @@
         }
 
         // 页面加载时的初始化
+        // 初始化用户认证状态
+        async function initAuth() {
+            try {
+                if (authService.isLoggedIn()) {
+                    // 已登录，获取最新用户信息
+                    const user = await authService.getCurrentUser();
+                    if (user) {
+                        authManager.updateUserDisplay();
+                        console.log('✅ 用户已登录:', user.username);
+                    } else {
+                        // 获取用户信息失败，可能token已过期
+                        console.log('⚠️ 获取用户信息失败，需要重新登录');
+                        authManager.updateUserDisplay();
+                    }
+                } else {
+                    // 未登录，显示登录按钮
+                    authManager.updateUserDisplay();
+                }
+            } catch (error) {
+                console.error('初始化认证状态错误:', error);
+                authManager.updateUserDisplay();
+            }
+        }
+
+        // Token自动刷新机制
+        function setupTokenRefresh() {
+            // 每5分钟检查一次token是否即将过期（提前1小时刷新）
+            setInterval(async () => {
+                if (authService.isLoggedIn()) {
+                    try {
+                        // 尝试获取用户信息，如果失败则刷新token
+                        const user = await authService.getCurrentUser();
+                        if (!user) {
+                            // 尝试刷新token
+                            const refreshed = await authService.refreshToken();
+                            if (refreshed) {
+                                console.log('✅ Token已自动刷新');
+                                // 重新获取用户信息
+                                await authService.getCurrentUser();
+                                authManager.updateUserDisplay();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Token自动刷新错误:', error);
+                    }
+                }
+            }, 5 * 60 * 1000); // 5分钟
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化认证状态
+            initAuth();
+            // 设置token自动刷新
+            setupTokenRefresh();
             // 加载用户数据
             loadUserData();
             
@@ -2657,6 +3117,215 @@
         // ==================== 聊天功能 ====================
         
         // 聊天数据管理
+        // 认证管理器
+        const authManager = {
+            // 显示登录表单
+            showLoginForm() {
+                document.getElementById('auth-login-form').style.display = 'block';
+                document.getElementById('auth-register-form').style.display = 'none';
+                document.getElementById('auth-login-error').style.display = 'none';
+                document.getElementById('auth-register-error').style.display = 'none';
+            },
+
+            // 显示注册表单
+            showRegisterForm() {
+                document.getElementById('auth-login-form').style.display = 'none';
+                document.getElementById('auth-register-form').style.display = 'block';
+                document.getElementById('auth-login-error').style.display = 'none';
+                document.getElementById('auth-register-error').style.display = 'none';
+            },
+
+            // 显示模态框
+            showModal() {
+                const modal = document.getElementById('auth-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    this.showLoginForm();
+                }
+            },
+
+            // 关闭模态框
+            closeModal() {
+                const modal = document.getElementById('auth-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            },
+
+            // 处理登录
+            async handleLogin() {
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                const errorDiv = document.getElementById('auth-login-error');
+
+                if (!email || !password) {
+                    errorDiv.textContent = '请填写邮箱和密码';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '登录中...';
+                errorDiv.style.background = '#e3f2fd';
+                errorDiv.style.color = '#1976d2';
+                errorDiv.style.display = 'block';
+
+                const result = await authService.login(email, password);
+
+                if (result.success) {
+                    errorDiv.textContent = '登录成功！';
+                    errorDiv.style.background = '#e8f5e9';
+                    errorDiv.style.color = '#2e7d32';
+                    
+                    // 更新用户信息显示
+                    this.updateUserDisplay();
+                    
+                    // 延迟关闭，让用户看到成功消息
+                    setTimeout(() => {
+                        this.closeModal();
+                        // 刷新页面以加载用户数据
+                        location.reload();
+                    }, 1000);
+                } else {
+                    errorDiv.textContent = result.message || '登录失败';
+                    errorDiv.style.background = '#fee';
+                    errorDiv.style.color = '#c33';
+                }
+            },
+
+            // 处理注册
+            async handleRegister() {
+                const username = document.getElementById('register-username').value.trim();
+                const email = document.getElementById('register-email').value.trim();
+                const password = document.getElementById('register-password').value;
+                const errorDiv = document.getElementById('auth-register-error');
+
+                if (!username || !email || !password) {
+                    errorDiv.textContent = '请填写所有字段';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                if (username.length < 3 || username.length > 20) {
+                    errorDiv.textContent = '用户名长度应在3-20个字符之间';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                if (password.length < 6) {
+                    errorDiv.textContent = '密码长度至少6个字符';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '注册中...';
+                errorDiv.style.background = '#e3f2fd';
+                errorDiv.style.color = '#1976d2';
+                errorDiv.style.display = 'block';
+
+                const result = await authService.register(username, email, password);
+
+                if (result.success) {
+                    errorDiv.textContent = '注册成功！正在登录...';
+                    errorDiv.style.background = '#e8f5e9';
+                    errorDiv.style.color = '#2e7d32';
+                    
+                    // 更新用户信息显示
+                    this.updateUserDisplay();
+                    
+                    // 延迟关闭，让用户看到成功消息
+                    setTimeout(() => {
+                        this.closeModal();
+                        // 刷新页面以加载用户数据
+                        location.reload();
+                    }, 1500);
+                } else {
+                    errorDiv.textContent = result.message || '注册失败';
+                    errorDiv.style.background = '#fee';
+                    errorDiv.style.color = '#c33';
+                }
+            },
+
+            // 检查登录状态，如果未登录则显示登录框
+            checkLoginStatus() {
+                if (!authService.isLoggedIn()) {
+                    // 延迟显示，让页面先加载
+                    setTimeout(() => {
+                        this.showModal();
+                    }, 500);
+                    return false;
+                }
+                return true;
+            },
+
+            // 处理登出
+            async handleLogout() {
+                if (confirm('确定要登出吗？')) {
+                    await authService.logout();
+                }
+            },
+
+            // 更新用户信息显示
+            updateUserDisplay() {
+                const user = authService.getUser();
+                const userInfoBar = document.getElementById('user-info-bar');
+                const loginButtonContainer = document.getElementById('login-button-container');
+                
+                if (user && authService.isLoggedIn()) {
+                    // 显示用户信息栏，隐藏登录按钮
+                    if (userInfoBar) {
+                        userInfoBar.style.display = 'flex';
+                    }
+                    if (loginButtonContainer) {
+                        loginButtonContainer.style.display = 'none';
+                    }
+                    
+                    // 更新用户信息
+                    const avatarDisplay = document.getElementById('user-avatar-display');
+                    const displayName = document.getElementById('user-display-name');
+                    const displayLevel = document.getElementById('user-display-level');
+                    const adminBtn = document.getElementById('admin-panel-btn');
+                    
+                    if (avatarDisplay) {
+                        avatarDisplay.textContent = user.avatar || '👤';
+                        if (user.avatar && user.avatar.startsWith('http')) {
+                            avatarDisplay.style.backgroundImage = `url(${user.avatar})`;
+                            avatarDisplay.style.backgroundSize = 'cover';
+                            avatarDisplay.style.backgroundPosition = 'center';
+                            avatarDisplay.textContent = '';
+                        }
+                    }
+                    if (displayName) {
+                        displayName.textContent = user.username || '游客';
+                    }
+                    if (displayLevel) {
+                        displayLevel.textContent = `LV.${user.level?.currentLevel || 1}`;
+                    }
+                    // 如果是管理员，显示管理按钮
+                    if (adminBtn) {
+                        adminBtn.style.display = (user.role === 'admin') ? 'block' : 'none';
+                    }
+                    
+                    // 更新页面中的用户信息
+                    if (document.getElementById('user-name')) {
+                        document.getElementById('user-name').textContent = user.username || '游客';
+                    }
+                    if (document.getElementById('user-level')) {
+                        document.getElementById('user-level').textContent = `LV.${user.level?.currentLevel || 1}`;
+                    }
+                } else {
+                    // 隐藏用户信息栏，显示登录按钮
+                    if (userInfoBar) {
+                        userInfoBar.style.display = 'none';
+                    }
+                    if (loginButtonContainer) {
+                        loginButtonContainer.style.display = 'block';
+                    }
+                }
+            }
+        };
+
         const chatManager = {
             currentUser: null,
             friends: [],
@@ -2664,51 +3333,69 @@
             unreadCount: 0,
 
             // 初始化当前用户
-            init() {
+            async init() {
                 console.log('🔧 开始初始化聊天系统...');
                 
-                // 尝试加载已有的聊天用户
-                let savedChatUser = storageManager.load('chatUser');
-                
-                if (!savedChatUser) {
-                    console.log('📝 未找到已有用户，创建新用户...');
-                    // 如果没有聊天用户，创建一个持久的ID
-                    // 使用固定的ID生成方式，确保用户ID不会改变
-                    const userId = this.generatePersistentUserId();
-                    
-                    // 尝试从游戏数据中获取昵称
-                    const gameUserData = storageManager.load('totofun-treasure-user');
-                    const username = gameUserData?.username || '游客';
-                    
-                    savedChatUser = {
-                        id: userId,
-                        name: username,
-                        avatar: '👤',
+                // 检查是否已登录
+                if (authService.isLoggedIn()) {
+                    console.log('✅ 用户已登录，使用服务器数据');
+                    const serverUser = authService.getUser();
+                    this.currentUser = {
+                        id: serverUser._id || serverUser.id,
+                        name: serverUser.username,
+                        avatar: serverUser.avatar || '👤',
                         online: true,
-                        createdAt: new Date().toISOString()
+                        createdAt: serverUser.createdAt || new Date().toISOString()
                     };
                     
-                    storageManager.save('chatUser', savedChatUser);
-                    console.log('✅ 新用户已创建:', userId, '昵称:', username);
+                    // 从服务器加载好友列表和聊天记录（异步，不阻塞）
+                    this.loadServerData();
                 } else {
-                    console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
+                    console.log('📝 用户未登录，使用本地数据');
+                    // 尝试加载已有的聊天用户
+                    let savedChatUser = storageManager.load('chatUser');
                     
-                    // 检查ID格式，如果是旧的长ID，提示用户（但不强制迁移，避免破坏好友关系）
-                    if (savedChatUser.id && (savedChatUser.id.length > 10 || !/^\d+$/.test(savedChatUser.id))) {
-                        console.log('⚠️ 检测到旧格式ID（长度>10或包含非数字字符）:', savedChatUser.id);
-                        // 可选：在这里可以提示用户迁移到短ID，但为了不破坏好友关系，暂时保持原ID
-                    }
-                    
-                    // 同步游戏昵称到聊天昵称
-                    const gameUserData = storageManager.load('totofun-treasure-user');
-                    if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
-                        savedChatUser.name = gameUserData.username;
+                    if (!savedChatUser) {
+                        console.log('📝 未找到已有用户，创建新用户...');
+                        // 如果没有聊天用户，创建一个持久的ID
+                        // 使用固定的ID生成方式，确保用户ID不会改变
+                        const userId = this.generatePersistentUserId();
+                        
+                        // 尝试从游戏数据中获取昵称
+                        const gameUserData = storageManager.load('totofun-treasure-user');
+                        const username = gameUserData?.username || '游客';
+                        
+                        savedChatUser = {
+                            id: userId,
+                            name: username,
+                            avatar: '👤',
+                            online: true,
+                            createdAt: new Date().toISOString()
+                        };
+                        
                         storageManager.save('chatUser', savedChatUser);
-                        console.log('✅ 昵称已同步:', gameUserData.username);
+                        console.log('✅ 新用户已创建:', userId, '昵称:', username);
+                    } else {
+                        console.log('✅ 恢复已有用户:', savedChatUser.id, '昵称:', savedChatUser.name);
+                        
+                        // 检查ID格式，如果是旧的长ID，提示用户（但不强制迁移，避免破坏好友关系）
+                        if (savedChatUser.id && (savedChatUser.id.length > 10 || !/^\d+$/.test(savedChatUser.id))) {
+                            console.log('⚠️ 检测到旧格式ID（长度>10或包含非数字字符）:', savedChatUser.id);
+                            // 可选：在这里可以提示用户迁移到短ID，但为了不破坏好友关系，暂时保持原ID
+                        }
+                        
+                        // 同步游戏昵称到聊天昵称
+                        const gameUserData = storageManager.load('totofun-treasure-user');
+                        if (gameUserData?.username && gameUserData.username !== savedChatUser.name) {
+                            savedChatUser.name = gameUserData.username;
+                            storageManager.save('chatUser', savedChatUser);
+                            console.log('✅ 昵称已同步:', gameUserData.username);
+                        }
                     }
+                    
+                    this.currentUser = savedChatUser;
                 }
                 
-                this.currentUser = savedChatUser;
                 console.log('👤 当前用户:', this.currentUser.id, this.currentUser.name);
                 
                 // 如果ID是短ID（10位数字），在控制台显示友好提示
@@ -2716,55 +3403,28 @@
                     console.log('✅ 用户ID格式正确（10位数字）');
                 }
                 
-                // 加载好友列表
-                const savedFriends = storageManager.load('chatFriends');
-                if (savedFriends && Array.isArray(savedFriends) && savedFriends.length > 0) {
-                    this.friends = savedFriends;
-                } else {
-                    // 如果没有保存的好友列表，使用默认好友（包含机器人）
+                // 加载好友列表和对话记录
+                if (authService.isLoggedIn()) {
+                    // 已登录：从服务器加载（异步，不阻塞）
+                    this.loadServerData();
+                    // 先使用默认好友列表（包含机器人）
                     this.friends = this.getDefaultFriends();
-                }
-                
-                // 确保机器人好友存在（如果不存在则添加，如果存在则更新头像）
-                const botIndex = this.friends.findIndex(f => f.id === 'totofun_bot');
-                let isNewBot = false;
-                
-                if (botIndex === -1) {
-                    // 不存在，添加机器人好友
-                    const botFriend = {
-                        id: 'totofun_bot',
-                        name: '小突',
-                        avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径
-                        avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
-                        online: true,
-                        isBot: true,
-                        lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                        lastTime: new Date().toISOString()
-                    };
-                    this.friends.unshift(botFriend); // 添加到列表开头
-                    isNewBot = true;
-                    console.log('✅ 已添加AI机器人好友"小突"');
+                    this.conversations = {};
                 } else {
-                    // 已存在，更新头像（确保使用图片而不是emoji）
-                    const botFriend = this.friends[botIndex];
-                    if (!botFriend.avatar || botFriend.avatar === '🤖' || !botFriend.avatar.includes('.png')) {
-                        botFriend.avatar = 'assets/images/xiaotu-bot.png';
-                        botFriend.avatarFallback = '🤖';
-                        botFriend.isBot = true; // 确保标记为机器人
-                        console.log('✅ 已更新机器人好友"小突"的头像为图片');
+                    // 未登录：使用本地数据
+                    const savedFriends = storageManager.load('chatFriends');
+                    if (savedFriends && Array.isArray(savedFriends) && savedFriends.length > 0) {
+                        this.friends = savedFriends;
+                    } else {
+                        this.friends = this.getDefaultFriends();
                     }
+                    this.conversations = storageManager.load('chatConversations') || {};
                 }
                 
-                storageManager.save('chatFriends', this.friends);
-                
-                // 加载对话记录
-                this.conversations = storageManager.load('chatConversations') || {};
-                
-                // 如果是新添加的机器人好友，添加欢迎消息
-                if (isNewBot) {
-                    if (!this.conversations['totofun_bot']) {
-                        this.conversations['totofun_bot'] = [];
-                    }
+                // 机器人不再添加到好友列表，通过左下角头像按钮访问
+                // 但确保机器人对话记录存在
+                if (!this.conversations['totofun_bot']) {
+                    this.conversations['totofun_bot'] = [];
                     // 检查是否已有欢迎消息
                     const hasWelcomeMsg = this.conversations['totofun_bot'].some(m => m.id === 'welcome_msg');
                     if (!hasWelcomeMsg) {
@@ -2781,6 +3441,13 @@
                         console.log('✅ 已添加机器人欢迎消息');
                         this.saveData();
                     }
+                }
+                
+                // 从好友列表中移除机器人（如果存在）
+                this.friends = this.friends.filter(f => f.id !== 'totofun_bot');
+                
+                if (!authService.isLoggedIn()) {
+                    storageManager.save('chatFriends', this.friends);
                 }
 
                 // 初始化机器人聊天窗口
@@ -3111,6 +3778,121 @@
                         console.log('📋 Firebase中没有好友关系');
                     }
                 });
+            },
+            
+            // 从服务器加载好友列表和聊天记录
+            async loadServerData() {
+                if (!authService.isLoggedIn()) {
+                    console.warn('⚠️ 用户未登录，无法加载服务器数据');
+                    return;
+                }
+                
+                try {
+                    console.log('📡 开始从服务器加载数据...');
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const authHeaders = authService.getAuthHeaders();
+                    
+                    // 1. 加载好友列表
+                    try {
+                        const friendsResponse = await fetch(baseUrl + API_CONFIG.ENDPOINTS.FRIENDS, {
+                            method: 'GET',
+                            headers: authHeaders
+                        });
+                        
+                        if (friendsResponse.ok) {
+                            const friendsData = await friendsResponse.json();
+                            if (friendsData.success && Array.isArray(friendsData.data)) {
+                                console.log('✅ 从服务器加载到', friendsData.data.length, '个好友');
+                                
+                                // 转换服务器数据格式为本地格式
+                                const serverFriends = friendsData.data.map(friend => {
+                                    const friendUser = friend.user || friend;
+                                    return {
+                                        id: friendUser._id || friendUser.id,
+                                        name: friendUser.username || friendUser.name || '未知用户',
+                                        avatar: friendUser.avatar || '👤',
+                                        online: false, // 服务器数据可能不包含在线状态
+                                        lastMessage: '',
+                                        lastTime: new Date().toISOString()
+                                    };
+                                });
+                                
+                                // 合并服务器好友列表（不包含机器人，机器人通过左下角头像按钮访问）
+                                this.friends = serverFriends;
+                                
+                                // 从好友列表中移除机器人（如果存在）
+                                this.friends = this.friends.filter(f => f.id !== 'totofun_bot');
+                                
+                                this.updateFriendsList();
+                                console.log('✅ 好友列表已更新');
+                            }
+                        } else {
+                            console.warn('⚠️ 加载好友列表失败:', friendsResponse.status);
+                        }
+                    } catch (error) {
+                        console.error('❌ 加载好友列表出错:', error);
+                    }
+                    
+                    // 2. 加载对话记录
+                    try {
+                        const conversationsResponse = await fetch(baseUrl + API_CONFIG.ENDPOINTS.CONVERSATIONS, {
+                            method: 'GET',
+                            headers: authHeaders
+                        });
+                        
+                        if (conversationsResponse.ok) {
+                            const conversationsData = await conversationsResponse.json();
+                            if (conversationsData.success && conversationsData.data) {
+                                console.log('✅ 从服务器加载到对话记录');
+                                
+                                // 转换服务器数据格式为本地格式
+                                // 服务器返回的格式可能是数组或对象
+                                if (Array.isArray(conversationsData.data)) {
+                                    // 如果是数组，转换为对象格式
+                                    const conversationsObj = {};
+                                    conversationsData.data.forEach(conv => {
+                                        const friendId = conv.friendId || conv.userId;
+                                        if (friendId && conv.messages && Array.isArray(conv.messages)) {
+                                            conversationsObj[friendId] = conv.messages.map(msg => ({
+                                                id: msg.id || 'msg_' + Date.now(),
+                                                from: msg.from || friendId,
+                                                to: msg.to || this.currentUser.id,
+                                                content: msg.content || '',
+                                                type: msg.type || 'text',
+                                                timestamp: msg.timestamp || new Date().toISOString(),
+                                                read: msg.read || false,
+                                                status: msg.status || 'received'
+                                            }));
+                                        }
+                                    });
+                                    this.conversations = conversationsObj;
+                                } else if (typeof conversationsData.data === 'object') {
+                                    // 如果已经是对象格式，直接使用
+                                    this.conversations = conversationsData.data;
+                                }
+                                
+                                // 确保机器人对话存在
+                                if (!this.conversations['totofun_bot']) {
+                                    this.conversations['totofun_bot'] = [];
+                                }
+                                
+                                this.updateUnreadCount();
+                                console.log('✅ 对话记录已更新');
+                            }
+                        } else {
+                            console.warn('⚠️ 加载对话记录失败:', conversationsResponse.status);
+                        }
+                    } catch (error) {
+                        console.error('❌ 加载对话记录出错:', error);
+                    }
+                    
+                    // 保存数据
+                    this.saveData();
+                    console.log('✅ 服务器数据加载完成');
+                    
+                } catch (error) {
+                    console.error('❌ 加载服务器数据失败:', error);
+                }
             },
             
             // 监听好友在线状态变化
@@ -3610,20 +4392,10 @@
                 return `<span style="font-size: ${size * 0.7}px; display: block; text-align: center; line-height: ${size}px;">${avatar}</span>`;
             },
             
-            // 获取默认好友（包含AI机器人"小突"）
+            // 获取默认好友（不包含AI机器人，机器人通过左下角头像按钮访问）
             getDefaultFriends() {
-                // 添加AI机器人"小突"作为默认好友
-                // 使用图片路径（如果图片不存在，会fallback到emoji）
-                return [{
-                    id: 'totofun_bot',
-                    name: '小突',
-                    avatar: 'assets/images/xiaotu-bot.png', // 机器人头像图片路径（使用相对路径，不带./）
-                    avatarFallback: '🤖', // 如果图片加载失败，使用这个emoji
-                    online: true,
-                    isBot: true, // 标记为机器人
-                    lastMessage: '你好！我是小突，你的寻宝伙伴！有什么问题都可以问我哦~',
-                    lastTime: new Date().toISOString()
-                }];
+                // 机器人不再显示在好友列表中，通过左下角的头像按钮访问
+                return [];
             },
 
             // 显示添加好友面板
@@ -4059,6 +4831,12 @@
 
             // 发送消息
             sendMessage(friendId, content, type = 'text') {
+                // 检查登录状态
+                if (!authService.isLoggedIn()) {
+                    authManager.showModal();
+                    return null;
+                }
+
                 const message = {
                     id: 'msg_' + Date.now(),
                     from: this.currentUser.id,
@@ -4090,28 +4868,45 @@
                     // 延迟一下，模拟思考时间，然后获取AI回复
                     setTimeout(() => {
                         this.getBotReply(content, friendId).then(reply => {
-                            if (reply) {
-                                // 模拟机器人发送消息
-                                const botMessage = {
-                                    id: 'msg_' + Date.now(),
-                                    from: friendId,
-                                    to: this.currentUser.id,
-                                    content: reply,
-                                    type: 'text',
-                                    timestamp: new Date().toISOString(),
-                                    read: false,
-                                    status: 'received'
-                                };
-                                
-                                // 添加到对话记录
-                                this.addMessageToConversation(botMessage, true);
-                                
-                                // 更新消息状态为已发送
-                                this.updateMessageStatus(friendId, message.id, 'sent');
-                                
-                                // 更新机器人聊天窗口显示
-                                this.updateBotChatMessages();
-                            }
+                            // 确保有回复（即使AI失败也应该有默认回复）
+                            const finalReply = reply || this.getDefaultBotReply() || '我在呢！有什么问题吗？😊';
+                            
+                            // 模拟机器人发送消息
+                            const botMessage = {
+                                id: 'msg_' + Date.now(),
+                                from: friendId,
+                                to: this.currentUser.id,
+                                content: finalReply,
+                                type: 'text',
+                                timestamp: new Date().toISOString(),
+                                read: false,
+                                status: 'received'
+                            };
+                            
+                            // 添加到对话记录
+                            this.addMessageToConversation(botMessage, true);
+                            
+                            // 更新消息状态为已发送
+                            this.updateMessageStatus(friendId, message.id, 'sent');
+                            
+                            // 更新机器人聊天窗口显示
+                            this.updateBotChatMessages();
+                        }).catch(error => {
+                            console.error('❌ 获取机器人回复异常:', error);
+                            // 即使出错也显示默认回复
+                            const defaultReply = this.getDefaultBotReply() || '抱歉，我现在有点累，稍后再聊吧~ 😴';
+                            const botMessage = {
+                                id: 'msg_' + Date.now(),
+                                from: friendId,
+                                to: this.currentUser.id,
+                                content: defaultReply,
+                                type: 'text',
+                                timestamp: new Date().toISOString(),
+                                read: false,
+                                status: 'received'
+                            };
+                            this.addMessageToConversation(botMessage, true);
+                            this.updateBotChatMessages();
                         });
                     }, 500); // 500ms延迟，模拟思考时间
                 } else {
@@ -4135,17 +4930,24 @@
                     }
                     
                     // 如果没有匹配的规则，尝试调用AI API
-                    const aiReply = await this.getAIReply(userMessage);
-                    if (aiReply) {
-                        console.log('🤖 使用AI回复:', aiReply);
-                        return aiReply;
+                    try {
+                        const aiReply = await this.getAIReply(userMessage);
+                        if (aiReply && aiReply.trim()) {
+                            console.log('🤖 使用AI回复:', aiReply.substring(0, 50) + '...');
+                            return aiReply;
+                        }
+                    } catch (aiError) {
+                        console.error('❌ AI API调用失败:', aiError);
+                        // 继续执行，使用默认回复
                     }
                     
-                    // 如果AI API不可用，返回默认回复
-                    return this.getDefaultBotReply();
+                    // 如果AI API不可用或返回空，返回默认回复
+                    const defaultReply = this.getDefaultBotReply();
+                    console.log('🤖 使用默认回复:', defaultReply);
+                    return defaultReply;
                 } catch (error) {
                     console.error('❌ 获取机器人回复失败:', error);
-                    return '抱歉，我现在有点累，稍后再聊吧~ 😴';
+                    return this.getDefaultBotReply() || '抱歉，我现在有点累，稍后再聊吧~ 😴';
                 }
             },
             
@@ -4220,17 +5022,27 @@
                 const username = gameUserData?.username || this.currentUser.name;
                 
                 // 优先尝试后端API代理（如果可用）
-                const apiProxyUrl = '/api/ai/chat';
+                // GitHub Pages静态托管时使用相对路径，有后端服务器时使用完整URL
+                const apiProxyUrl = (API_CONFIG && API_CONFIG.BASE_URL) 
+                    ? API_CONFIG.BASE_URL + '/api/ai/chat' 
+                    : '/api/ai/chat';
                 let useDirectCall = false;
+                
+                // 如果有登录检查，但不强制（GitHub Pages可能没有后端）
+                // 如果authService存在且已登录，添加认证头
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (authService && authService.isLoggedIn && authService.isLoggedIn() && authService.getAuthHeaders) {
+                    Object.assign(headers, authService.getAuthHeaders());
+                }
                 
                 try {
                     DEBUG_MODE.log('🤖 尝试调用后端AI代理API...');
                     
                     const response = await fetch(apiProxyUrl, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: headers,
                         body: JSON.stringify({
                             message: message,
                             context: contextMessages,
@@ -5650,10 +6462,293 @@
                 if (botAvatarButton) {
                     botAvatarButton.style.display = 'block';
                 }
+                
+                // 检测sprite图片是否加载成功
+                this.checkBotSpriteImage();
+            },
+            
+            // 检测机器人sprite图片是否加载成功
+            checkBotSpriteImage() {
+                const spriteImage = new Image();
+                spriteImage.onload = () => {
+                    console.log('✅ 机器人sprite图片加载成功');
+                    // 启动sprite动画
+                    this.startBotSpriteAnimation();
+                };
+                spriteImage.onerror = () => {
+                    console.warn('⚠️ 机器人sprite图片加载失败，使用fallback');
+                    // 如果sprite图片加载失败，将所有bot-sprite-animation改为使用静态图片
+                    const spriteElements = document.querySelectorAll('.bot-sprite-animation');
+                    spriteElements.forEach(el => {
+                        el.classList.remove('bot-sprite-animation');
+                        el.style.backgroundImage = "url('assets/images/xiaotu-bot.png')";
+                        el.style.backgroundSize = 'contain';
+                        el.style.backgroundPosition = 'center';
+                        el.style.backgroundRepeat = 'no-repeat';
+                        el.style.animation = 'none';
+                    });
+                };
+                // 添加版本号避免缓存问题（每次代码更新时改变这个版本号）
+                const spriteVersion = 'v2.0';
+                spriteImage.src = `assets/images/xiaotu-bot01.png?${spriteVersion}`;
+            },
+            
+            // 启动机器人sprite动画（使用JavaScript控制）
+            startBotSpriteAnimation() {
+                // 检测平台类型
+                const ua = navigator.userAgent;
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || 
+                                 (window.innerWidth <= 768);
+                // iOS设备（iPad/iPhone）、WebView对像素值支持好
+                const isIOS = /iPhone|iPad|iPod/i.test(ua);
+                const isWebView = /MicroMessenger|wxwork|Seatalk|QQ/i.test(ua);
+                const isHarmonyOS = /HarmonyOS/i.test(ua); // 鸿蒙系统
+                const isHuaweiBrowser = /HuaweiBrowser|HUAWEI|HiBrowser/i.test(ua); // 华为浏览器
+                // 统一使用像素值，但华为浏览器需要特殊处理
+                const usePixelForMobile = true; // 所有平台都用像素值
+                const isHuaweiDevice = isHarmonyOS || isHuaweiBrowser; // 华为设备需要特殊处理
+                
+                // 延迟启动，确保DOM元素已经创建
+                setTimeout(() => {
+                    const spriteElements = document.querySelectorAll('.bot-sprite-animation');
+                    console.log('🎬 启动sprite动画，找到元素数量:', spriteElements.length, '平台:', isMobile ? '移动端' : 'PC');
+                    
+                    if (spriteElements.length === 0) {
+                        console.warn('⚠️ 未找到.bot-sprite-animation元素，延迟重试...');
+                        // 如果没找到，再延迟重试一次
+                        setTimeout(() => this.startBotSpriteAnimation(), 500);
+                        return;
+                    }
+                    
+                    // 如果已经有动画在运行，先清除
+                    if (this.botSpriteAnimationInterval) {
+                        clearInterval(this.botSpriteAnimationInterval);
+                    }
+                    
+                    // 4x4 sprite的16帧位置
+                    const frames = [
+                        { x: 0, y: 0 },      // 第1帧：第1行第1列
+                        { x: 1, y: 0 },      // 第2帧：第1行第2列
+                        { x: 2, y: 0 },      // 第3帧：第1行第3列
+                        { x: 3, y: 0 },      // 第4帧：第1行第4列
+                        { x: 0, y: 1 },      // 第5帧：第2行第1列
+                        { x: 1, y: 1 },      // 第6帧：第2行第2列
+                        { x: 2, y: 1 },      // 第7帧：第2行第3列
+                        { x: 3, y: 1 },      // 第8帧：第2行第4列
+                        { x: 0, y: 2 },      // 第9帧：第3行第1列
+                        { x: 1, y: 2 },      // 第10帧：第3行第2列
+                        { x: 2, y: 2 },      // 第11帧：第3行第3列
+                        { x: 3, y: 2 },      // 第12帧：第3行第4列
+                        { x: 0, y: 3 },      // 第13帧：第4行第1列
+                        { x: 1, y: 3 },      // 第14帧：第4行第2列
+                        { x: 2, y: 3 },      // 第15帧：第4行第3列
+                        { x: 3, y: 3 }       // 第16帧：第4行第4列
+                    ];
+                    
+                    let currentFrame = 0;
+                    const frameDuration = 150; // 每帧150ms，总共2.4s（PC和移动端统一速度）
+                    
+                    // 过滤出有有效尺寸的元素
+                    const getValidElements = () => {
+                        return Array.from(spriteElements).filter(el => {
+                            const rect = el.getBoundingClientRect();
+                            return rect.width > 0 && rect.height > 0;
+                        });
+                    };
+                    
+                    // 更新每一帧的函数
+                    const updateFrame = () => {
+                        const frame = frames[currentFrame];
+                        const validElements = getValidElements();
+                        
+                        if (validElements.length === 0) {
+                            // 如果没有有效元素，不输出警告（避免日志过多）
+                            return;
+                        }
+                        
+                        validElements.forEach((el, index) => {
+                            // 获取容器的实际尺寸
+                            const rect = el.getBoundingClientRect();
+                            const containerWidth = rect.width;
+                            const containerHeight = rect.height;
+                            
+                            // 统一使用像素值计算
+                            const xPx = frame.x * containerWidth * -1;
+                            const yPx = frame.y * containerHeight * -1;
+                            const bgPosition = `${xPx}px ${yPx}px`;
+                            
+                            // 华为设备需要先清除backgroundPosition，再设置，避免transition
+                            if (isHuaweiDevice) {
+                                // 先清除backgroundPosition
+                                el.style.backgroundPosition = '';
+                                // 强制重排
+                                el.offsetHeight;
+                            }
+                            
+                            // 彻底禁用所有transition效果，让切换瞬间完成
+                            el.style.setProperty('transition', 'none', 'important');
+                            el.style.setProperty('-webkit-transition', 'none', 'important');
+                            el.style.setProperty('-moz-transition', 'none', 'important');
+                            el.style.setProperty('-o-transition', 'none', 'important');
+                            el.style.setProperty('transition-property', 'none', 'important');
+                            el.style.setProperty('-webkit-transition-property', 'none', 'important');
+                            el.style.setProperty('-moz-transition-property', 'none', 'important');
+                            el.style.setProperty('-o-transition-property', 'none', 'important');
+                            el.style.setProperty('transition-duration', '0s', 'important');
+                            el.style.setProperty('-webkit-transition-duration', '0s', 'important');
+                            el.style.setProperty('-moz-transition-duration', '0s', 'important');
+                            el.style.setProperty('-o-transition-duration', '0s', 'important');
+                            el.style.setProperty('will-change', 'auto', 'important'); // 禁用硬件加速
+                            
+                            el.style.backgroundSize = '400% 400%';
+                            el.style.backgroundPosition = bgPosition;
+                            
+                            // 强制重绘，确保样式立即生效
+                            el.offsetHeight; // 触发重排
+                            
+                            // 华为设备再次强制重排，确保样式生效
+                            if (isHuaweiDevice) {
+                                requestAnimationFrame(() => {
+                                    el.style.backgroundPosition = bgPosition;
+                                    el.offsetHeight;
+                                });
+                            }
+                            
+                            // 添加调试信息（只在第一个有效元素时输出）
+                            if (index === 0) {
+                                let platform = 'PC';
+                                if (isMobile) {
+                                    if (isIOS) platform = 'iOS';
+                                    else if (isHarmonyOS) platform = '鸿蒙';
+                                    else if (isHuaweiBrowser) platform = '华为浏览器';
+                                    else if (isWebView) platform = 'WebView';
+                                    else platform = 'Android浏览器';
+                                }
+                                console.log(`🎬 帧 ${currentFrame + 1}/16: 位置(${frame.x},${frame.y}) → bgPos(${bgPosition}) 容器(${Math.round(containerWidth)}x${Math.round(containerHeight)}) 平台:${platform} 有效元素:${validElements.length}/${spriteElements.length}`);
+                            }
+                        });
+                        
+                        currentFrame = (currentFrame + 1) % frames.length;
+                    };
+                    
+                    // 等待至少有一个有效元素后再启动动画
+                    const waitAndStart = () => {
+                        const validElements = getValidElements();
+                        if (validElements.length > 0) {
+                            console.log(`✅ 找到 ${validElements.length} 个有效元素，启动动画`);
+                            // 立即显示第一帧
+                            updateFrame();
+                            // 启动动画循环
+                            const animationInterval = setInterval(() => {
+                                updateFrame();
+                                // 每帧后检查是否回到第一帧
+                                if (currentFrame === 0) {
+                                    console.log('🔄 动画循环完成，重新开始');
+                                }
+                            }, frameDuration);
+                            
+                            // 保存interval ID以便后续清理
+                            this.botSpriteAnimationInterval = animationInterval;
+                            console.log('✅ Sprite动画已启动，帧间隔:', frameDuration + 'ms');
+                        } else {
+                            // 如果还没准备好，100ms后重试（最多重试10次）
+                            if (!this._spriteRetryCount) {
+                                this._spriteRetryCount = 0;
+                            }
+                            if (this._spriteRetryCount < 10) {
+                                this._spriteRetryCount++;
+                                setTimeout(waitAndStart, 100);
+                            } else {
+                                console.warn('⚠️ 10次重试后仍未找到有效元素，停止尝试');
+                            }
+                        }
+                    };
+                    
+                    // 开始等待并启动
+                    waitAndStart();
+                    
+                    
+                    // 添加全局测试函数，可以在控制台手动调用
+                    window.testSpriteFrame = (frameIndex, method = 1) => {
+                        if (frameIndex < 0 || frameIndex >= frames.length) {
+                            console.error('帧索引超出范围，应该是0-15');
+                            return;
+                        }
+                        const validElements = getValidElements();
+                        if (validElements.length === 0) {
+                            console.error('没有找到有效元素');
+                            return;
+                        }
+                        const frame = frames[frameIndex];
+                        validElements.forEach((el, index) => {
+                            const rect = el.getBoundingClientRect();
+                            const containerWidth = rect.width;
+                            const containerHeight = rect.height;
+                            
+                            if (method === 1) {
+                                // 方法1：background-size: 400%，使用像素值计算（PC版正确的方式）
+                                const xPx = frame.x * containerWidth * -1;
+                                const yPx = frame.y * containerHeight * -1;
+                                el.style.backgroundSize = '400% 400%';
+                                el.style.backgroundPosition = `${xPx}px ${yPx}px`;
+                            } else {
+                                // 方法2：background-size: 100%，每帧移动25%
+                                const xPercent = frame.x * -25;
+                                const yPercent = frame.y * -25;
+                                el.style.backgroundSize = '100% 100%';
+                                el.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
+                            }
+                            
+                            if (index === 0) {
+                                const computedStyle = window.getComputedStyle(el);
+                                console.log(`🧪 测试帧 ${frameIndex + 1}/16 (方法${method}): 位置(${frame.x},${frame.y})`);
+                                console.log(`🧪 容器尺寸: ${Math.round(containerWidth)}x${Math.round(containerHeight)}`);
+                                console.log(`🧪 设置样式:`, {
+                                    backgroundSize: el.style.backgroundSize,
+                                    backgroundPosition: el.style.backgroundPosition
+                                });
+                                console.log(`🧪 计算后样式:`, {
+                                    backgroundSize: computedStyle.backgroundSize,
+                                    backgroundPosition: computedStyle.backgroundPosition,
+                                    backgroundImage: computedStyle.backgroundImage
+                                });
+                            }
+                        });
+                        console.log(`🧪 已设置帧 ${frameIndex + 1}/16 (方法${method})，请查看页面上的显示效果`);
+                    };
+                    console.log('💡 提示：可以在控制台使用 testSpriteFrame(0-15, 1或2) 来测试显示特定帧');
+                    console.log('💡 方法1: background-size 400%，方法2: background-size 100%');
+                }, 100);
             },
 
             // 打开机器人聊天窗口
             openBotChat() {
+                // 检查登录状态 - 只有登录用户才能使用机器人聊天
+                if (!authService.isLoggedIn()) {
+                    console.log('⚠️ 请先登录才能使用AI机器人聊天功能');
+                    authManager.showModal();
+                    return;
+                }
+                
+                // 确保friends数组存在
+                if (!this.friends) {
+                    this.friends = [];
+                }
+                
+                // 如果还没有加载服务器数据，先加载
+                if (this.friends.length === 0) {
+                    console.log('📡 开始加载服务器数据...');
+                    this.loadServerData();
+                }
+                
+                // 确保对话记录存在（机器人不显示在好友列表中）
+                if (!this.conversations) {
+                    this.conversations = {};
+                }
+                if (!this.conversations['totofun_bot']) {
+                    this.conversations['totofun_bot'] = [];
+                }
+
                 const botChatContainer = document.getElementById('bot-chat-container');
                 const botAvatarButton = document.getElementById('bot-avatar-button');
                 if (botChatContainer) {
@@ -5663,6 +6758,9 @@
                     if (botAvatarButton) {
                         botAvatarButton.style.display = 'none';
                     }
+                    console.log('✅ 机器人聊天窗口已打开');
+                } else {
+                    console.error('❌ bot-chat-container 元素不存在');
                 }
             },
 
@@ -5715,10 +6813,13 @@
                 botChatContainer.style.display = 'none';
                 botChatContainer.setAttribute('style', (botChatContainer.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: none !important;');
                 
-                // 显示头像按钮
+                // 显示头像按钮并重置transform和filter状态（避免超框）
                 if (botAvatarButton) {
                     botAvatarButton.style.display = 'block';
                     botAvatarButton.setAttribute('style', (botAvatarButton.getAttribute('style') || '').replace(/display\s*:\s*[^;!]*!?important?;?/gi, '') + ' display: block !important;');
+                    // 重置transform和filter，避免移动端点击后放大状态残留
+                    botAvatarButton.style.transform = 'scale(1)';
+                    botAvatarButton.style.filter = 'drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))';
                 }
                 
                 console.log('✅ 机器人聊天窗口已强制关闭');
@@ -5737,18 +6838,20 @@
                 if (messages.length === 0) {
                     botMessagesContainer.innerHTML = `
                         <div style="text-align: center; color: #999; padding: 20px;">
-                            <div style="
+                            <div class="bot-sprite-animation" style="
                                 width: 128px;
                                 height: 128px;
+                                min-width: 128px;
+                                min-height: 128px;
+                                max-width: 128px;
+                                max-height: 128px;
                                 margin: 0 auto 10px;
-                                background-image: url('assets/images/xiaotu-bot.png');
-                                background-size: contain;
-                                background-repeat: no-repeat;
-                                background-position: center;
                                 background-color: rgba(0, 0, 0, 0) !important;
                                 border: none !important;
                                 padding: 0 !important;
                                 opacity: 1 !important;
+                                object-fit: contain;
+                                aspect-ratio: 1 / 1;
                             "></div>
                             <div>开始和小突聊天吧！</div>
                         </div>
@@ -5769,18 +6872,20 @@
 
                     if (!isMe) {
                         messageDiv.innerHTML += `
-                            <div style="
+                            <div class="bot-sprite-animation" style="
                                 width: 64px;
                                 height: 64px;
-                                background-image: url('assets/images/xiaotu-bot.png');
-                                background-size: contain;
-                                background-repeat: no-repeat;
-                                background-position: center;
+                                min-width: 64px;
+                                min-height: 64px;
+                                max-width: 64px;
+                                max-height: 64px;
                                 background-color: transparent !important;
                                 border: none !important;
                                 padding: 0 !important;
                                 margin: 0 !important;
                                 flex-shrink: 0;
+                                object-fit: contain;
+                                aspect-ratio: 1 / 1;
                             "></div>
                         `;
                     }
@@ -5993,9 +7098,225 @@
             }
         };
 
+        // 管理员管理器
+        const adminManager = {
+            currentPage: 1,
+            pageSize: 50,
+            allUsers: [],
+            filteredUsers: [],
+            
+            // 显示管理面板
+            async showPanel() {
+                const panel = document.getElementById('admin-panel');
+                if (!panel) {
+                    alert('❌ 管理面板未找到');
+                    return;
+                }
+                
+                // 检查是否是管理员
+                const user = authService.getUser();
+                if (!user || user.role !== 'admin') {
+                    alert('❌ 您没有管理员权限');
+                    return;
+                }
+                
+                panel.style.display = 'block';
+                await this.loadUsers();
+            },
+            
+            // 关闭管理面板
+            closePanel() {
+                const panel = document.getElementById('admin-panel');
+                if (panel) {
+                    panel.style.display = 'none';
+                }
+            },
+            
+            // 加载用户列表
+            async loadUsers() {
+                try {
+                    const baseUrl = API_CONFIG.BASE_URL;
+                    const authHeaders = authService.getAuthHeaders();
+                    
+                    const response = await fetch(`${baseUrl}/api/users/all?page=${this.currentPage}&limit=${this.pageSize}`, {
+                        method: 'GET',
+                        headers: authHeaders
+                    });
+                    
+                    if (!response.ok) {
+                        if (response.status === 403) {
+                            alert('❌ 您没有管理员权限');
+                            this.closePanel();
+                            return;
+                        }
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        this.allUsers = data.data.users || [];
+                        this.filteredUsers = [...this.allUsers];
+                        this.updateStats(data.data.pagination);
+                        this.renderUsers();
+                        this.renderPagination(data.data.pagination);
+                    }
+                } catch (error) {
+                    console.error('❌ 加载用户列表失败:', error);
+                    alert('❌ 加载用户列表失败: ' + error.message);
+                }
+            },
+            
+            // 搜索用户
+            searchUsers() {
+                const searchInput = document.getElementById('admin-search-input');
+                const query = searchInput.value.toLowerCase().trim();
+                
+                if (!query) {
+                    this.filteredUsers = [...this.allUsers];
+                } else {
+                    this.filteredUsers = this.allUsers.filter(user => 
+                        (user.username && user.username.toLowerCase().includes(query)) ||
+                        (user.email && user.email.toLowerCase().includes(query))
+                    );
+                }
+                
+                this.renderUsers();
+            },
+            
+            // 更新统计信息
+            updateStats(pagination) {
+                const statsContainer = document.getElementById('admin-stats');
+                if (!statsContainer) return;
+                
+                const totalUsers = pagination.total || 0;
+                const adminCount = this.allUsers.filter(u => u.role === 'admin').length;
+                const activeCount = this.allUsers.filter(u => u.isActive !== false).length;
+                const premiumCount = this.allUsers.filter(u => u.isPremium).length;
+                
+                statsContainer.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${totalUsers}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">总用户数</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${activeCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">活跃用户</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${adminCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">管理员</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); padding: 20px; border-radius: 10px; color: white; text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold;">${premiumCount}</div>
+                        <div style="font-size: 14px; opacity: 0.9;">会员用户</div>
+                    </div>
+                `;
+            },
+            
+            // 渲染用户列表
+            renderUsers() {
+                const listContainer = document.getElementById('admin-users-list');
+                if (!listContainer) return;
+                
+                if (this.filteredUsers.length === 0) {
+                    listContainer.innerHTML = '<tr><td colspan="8" style="padding: 40px; text-align: center; color: #999;">暂无用户数据</td></tr>';
+                    return;
+                }
+                
+                listContainer.innerHTML = this.filteredUsers.map(user => {
+                    const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleString('zh-CN') : '-';
+                    const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('zh-CN') : '从未登录';
+                    const level = user.level?.currentLevel || 1;
+                    const role = user.role || 'user';
+                    const isActive = user.isActive !== false;
+                    const isPremium = user.isPremium || false;
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 15px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                                        ${(user.username || 'U')[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: bold; color: #333;">${user.username || '未知'}</div>
+                                        ${isPremium ? '<span style="font-size: 10px; color: #9C27B0;">⭐ 会员</span>' : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding: 15px; color: #666;">${user.email || '-'}</td>
+                            <td style="padding: 15px;">
+                                <span style="background: #4FC3F7; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">LV.${level}</span>
+                            </td>
+                            <td style="padding: 15px;">
+                                <span style="background: ${role === 'admin' ? '#f44336' : '#22C55E'}; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">
+                                    ${role === 'admin' ? '👑 管理员' : '👤 用户'}
+                                </span>
+                            </td>
+                            <td style="padding: 15px; color: #666; font-size: 12px;">${createdAt}</td>
+                            <td style="padding: 15px; color: #666; font-size: 12px;">${lastLogin}</td>
+                            <td style="padding: 15px; color: #666; text-align: center;">${user.loginCount || 0}</td>
+                            <td style="padding: 15px;">
+                                <span style="background: ${isActive ? '#22C55E' : '#999'}; color: white; padding: 4px 8px; border-radius: 5px; font-size: 12px;">
+                                    ${isActive ? '✓ 活跃' : '✗ 禁用'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+            
+            // 渲染分页
+            renderPagination(pagination) {
+                const paginationContainer = document.getElementById('admin-pagination');
+                if (!paginationContainer || !pagination) return;
+                
+                const { page, pages, total } = pagination;
+                
+                if (pages <= 1) {
+                    paginationContainer.innerHTML = `<div style="color: #666;">共 ${total} 条记录</div>`;
+                    return;
+                }
+                
+                let html = `<div style="color: #666; margin-right: 20px;">共 ${total} 条记录，第 ${page}/${pages} 页</div>`;
+                
+                // 上一页
+                if (page > 1) {
+                    html += `<button onclick="adminManager.goToPage(${page - 1})" style="padding: 8px 16px; background: #4FC3F7; color: white; border: none; border-radius: 5px; cursor: pointer;">上一页</button>`;
+                }
+                
+                // 页码
+                for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++) {
+                    html += `<button onclick="adminManager.goToPage(${i})" style="padding: 8px 16px; background: ${i === page ? '#22C55E' : '#f0f0f0'}; color: ${i === page ? 'white' : '#333'}; border: none; border-radius: 5px; cursor: pointer; margin: 0 2px;">${i}</button>`;
+                }
+                
+                // 下一页
+                if (page < pages) {
+                    html += `<button onclick="adminManager.goToPage(${page + 1})" style="padding: 8px 16px; background: #4FC3F7; color: white; border: none; border-radius: 5px; cursor: pointer;">下一页</button>`;
+                }
+                
+                paginationContainer.innerHTML = html;
+            },
+            
+            // 跳转到指定页
+            async goToPage(page) {
+                this.currentPage = page;
+                await this.loadUsers();
+                // 滚动到顶部
+                document.getElementById('admin-panel').scrollTop = 0;
+            }
+        };
+        
         // 初始化聊天系统
         chatManager.init();
         chatManager.checkUrlParams();
+        
+        // 延迟启动sprite动画，确保DOM元素已创建
+        setTimeout(() => {
+            if (chatManager.startBotSpriteAnimation) {
+                chatManager.startBotSpriteAnimation();
+            }
+        }, 500);
         
         // 移动端：添加触摸事件监听器确保按钮可点击
         if (window.innerWidth <= 768) {
@@ -6045,6 +7366,165 @@
         });
     </script>
 
+    <!-- 登录/注册模态框 -->
+    <div id="auth-modal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        z-index: 100000;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+        ">
+            <!-- 关闭按钮 -->
+            <button id="auth-modal-close" onclick="authManager.closeModal()" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #999;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">×</button>
+
+            <!-- 登录表单 -->
+            <div id="auth-login-form">
+                <h2 style="margin-bottom: 20px; color: #333; text-align: center;">🔐 登录</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">邮箱</label>
+                    <input type="email" id="login-email" placeholder="请输入邮箱" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">密码</label>
+                    <input type="password" id="login-password" placeholder="请输入密码" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <button onclick="authManager.handleLogin()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-bottom: 15px;
+                ">登录</button>
+                <div style="text-align: center; color: #999; font-size: 14px;">
+                    还没有账号？<a href="#" onclick="authManager.showRegisterForm(); return false;" style="color: #4FC3F7; text-decoration: none;">立即注册</a>
+                </div>
+                <div id="auth-login-error" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: #fee;
+                    color: #c33;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    display: none;
+                "></div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="auth-register-form" style="display: none;">
+                <h2 style="margin-bottom: 20px; color: #333; text-align: center;">✨ 注册</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">用户名</label>
+                    <input type="text" id="register-username" placeholder="3-20个字符，支持中文、英文、数字" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">邮箱</label>
+                    <input type="email" id="register-email" placeholder="请输入邮箱" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">密码</label>
+                    <input type="password" id="register-password" placeholder="至少6个字符" style="
+                        width: 100%;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                    " />
+                </div>
+                <button onclick="authManager.handleRegister()" style="
+                    width: 100%;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-bottom: 15px;
+                ">注册</button>
+                <div style="text-align: center; color: #999; font-size: 14px;">
+                    已有账号？<a href="#" onclick="authManager.showLoginForm(); return false;" style="color: #4FC3F7; text-decoration: none;">立即登录</a>
+                </div>
+                <div id="auth-register-error" style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: #fee;
+                    color: #c33;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    display: none;
+                "></div>
+            </div>
+        </div>
+    </div>
+
     <!-- 小突头像按钮（左下角，关闭聊天窗口时显示） -->
     <div id="bot-avatar-button" onclick="chatManager.openBotChat()" style="
         position: fixed;
@@ -6062,21 +7542,17 @@
         background: none !important;
         background-color: rgba(0, 0, 0, 0) !important;
         line-height: 0 !important;
-    " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
-        <img src="assets/images/xiaotu-bot.png" alt="小突" style="
+    " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchstart="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchend="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'">
+        <div class="bot-sprite-animation" style="
             width: 100%;
             height: 100%;
-            object-fit: contain;
-            display: block;
-            border: none !important;
-            outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background: none !important;
-            background-color: rgba(0, 0, 0, 0) !important;
             filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
-            vertical-align: top !important;
+            transition: none !important;
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
         " onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
+        </div>
     </div>
 
     <!-- 机器人聊天窗口（左下角） -->
@@ -6089,7 +7565,7 @@
         background: white;
         border-radius: 20px;
         box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
-        z-index: 9997;
+        z-index: 10000;
         display: none !important;
         flex-direction: column;
         overflow: hidden;
@@ -6105,18 +7581,25 @@
             font-weight: bold;
         ">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="
+                <div class="bot-sprite-animation" style="
                     width: 64px;
                     height: 64px;
-                    background-image: url('assets/images/xiaotu-bot.png');
-                    background-size: contain;
-                    background-repeat: no-repeat;
-                    background-position: center;
+                    min-width: 64px;
+                    min-height: 64px;
+                    max-width: 64px;
+                    max-height: 64px;
                     background-color: rgba(0, 0, 0, 0) !important;
                     border: none !important;
                     padding: 0 !important;
                     margin: 0 !important;
                     opacity: 1 !important;
+                    flex-shrink: 0;
+                    object-fit: contain;
+                    aspect-ratio: 1 / 1;
+                    transition: none !important;
+                    -webkit-transition: none !important;
+                    -moz-transition: none !important;
+                    -o-transition: none !important;
                 "></div>
                 <div>
                     <div style="font-size: 16px;">小突 AI助手</div>
@@ -6165,7 +7648,7 @@
             display: flex;
             gap: 8px;
             position: relative;
-            z-index: 100;
+            z-index: 10004;
             flex-shrink: 0;
         ">
             <input type="text" id="bot-chat-input" placeholder="问小突..." style="
@@ -6175,6 +7658,8 @@
                 border-radius: 20px;
                 outline: none;
                 font-size: 14px;
+                position: relative;
+                z-index: 10005;
             " onkeypress="if(event.key === 'Enter') chatManager.sendBotMessage()">
             <button onclick="chatManager.sendBotMessage()" style="
                 background: #4FC3F7;
@@ -6183,6 +7668,8 @@
                 width: 40px;
                 height: 40px;
                 border-radius: 50%;
+                position: relative;
+                z-index: 10005;
                 cursor: pointer;
                 font-size: 18px;
                 display: flex;
@@ -6809,6 +8296,128 @@
         </div>
     </div>
 
+    <!-- 管理员面板 -->
+    <div id="admin-panel" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(5px);
+        z-index: 100000;
+        overflow-y: auto;
+        padding: 20px;
+    ">
+        <div style="
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #e0e0e0;
+            ">
+                <h2 style="margin: 0; color: #333; font-size: 24px;">⚙️ 管理后台 - 用户管理</h2>
+                <button onclick="adminManager.closePanel()" style="
+                    background: #f44336;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                ">✕ 关闭</button>
+            </div>
+            
+            <!-- 搜索和筛选 -->
+            <div style="
+                display: flex;
+                gap: 15px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            ">
+                <input type="text" id="admin-search-input" placeholder="搜索用户名或邮箱..." style="
+                    flex: 1;
+                    min-width: 200px;
+                    padding: 12px;
+                    border: 2px solid #e0e0e0;
+                    border-radius: 10px;
+                    font-size: 14px;
+                " onkeyup="adminManager.searchUsers()">
+                <button onclick="adminManager.loadUsers()" style="
+                    padding: 12px 24px;
+                    background: #4FC3F7;
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                ">🔄 刷新</button>
+            </div>
+            
+            <!-- 统计信息 -->
+            <div id="admin-stats" style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            ">
+                <!-- 统计卡片将在这里动态生成 -->
+            </div>
+            
+            <!-- 用户列表 -->
+            <div style="
+                overflow-x: auto;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+            ">
+                <table style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                ">
+                    <thead>
+                        <tr style="background: #f5f5f5;">
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">用户名</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">邮箱</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">等级</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">角色</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">注册时间</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">最后登录</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">登录次数</th>
+                            <th style="padding: 15px; text-align: left; border-bottom: 2px solid #e0e0e0;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-list">
+                        <!-- 用户列表将在这里动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页 -->
+            <div id="admin-pagination" style="
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
+                margin-top: 20px;
+            ">
+                <!-- 分页按钮将在这里动态生成 -->
+            </div>
+        </div>
+    </div>
+
     <style>
         /* 好友列表项样式 */
         .friend-item {
@@ -6849,6 +8458,99 @@
             padding: 0 !important;
             margin: 0 !important;
             display: block !important;
+        }
+        
+        /* 机器人sprite动画样式 - 4x4网格，16帧动画 */
+        .bot-sprite-animation {
+            /* 注意：CSS中的图片URL也会被缓存，如果更新后仍有问题，请清除浏览器缓存 */
+            background-image: url('./assets/images/xiaotu-bot01.png?v=2.0');
+            background-repeat: no-repeat;
+            background-size: 400% 400%; /* 4x4网格：整个sprite图是容器尺寸的4倍，每帧占容器尺寸的100% */
+            background-position: 0% 0%; /* 显示左上角第一帧 */
+            /* animation: botSpriteAnimation 1.6s steps(16, end) infinite; */ /* 使用JavaScript控制动画 */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            display: block !important;
+            width: 100%;
+            height: 100%;
+            min-width: 32px;
+            min-height: 32px;
+            object-fit: contain;
+            aspect-ratio: 1 / 1; /* 保持正方形，防止变形 */
+            /* 确保没有transition效果，让逐帧切换瞬间完成 */
+            transition: none !important;
+            -webkit-transition: none !important;
+            -moz-transition: none !important;
+            -o-transition: none !important;
+        }
+        
+        /* 4x4 sprite动画关键帧 - 从左到右，从上到下播放16帧
+           关键：使用steps(16, end)时，我们需要让100%的位置是第17帧的位置
+           这样steps(16, end)会在0%到100%之间创建16个步骤，每个步骤对应一帧
+           
+           对于4x4的sprite，16帧的排列是：
+           - 第1帧：(0%, 0%) - 第1行第1列
+           - 第2帧：(-100%, 0%) - 第1行第2列
+           - 第3帧：(-200%, 0%) - 第1行第3列
+           - 第4帧：(-300%, 0%) - 第1行第4列
+           - 第5帧：(0%, -100%) - 第2行第1列
+           - ...
+           - 第16帧：(-300%, -300%) - 第4行第4列
+           
+           第17帧应该是下一行的第1帧，即(0%, -400%)
+           但这样会超出sprite图的范围
+           
+           实际上，正确的做法是：让100%的位置是第17帧的位置(0%, -400%)
+           这样steps(16, end)会在0%到100%之间创建16个步骤
+           每个步骤的位置是线性插值的，从(0%, 0%)到(0%, -400%)
+           但这样只能得到行的变化，不能得到列的变化
+           
+           我们需要同时变化行和列，所以需要使用不同的方法
+           让我试试：从(0%, 0%)到(-300%, -300%)，然后到(0%, -400%)
+           但这样steps(16)不会正确工作
+           
+           实际上，对于sprite动画，我们需要使用JavaScript来控制
+           或者使用更复杂的关键帧定义
+           
+           让我试试使用background-size: 100% 100%，然后每帧移动25%
+           不对，如果background-size是100% 100%，那么整个sprite图就是容器尺寸
+           每帧占25%，所以移动距离应该是-25%, -50%, -75%等
+           
+           让我重新计算：对于4x4的sprite，如果background-size是400% 400%：
+           - 整个sprite图是容器尺寸的4倍
+           - 每帧占容器尺寸的100%
+           - 所以移动距离应该是-100%, -200%, -300%等
+           
+           问题可能在于steps()函数的使用方式
+           让我试试：从(0%, 0%)到(-300%, -300%)，然后使用steps(16)
+           但这样steps(16)会在0%到100%之间创建16个步骤，每个步骤的位置是线性插值的
+           不会得到我们想要的离散帧位置
+           
+           实际上，对于sprite动画，正确的做法是使用JavaScript来控制
+           或者使用更复杂的关键帧定义，定义所有16帧的精确位置
+           然后使用steps(1)来确保每帧都是静态的
+        */
+        @keyframes botSpriteAnimation {
+            0% { 
+                background-position: 0% 0%; /* 第1帧：第1行第1列 */
+            }
+            100% { 
+                /* 第17帧的位置（即第1帧位置，用于循环）
+                   对于4x4的sprite，16帧的排列是：
+                   - 第1帧：(0%, 0%)
+                   - 第2帧：(-100%, 0%)
+                   - 第3帧：(-200%, 0%)
+                   - 第4帧：(-300%, 0%)
+                   - 第5帧：(0%, -100%)
+                   - ...
+                   - 第16帧：(-300%, -300%)
+                   
+                   第17帧应该是下一行的第1帧，即(0%, -400%)
+                   使用steps(16, end)会在0%到100%之间创建16个步骤
+                   每个步骤对应一帧，从第1帧到第16帧
+                */
+                background-position: 0% -400%; /* 第17帧的位置（下一行的第1帧） */
+            }
         }
         
         /* 确保没有继承的背景色 */
@@ -7046,12 +8748,30 @@
                 border: none !important;
             }
             
-            /* 确保移动端图片正确显示 */
-            #bot-avatar-button img {
+            /* 确保移动端sprite动画正确显示 */
+            #bot-avatar-button .bot-sprite-animation,
+            .bot-sprite-animation {
                 width: 100% !important;
                 height: 100% !important;
+                background-size: 400% 400% !important;
+                background-repeat: no-repeat !important;
                 object-fit: contain !important;
-                background: transparent !important;
+                aspect-ratio: 1 / 1 !important; /* 保持正方形，防止变形 */
+                /* 确保移动端也没有transition效果，强制禁用所有transition */
+                transition: none !important;
+                -webkit-transition: none !important;
+                -moz-transition: none !important;
+                -o-transition: none !important;
+                transition-property: none !important;
+                -webkit-transition-property: none !important;
+                -moz-transition-property: none !important;
+                -o-transition-property: none !important;
+            }
+            
+            /* 确保父元素也不会影响子元素的transition */
+            #bot-avatar-button {
+                transition: transform 0.3s ease, filter 0.3s ease !important;
+                /* 明确指定只transition transform和filter，不包括background-position */
             }
 
             /* 机器人聊天窗口移动端适配 */
@@ -7082,11 +8802,21 @@
                 padding: 10px !important;
                 background: white !important;
                 border-top: 1px solid #e0e0e0 !important;
+                z-index: 10004 !important;
+                position: relative !important;
             }
             
             #bot-chat-input {
                 font-size: 16px !important; /* 防止iOS自动缩放 */
                 padding: 12px 15px !important;
+                z-index: 10005 !important;
+                position: relative !important;
+            }
+            
+            /* 确保机器人对话框输入框按钮也在最上层 */
+            #bot-chat-container > div:last-child button {
+                z-index: 10005 !important;
+                position: relative !important;
             }
 
             #chat-container {

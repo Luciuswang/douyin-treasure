@@ -139,6 +139,11 @@ const userSchema = new mongoose.Schema({
     }],
     
     // 账户状态
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
     isVerified: {
         type: Boolean,
         default: false
@@ -227,9 +232,9 @@ const userSchema = new mongoose.Schema({
 });
 
 // 索引
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ 'location.coordinates': '2dsphere' });
+// 注意：username和email已经有unique:true，会自动创建索引
+// location.coordinates已经有index: '2dsphere'，会自动创建索引
+// 只添加其他需要的索引
 userSchema.index({ 'stats.treasuresCreated': -1 });
 userSchema.index({ 'stats.treasuresDiscovered': -1 });
 userSchema.index({ createdAt: -1 });
@@ -245,15 +250,15 @@ userSchema.virtual('followingCount').get(function() {
 });
 
 // 密码加密
-userSchema.pre('save', async function(next) {
-    if (!this.isModified('password')) return next();
+// Mongoose 6+ 支持 async/await，不需要 next 参数
+userSchema.pre('save', async function() {
+    if (!this.isModified('password')) return;
     
     try {
         const salt = await bcrypt.genSalt(12);
         this.password = await bcrypt.hash(this.password, salt);
-        next();
     } catch (error) {
-        next(error);
+        throw error;
     }
 });
 

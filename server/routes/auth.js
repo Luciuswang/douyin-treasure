@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Joi = require('joi');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -9,7 +10,14 @@ const router = express.Router();
 
 // 验证schemas
 const registerSchema = Joi.object({
-    username: Joi.string().alphanum().min(3).max(20).required(),
+    username: Joi.string()
+        .pattern(/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/)
+        .min(3)
+        .max(20)
+        .required()
+        .messages({
+            'string.pattern.base': '用户名只能包含字母、数字、下划线和中文'
+        }),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).max(128).required(),
     bio: Joi.string().max(200).optional(),
@@ -89,10 +97,38 @@ router.post('/register', async (req, res) => {
 
         const { username, email, password, bio, interests } = value;
 
-        // 检查用户是否已存在
+        // 检查MongoDB连接状态，确保连接已建立
+        if (mongoose.connection.readyState !== 1) {
+            console.warn('⚠️  MongoDB连接未就绪，状态:', mongoose.connection.readyState);
+            // 如果未连接，尝试连接
+            if (mongoose.connection.readyState === 0) {
+                console.log('🔄 尝试建立MongoDB连接...');
+                const mongoUri = process.env.MONGODB_URI;
+                console.log('📋 连接字符串长度:', mongoUri ? mongoUri.length : 0);
+                console.log('📋 连接字符串开头:', mongoUri ? mongoUri.substring(0, 30) : 'undefined');
+                if (!mongoUri || (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://'))) {
+                    console.error('❌ MongoDB URI 格式错误:', mongoUri);
+                    throw new Error('MongoDB连接字符串格式错误');
+                }
+                try {
+                    await mongoose.connect(mongoUri, {
+                        serverSelectionTimeoutMS: 30000,
+                        socketTimeoutMS: 45000,
+                        connectTimeoutMS: 30000
+                        // 注意：Mongoose 9+ 已移除 bufferMaxEntries 和 bufferCommands 选项
+                    });
+                    console.log('✅ MongoDB连接已建立');
+                } catch (connectError) {
+                    console.error('❌ MongoDB连接失败:', connectError.message);
+                    throw new Error('数据库连接失败，请稍后重试');
+                }
+            }
+        }
+
+        // 检查用户是否已存在（使用更长的超时时间）
         const existingUser = await User.findOne({
             $or: [{ email }, { username }]
-        });
+        }).maxTimeMS(25000); // 设置25秒超时
 
         if (existingUser) {
             return res.status(409).json({
@@ -107,9 +143,13 @@ router.post('/register', async (req, res) => {
             email,
             password, // 密码会在User模型的pre-save中间件中自动加密
             bio: bio || '',
-            'preferences.interests': interests || [],
-            'level.currentLevel': 1,
-            'level.experience': 0,
+            preferences: {
+                interests: interests || []
+            },
+            level: {
+                currentLevel: 1,
+                experience: 0
+            },
             loginCount: 0
         });
 
@@ -143,10 +183,13 @@ router.post('/register', async (req, res) => {
 
     } catch (error) {
         console.error('注册错误:', error);
+        console.error('错误堆栈:', error.stack);
+        // 在Vercel环境中也显示错误信息，方便调试
         res.status(500).json({
             success: false,
             message: '服务器内部错误',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: error.message,
+            stack: (process.env.NODE_ENV === 'development' || process.env.VERCEL) ? error.stack : undefined
         });
     }
 });
