@@ -4846,8 +4846,8 @@
 
                 this.saveData();
                 
-                // 检查是否是发给AI机器人的消息
-                if (friend && friend.isBot && friendId === 'totofun_bot') {
+                // 检查是否是发给AI机器人的消息（机器人不在好友列表中，但可以通过ID判断）
+                if (friendId === 'totofun_bot') {
                     // 延迟一下，模拟思考时间，然后获取AI回复
                     setTimeout(() => {
                         this.getBotReply(content, friendId).then(reply => {
