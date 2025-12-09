@@ -7287,13 +7287,16 @@
         height: 160px;
         z-index: 9996;
         cursor: pointer;
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
         background: none !important;
         background-color: rgba(0, 0, 0, 0) !important;
         line-height: 0 !important;
+        overflow: visible !important;
     ">
         <div class="bot-sprite-animation" style="
             width: 100%;
@@ -7301,9 +7304,13 @@
             filter: drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4));
             transition: transform 0.3s ease, filter 0.3s ease;
             transform-origin: center center;
+            transform: scale(1);
             -webkit-transition: transform 0.3s ease, filter 0.3s ease;
             -moz-transition: transform 0.3s ease, filter 0.3s ease;
             -o-transition: transform 0.3s ease, filter 0.3s ease;
+            -webkit-transform-origin: center center;
+            -moz-transform-origin: center center;
+            -ms-transform-origin: center center;
         " onmouseover="this.style.transform='scale(1.1)'; this.style.filter='drop-shadow(0 6px 20px rgba(79, 195, 247, 0.6))'" onmouseout="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchstart="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" ontouchend="this.style.transform='scale(1)'; this.style.filter='drop-shadow(0 4px 15px rgba(79, 195, 247, 0.4))'" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;color:white;\'>🤖</div>';">
         </div>
     </div>
