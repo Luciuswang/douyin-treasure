@@ -3958,9 +3958,11 @@
             addMessageToConversation(messageData, updateDisplay = true) {
                 const friendId = messageData.from;
                 
-                // 检查发送者是否是好友（不允许自动添加陌生人）
+                // 检查发送者是否是好友（机器人允许通过，即使不在好友列表中）
                 const friend = this.friends.find(f => f.id === friendId);
-                if (!friend) {
+                const isBot = friendId === 'totofun_bot';
+                
+                if (!friend && !isBot) {
                     console.warn('⚠️ 收到来自非好友的消息，已忽略:', friendId, messageData.content);
                     // 不自动添加，只记录日志
                     return false;
@@ -3990,16 +3992,23 @@
                     
                     this.conversations[friendId].push(receivedMessage);
                     
-                    // 更新好友最后消息
-                    friend.lastMessage = messageData.type === 'location' ? '📍 位置' : messageData.content;
-                    friend.lastTime = receivedMessage.timestamp;
+                    // 更新好友最后消息（如果好友存在）
+                    if (friend) {
+                        friend.lastMessage = messageData.type === 'location' ? '📍 位置' : messageData.content;
+                        friend.lastTime = receivedMessage.timestamp;
+                    }
                     
                     this.updateUnreadCount();
                     this.saveData();
                     
                     if (updateDisplay) {
-                        // 检查聊天窗口状态并更新显示
-                        this.updateChatDisplayAfterMessage(friendId, friend, messageData);
+                        // 如果是机器人消息，更新机器人聊天窗口
+                        if (isBot) {
+                            this.updateBotChatMessages();
+                        } else if (friend) {
+                            // 检查聊天窗口状态并更新显示
+                            this.updateChatDisplayAfterMessage(friendId, friend, messageData);
+                        }
                     }
                     
                     return true; // 消息已添加
