@@ -8384,6 +8384,10 @@
                 left: 20px !important;
                 background-color: transparent !important;
                 border: none !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: visible !important;
             }
             
             /* 确保移动端sprite动画正确显示 */
@@ -8395,21 +8399,15 @@
                 background-repeat: no-repeat !important;
                 object-fit: contain !important;
                 aspect-ratio: 1 / 1 !important; /* 保持正方形，防止变形 */
-                /* 确保移动端也没有transition效果，强制禁用所有transition */
-                transition: none !important;
-                -webkit-transition: none !important;
-                -moz-transition: none !important;
-                -o-transition: none !important;
-                transition-property: none !important;
-                -webkit-transition-property: none !important;
-                -moz-transition-property: none !important;
-                -o-transition-property: none !important;
-            }
-            
-            /* 确保父元素也不会影响子元素的transition */
-            #bot-avatar-button {
+                transform-origin: center center !important;
+                -webkit-transform-origin: center center !important;
+                -moz-transform-origin: center center !important;
+                -ms-transform-origin: center center !important;
+                /* 允许transform transition，但禁用background-position transition */
                 transition: transform 0.3s ease, filter 0.3s ease !important;
-                /* 明确指定只transition transform和filter，不包括background-position */
+                -webkit-transition: transform 0.3s ease, filter 0.3s ease !important;
+                -moz-transition: transform 0.3s ease, filter 0.3s ease !important;
+                -o-transition: transform 0.3s ease, filter 0.3s ease !important;
             }
 
             /* 机器人聊天窗口移动端适配 */
