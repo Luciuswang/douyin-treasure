@@ -1661,18 +1661,14 @@
                         zoomToAccuracy: false     // 不自动缩放
                     });
                     
-                    // 使用多次getCurrentPosition调用模拟持续定位，等待GPS信号稳定
+                    // 使用多次getCurrentPosition调用模拟持续定位
+                    const isMobile = isMobileDevice();
                     let bestPosition = null;
                     let positionCount = 0;
                     let isCompleted = false;
                     let lastAccuracy = Infinity;
-                    const maxPositions = 5; // 最多收集5个定位结果
                     const idealAccuracy = 50; // 理想精度要求（米）
                     const acceptableAccuracy = 200; // 可接受精度（米）
-                    const watchTimeout = 30000; // 30秒后停止
-                    const positionInterval = 2000; // 每2秒获取一次位置
-                    
-                    const isMobile = isMobileDevice();
                     const maxPositions = isMobile ? 1 : 5; // 手机端只获取1个，PC端最多5个
                     const watchTimeout = isMobile ? 10000 : 30000; // 手机端10秒，PC端30秒
                     const positionInterval = isMobile ? 1000 : 2000; // 手机端1秒，PC端2秒
