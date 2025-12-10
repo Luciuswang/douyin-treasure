@@ -1665,8 +1665,13 @@
                     const watchTimeout = 30000; // 30秒后停止
                     const positionInterval = 2000; // 每2秒获取一次位置
                     
-                    console.log('📡 开始持续定位，等待GPS信号稳定...');
-                    updateStatus('正在获取GPS位置...', 'info', true);
+                    const isMobile = isMobileDevice();
+                    const maxPositions = isMobile ? 1 : 5; // 手机端只获取1个，PC端最多5个
+                    const watchTimeout = isMobile ? 10000 : 30000; // 手机端10秒，PC端30秒
+                    const positionInterval = isMobile ? 1000 : 2000; // 手机端1秒，PC端2秒
+                    
+                    console.log(`📡 开始定位（${isMobile ? '手机端快速模式' : 'PC端等待模式'}）...`);
+                    updateStatus(isMobile ? '正在获取位置...' : '正在等待GPS信号稳定，请保持设备静止...', 'info', true);
                     
                     // 设置超时保护
                     const watchTimeoutId = setTimeout(() => {
@@ -1675,8 +1680,8 @@
                             console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                             handleAmapLocationSuccess(bestPosition);
                         } else {
-                            console.warn('⚠️ 持续定位超时，未获得位置，回退到浏览器GPS');
-                            useBrowserGPSFallback();
+                            console.warn('⚠️ 持续定位超时，未获得位置');
+                            updateStatus('定位超时。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
                         }
                     }, watchTimeout);
                     
@@ -1699,8 +1704,27 @@
                                     locationType: locationType
                                 });
                                 
-                                // 🔥 拒绝IP定位
-                                if (locationType.includes('IP')) {
+                                // 手机端：立即接受第一个定位结果
+                                if (isMobile && positionCount === 1) {
+                                    bestPosition = {
+                                        coords: {
+                                            latitude: lat,
+                                            longitude: lng,
+                                            accuracy: accuracy
+                                        },
+                                        timestamp: Date.now(),
+                                        address: result.formattedAddress || '获取地址中...',
+                                        locationType: locationType
+                                    };
+                                    console.log('📱 手机端：获得第一个定位结果，立即使用（精度:', accuracy, '米）');
+                                    isCompleted = true;
+                                    clearTimeout(watchTimeoutId);
+                                    handleAmapLocationSuccess(bestPosition);
+                                    return;
+                                }
+                                
+                                // PC端：拒绝IP定位
+                                if (!isMobile && locationType.includes('IP')) {
                                     console.warn('⚠️ 拒绝IP定位，继续等待GPS...');
                                     updateStatus('检测到IP定位，继续等待GPS信号...', 'warning', true);
                                     // 继续尝试
