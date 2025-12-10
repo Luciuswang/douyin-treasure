@@ -603,6 +603,9 @@
                 <button class="btn" onclick="centerToUser()" disabled id="center-btn">
                     🎯 回到位置
                 </button>
+                <button class="btn" onclick="enableManualCalibration()" id="calibration-btn" style="background: linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%);">
+                    ✏️ 手动校准位置
+                </button>
                 <button class="btn" onclick="generateNearbyTreasures()" disabled id="generate-btn">
                     🗺️ 生成宝藏
                 </button>
@@ -1553,11 +1556,10 @@
                 return;
             }
 
-            // 统一使用高德定位服务（避免坐标系转换问题）
-            // 高德定位会自动使用设备GPS + IP + WiFi 等多种定位方式
-            // 返回的坐标已经是GCJ-02标准，与高德地图完全匹配
-            console.log('🎯 使用高德定位服务（统一坐标系，确保精确）');
-            useAmapGeolocation();
+            // 🔥 优先使用浏览器GPS（精度更高），然后转换坐标
+            // 浏览器GPS通常比高德定位精度更高，特别是在户外
+            console.log('🎯 优先使用浏览器GPS定位（精度更高）');
+            useBrowserGPSFallback();
         }
 
         // 使用高德定位服务（优化版本：强制GPS，拒绝低精度定位）
