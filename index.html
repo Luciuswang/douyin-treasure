@@ -1926,14 +1926,29 @@
                         const wgs84Lat = position.coords.latitude;
                         const wgs84Lng = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
-                        const isGPSSatellite = position.coords.altitude !== null && position.coords.altitude !== undefined;
+                        const altitude = position.coords.altitude;
+                        const heading = position.coords.heading;
+                        const speed = position.coords.speed;
+                        const isGPSSatellite = altitude !== null && altitude !== undefined;
                         
                         console.log(`📍 GPS定位结果 #${positionCount}:`, {
                             lat: wgs84Lat,
                             lng: wgs84Lng,
                             accuracy: accuracy,
-                            isGPSSatellite: isGPSSatellite
+                            altitude: altitude,
+                            heading: heading,
+                            speed: speed,
+                            isGPSSatellite: isGPSSatellite,
+                            timestamp: new Date(position.timestamp).toLocaleString()
                         });
+                        
+                        // 详细日志：检查定位方式
+                        if (isGPSSatellite) {
+                            console.log('✅ 确认：使用GPS卫星定位');
+                        } else {
+                            console.warn('⚠️ 警告：未使用GPS卫星定位（altitude为空）');
+                            console.warn('   这可能是因为：1) GPS未开启 2) 在室内GPS信号弱 3) 浏览器使用网络定位');
+                        }
                         
                         // 🔥 手机端：强制等待GPS卫星定位，精度达到5米内
                         if (isMobileDevice()) {
