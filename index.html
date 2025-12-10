@@ -1882,11 +1882,17 @@
                             isGPSSatellite: isGPSSatellite
                         });
                         
-                        // 手机端：立即接受第一个定位结果，不等待GPS卫星
-                        // 因为手机的网络定位通常已经足够准确（50-200米）
+                        // 🔥 手机端：强制等待GPS卫星定位，精度达到5米内
                         if (isMobileDevice()) {
-                            // 手机端：记录第一个位置就使用
-                            if (!bestPosition) {
+                            // 必须使用GPS卫星定位（altitude不为null）
+                            if (!isGPSSatellite) {
+                                console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
+                                updateStatus('等待GPS卫星信号...', 'info', true);
+                                return; // 继续等待GPS卫星
+                            }
+                            
+                            // 记录最佳位置
+                            if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
                                 bestPosition = {
                                     coords: {
                                         latitude: wgs84Lat,
@@ -1896,7 +1902,22 @@
                                     },
                                     timestamp: position.timestamp
                                 };
-                                console.log('📱 手机端：获得第一个定位结果，立即使用（精度:', accuracy, '米）');
+                                console.log('✅ 更新最佳位置，精度:', accuracy, '米');
+                                
+                                if (accuracy < 5) {
+                                    updateStatus(`🎯 GPS精度: ${Math.round(accuracy)}米（极高精度）`, 'success', true);
+                                } else if (accuracy < 10) {
+                                    updateStatus(`✅ GPS精度: ${Math.round(accuracy)}米（高精度）`, 'success', true);
+                                } else if (accuracy < 20) {
+                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
+                                } else {
+                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米，等待更高精度...`, 'warning', true);
+                                }
+                            }
+                            
+                            // 如果精度达到5米内，立即使用
+                            if (accuracy < 5) {
+                                console.log('🎯 获得极高精度位置（精度:', accuracy, '米），立即使用');
                                 clearTimeout(watchTimeoutId);
                                 if (watchId !== null) {
                                     navigator.geolocation.clearWatch(watchId);
@@ -1905,6 +1926,33 @@
                                 convertAndUsePosition(bestPosition);
                                 return;
                             }
+                            
+                            // 如果精度达到10米内，且已经稳定，使用
+                            if (accuracy < 10 && positionCount >= 3 && accuracy >= lastAccuracy * 0.95) {
+                                console.log('✅ 精度已稳定（精度:', accuracy, '米），使用最佳位置');
+                                clearTimeout(watchTimeoutId);
+                                if (watchId !== null) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    watchId = null;
+                                }
+                                convertAndUsePosition(bestPosition);
+                                return;
+                            }
+                            
+                            // 如果精度达到20米内，且已经收集足够数据，使用
+                            if (accuracy < 20 && positionCount >= 5) {
+                                console.log('✅ 已收集足够数据（精度:', accuracy, '米），使用最佳位置');
+                                clearTimeout(watchTimeoutId);
+                                if (watchId !== null) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    watchId = null;
+                                }
+                                convertAndUsePosition(bestPosition);
+                                return;
+                            }
+                            
+                            lastAccuracy = accuracy;
+                            return; // 继续等待更高精度
                         } else {
                             // PC端：可以等待更精确的位置
                             if (!isGPSSatellite && positionCount < 2) {
