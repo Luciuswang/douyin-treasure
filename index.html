@@ -2333,30 +2333,9 @@
                         map.setZoom(18);
                     }
                     
-                    // 锁定用户位置，防止地图被移走
-                    userLocationLocked = true;
-                    console.log('🔒 用户位置已锁定');
+                    // 不再锁定用户位置，允许用户自由移动地图
+                    console.log('✅ 用户位置已设置，可以自由移动地图');
                 }, 2000);
-                
-                // 监听地图移动结束事件，如果偏移过大则强制回到用户位置
-                let isResetting = false; // 防止无限循环
-                map.on('moveend', function() {
-                    if (userLocationLocked && userLocation && !isResetting) {
-                        const currentCenter = map.getCenter();
-                        const distance = calculateDistance(
-                            [currentCenter.lng, currentCenter.lat],
-                            userLocation
-                        );
-                        
-                        // 如果偏移超过100米，强制回到用户位置
-                        if (distance > 100) {
-                            console.warn(`⚠️ 地图被移动了${distance.toFixed(2)}米，强制回到用户位置`);
-                            isResetting = true;
-                            map.setCenter(userLocation);
-                            setTimeout(() => { isResetting = false; }, 500);
-                        }
-                    }
-                });
             } else {
                 console.error('❌ 地图对象不存在，无法设置中心！');
             }
