@@ -1748,9 +1748,11 @@
                 let watchId = null;
                 let bestPosition = null;
                 let positionCount = 0;
-                const maxPositions = 10; // 最多收集10个定位结果
-                const minAccuracy = 50; // 最小精度要求（米）
-                const watchTimeout = 60000; // 60秒后停止watch
+                let lastAccuracy = Infinity;
+                const maxPositions = 5; // 最多收集5个定位结果
+                const idealAccuracy = 50; // 理想精度要求（米）
+                const acceptableAccuracy = 200; // 可接受精度（米）
+                const watchTimeout = 30000; // 30秒后停止watch
                 
                 // 设置超时保护
                 const watchTimeoutId = setTimeout(() => {
@@ -1763,9 +1765,9 @@
                         console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                         convertAndUsePosition(bestPosition);
                     } else {
-                console.warn('⏰ GPS定位超时，使用默认位置');
-                updateStatus('GPS定位超时，使用默认位置', 'warning');
-                useDefaultLocation();
+                        console.warn('⏰ GPS定位超时，使用默认位置');
+                        updateStatus('GPS定位超时，使用默认位置', 'warning');
+                        useDefaultLocation();
                     }
                 }, watchTimeout);
                 
