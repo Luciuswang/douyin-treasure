@@ -2223,6 +2223,12 @@
         let isLocationSet = false;
         let userLocationLocked = false;
         
+        // 检测设备类型
+        function isMobileDevice() {
+            const ua = navigator.userAgent;
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        }
+        
         // 处理高德定位成功（无需坐标转换）
         function handleAmapLocationSuccess(position) {
             const lat = position.coords.latitude;
@@ -2230,12 +2236,22 @@
             const accuracy = position.coords.accuracy || 100;
             const timestamp = new Date(position.timestamp).toLocaleString();
             const address = position.address || '未知位置';
+            const isMobile = isMobileDevice();
             
             console.log('========== 定位成功处理开始 ==========');
             console.log('✅ 定位成功 (GCJ-02):', { lat, lng, accuracy });
             console.log('📍 准确坐标 [经度, 纬度]:', [lng, lat]);
             console.log('📮 详细地址:', address);
+            console.log('📱 设备类型:', isMobile ? '移动设备' : 'PC');
             console.log('📍 坐标检查: 纬度在30-32之间?', lat > 30 && lat < 32, ', 经度在120-122之间?', lng > 120 && lng < 122);
+            
+            // PC设备且精度较低时，显示特殊提示
+            if (!isMobile && accuracy > 200) {
+                console.warn('⚠️ PC设备定位精度较低，这是正常的（PC通常没有GPS芯片）');
+                setTimeout(() => {
+                    updateStatus(`💡 PC定位精度较低（${Math.round(accuracy)}米）是正常的。建议：1) 使用手机浏览器获得更高精度 2) 点击"手动校准位置"按钮精确设置位置`, 'warning');
+                }, 2000);
+            }
             
             userLocation = [lng, lat];
             isLocationSet = true;
