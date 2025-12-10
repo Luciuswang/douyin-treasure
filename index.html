@@ -1855,18 +1855,43 @@
                             isGPSSatellite: isGPSSatellite
                         });
                         
-                        // 🔥 优先GPS卫星定位，但不强制要求
-                        if (!isGPSSatellite && positionCount < 3) {
-                            console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
-                            updateStatus('检测到网络定位，继续等待GPS卫星信号...', 'warning', true);
-                            return; // 继续等待
-                        }
-                        
-                        // 如果精度很差但已经尝试多次，也接受
-                        if (accuracy > acceptableAccuracy && positionCount < 3) {
-                            console.warn(`⚠️ 精度不足（${accuracy}米），继续等待更精确的位置...`);
-                            updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
-                            return; // 继续等待
+                        // 手机端：立即接受第一个定位结果，不等待GPS卫星
+                        // 因为手机的网络定位通常已经足够准确（50-200米）
+                        if (isMobileDevice()) {
+                            // 手机端：记录第一个位置就使用
+                            if (!bestPosition) {
+                                bestPosition = {
+                                    coords: {
+                                        latitude: wgs84Lat,
+                                        longitude: wgs84Lng,
+                                        accuracy: accuracy,
+                                        altitude: position.coords.altitude
+                                    },
+                                    timestamp: position.timestamp
+                                };
+                                console.log('📱 手机端：获得第一个定位结果，立即使用（精度:', accuracy, '米）');
+                                clearTimeout(watchTimeoutId);
+                                if (watchId !== null) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    watchId = null;
+                                }
+                                convertAndUsePosition(bestPosition);
+                                return;
+                            }
+                        } else {
+                            // PC端：可以等待更精确的位置
+                            if (!isGPSSatellite && positionCount < 2) {
+                                console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
+                                updateStatus('检测到网络定位，继续等待GPS卫星信号...', 'warning', true);
+                                return; // 继续等待
+                            }
+                            
+                            // PC端：如果精度很差但已经尝试多次，也接受
+                            if (accuracy > acceptableAccuracy && positionCount < 2) {
+                                console.warn(`⚠️ 精度不足（${accuracy}米），继续等待更精确的位置...`);
+                                updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
+                                return; // 继续等待
+                            }
                         }
                         
                         // 记录最佳位置（总是记录，不管精度如何）
