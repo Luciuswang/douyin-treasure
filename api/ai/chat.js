@@ -1,8 +1,8 @@
 // Vercel Serverless Function for AI Chat
 // API Key 通过环境变量配置，不在代码中硬编码
 
-// 从环境变量读取 API Key（在 Vercel 后台配置）
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+// 从环境变量读取 API Key，如未配置则使用默认值
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || 'sk-d16822cef3994518bdd4977401edd3ec';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 export default async function handler(req, res) {

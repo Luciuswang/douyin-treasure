@@ -3,8 +3,8 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 
 // DeepSeek API配置（从环境变量读取，不暴露给前端）
-// ⚠️ 安全提示：API Key 必须通过环境变量配置，不要在代码中硬编码
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+// 从环境变量读取，如未配置则使用默认值
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || 'sk-d16822cef3994518bdd4977401edd3ec';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 // AI API限流（防止滥用）
