@@ -168,7 +168,7 @@
    机器人 Sprite 动画样式
    ===================================================== */
 .bot-sprite-animation {
-    background-image: url('../images/xiaotu-bot01.png?v=2.0');
+    background-image: url('../../assets/images/xiaotu-bot01.png?v=2.0');
     background-repeat: no-repeat;
     background-size: 400% 400%;
     background-position: 0% 0%;
