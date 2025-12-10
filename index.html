@@ -1619,8 +1619,7 @@
             console.log('🎯 开始GPS定位...');
 
             if (!navigator.geolocation) {
-                updateStatus('浏览器不支持GPS定位功能', 'error');
-                useDefaultLocation();
+                updateStatus('浏览器不支持GPS定位功能。请使用"手动校准位置"功能设置您的位置', 'error');
                 return;
             }
 
@@ -1835,9 +1834,8 @@
                         console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                         convertAndUsePosition(bestPosition);
                     } else {
-                        console.warn('⏰ GPS定位超时，使用默认位置');
-                        updateStatus('GPS定位超时，使用默认位置', 'warning');
-                        useDefaultLocation();
+                        console.warn('⏰ GPS定位超时，未获得位置');
+                        updateStatus('GPS定位超时。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
                     }
                 }, watchTimeout);
                 
@@ -1945,13 +1943,17 @@
                             return;
                         }
                         
-                        // 如果持续失败，回退到高德定位
+                        // 如果持续失败，尝试高德定位
                         if (positionCount === 0 && watchId !== null) {
                             clearTimeout(watchTimeoutId);
                             navigator.geolocation.clearWatch(watchId);
                             watchId = null;
-                            console.log('🔄 回退到高德定位服务...');
+                            console.log('🔄 浏览器GPS失败，尝试高德定位服务...');
                             useAmapLocationFallback();
+                        } else if (positionCount === 0) {
+                            // 如果完全没有定位结果，提示用户手动校准
+                            console.warn('⚠️ 无法获取GPS位置');
+                            updateStatus('无法获取GPS位置。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
                         }
                     },
                     {
@@ -2123,11 +2125,10 @@
             console.log('📱 使用高德定位服务（回退方案，但仍要求GPS）...');
             updateStatus('正在使用高德定位服务...', 'info', true);
             
-            // 设置超时保护（30秒后使用默认位置）
+            // 设置超时保护（30秒后提示手动校准）
             const fallbackTimeoutId = setTimeout(() => {
-                console.warn('⏰ 高德定位也超时了，使用默认位置（上海）');
-                updateStatus('定位服务超时，使用默认位置（上海）', 'warning');
-                useDefaultLocation();
+                console.warn('⏰ 高德定位也超时了');
+                updateStatus('定位服务超时。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
             }, 30000);
             
             AMap.plugin('AMap.Geolocation', function() {
@@ -2195,8 +2196,7 @@
                         handleAmapLocationSuccess(position);
                     } else {
                         console.error('❌ 高德定位失败:', result);
-                        updateStatus('高德定位失败，使用默认位置（上海）', 'warning');
-                        useDefaultLocation();
+                        updateStatus('高德定位失败。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
                     }
                 });
             });
