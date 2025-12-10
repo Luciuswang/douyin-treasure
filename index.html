@@ -1589,13 +1589,15 @@
                     let bestPosition = null;
                     let positionCount = 0;
                     let isCompleted = false;
-                    const maxPositions = 10; // 最多收集10个定位结果
-                    const minAccuracy = 50; // 最小精度要求（米）
-                    const watchTimeout = 60000; // 60秒后停止
-                    const positionInterval = 3000; // 每3秒获取一次位置
+                    let lastAccuracy = Infinity;
+                    const maxPositions = 5; // 最多收集5个定位结果
+                    const idealAccuracy = 50; // 理想精度要求（米）
+                    const acceptableAccuracy = 200; // 可接受精度（米）
+                    const watchTimeout = 30000; // 30秒后停止
+                    const positionInterval = 2000; // 每2秒获取一次位置
                     
                     console.log('📡 开始持续定位，等待GPS信号稳定...');
-                    updateStatus('正在等待GPS信号稳定，请保持设备静止...', 'info', true);
+                    updateStatus('正在获取GPS位置...', 'info', true);
                     
                     // 设置超时保护
                     const watchTimeoutId = setTimeout(() => {
@@ -1604,7 +1606,7 @@
                             console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                             handleAmapLocationSuccess(bestPosition);
                         } else {
-                            console.warn('⚠️ 持续定位超时，未获得高精度位置，回退到浏览器GPS');
+                            console.warn('⚠️ 持续定位超时，未获得位置，回退到浏览器GPS');
                             useBrowserGPSFallback();
                         }
                     }, watchTimeout);
@@ -1620,7 +1622,7 @@
                                 positionCount++;
                                 const lat = result.position.lat;
                                 const lng = result.position.lng;
-                                const accuracy = result.accuracy || 999;
+                                const accuracy = result.accuracy || 9999;
                                 const locationType = result.location_type || '未知';
                                 
                                 console.log(`📍 定位结果 #${positionCount}:`, {
@@ -1628,24 +1630,28 @@
                                     locationType: locationType
                                 });
                                 
-                                // 🔥 拒绝IP定位和低精度定位
+                                // 🔥 拒绝IP定位
                                 if (locationType.includes('IP')) {
                                     console.warn('⚠️ 拒绝IP定位，继续等待GPS...');
                                     updateStatus('检测到IP定位，继续等待GPS信号...', 'warning', true);
                                     // 继续尝试
-                                    setTimeout(tryGetPosition, positionInterval);
+                                    if (positionCount < maxPositions) {
+                                        setTimeout(tryGetPosition, positionInterval);
+                                    } else {
+                                        // 如果已经尝试多次还是IP定位，使用当前位置
+                                        if (bestPosition) {
+                                            console.log('✅ 已尝试多次，使用最佳位置');
+                                            isCompleted = true;
+                                            clearTimeout(watchTimeoutId);
+                                            handleAmapLocationSuccess(bestPosition);
+                                        } else {
+                                            setTimeout(tryGetPosition, positionInterval);
+                                        }
+                                    }
                                     return;
                                 }
                                 
-                                if (accuracy > minAccuracy) {
-                                    console.warn(`⚠️ 精度不足（${accuracy}米 > ${minAccuracy}米），继续等待更精确的位置...`);
-                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
-                                    // 继续尝试
-                                    setTimeout(tryGetPosition, positionInterval);
-                                    return;
-                                }
-                                
-                                // 记录最佳位置
+                                // 记录最佳位置（总是记录，不管精度如何）
                                 if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
                                     bestPosition = {
                                         coords: {
@@ -1658,7 +1664,14 @@
                                         locationType: locationType
                                     };
                                     console.log('✅ 更新最佳位置，精度:', accuracy, '米');
-                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米 ✓`, 'success', true);
+                                    
+                                    if (accuracy < idealAccuracy) {
+                                        updateStatus(`GPS精度: ${Math.round(accuracy)}米 ✓`, 'success', true);
+                                    } else if (accuracy < acceptableAccuracy) {
+                                        updateStatus(`GPS精度: ${Math.round(accuracy)}米`, 'info', true);
+                                    } else {
+                                        updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'warning', true);
+                                    }
                                 }
                                 
                                 // 如果精度足够好（<20米），立即使用
@@ -1670,15 +1683,25 @@
                                     return;
                                 }
                                 
-                                // 收集足够的位置后，使用最佳位置
-                                if (positionCount >= maxPositions) {
-                                    console.log('✅ 已收集足够定位数据，使用最佳位置');
+                                // 如果精度没有改善，使用当前最佳位置
+                                if (positionCount >= 3 && accuracy >= lastAccuracy * 0.9) {
+                                    console.log('✅ 精度已稳定，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                                     isCompleted = true;
                                     clearTimeout(watchTimeoutId);
                                     handleAmapLocationSuccess(bestPosition);
                                     return;
                                 }
                                 
+                                // 收集足够的位置后，使用最佳位置
+                                if (positionCount >= maxPositions) {
+                                    console.log('✅ 已收集足够定位数据，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
+                                    isCompleted = true;
+                                    clearTimeout(watchTimeoutId);
+                                    handleAmapLocationSuccess(bestPosition);
+                                    return;
+                                }
+                                
+                                lastAccuracy = accuracy;
                                 // 继续尝试获取更精确的位置
                                 setTimeout(tryGetPosition, positionInterval);
                             } else {
@@ -1689,8 +1712,14 @@
                                     clearTimeout(watchTimeoutId);
                                     console.warn('⚠️ 高德定位失败，回退到浏览器GPS');
                                     useBrowserGPSFallback();
+                                } else if (bestPosition) {
+                                    // 已有位置数据，使用它
+                                    console.log('✅ 使用已获得的最佳位置');
+                                    isCompleted = true;
+                                    clearTimeout(watchTimeoutId);
+                                    handleAmapLocationSuccess(bestPosition);
                                 } else {
-                                    // 已有一些位置数据，继续尝试
+                                    // 继续尝试
                                     setTimeout(tryGetPosition, positionInterval);
                                 }
                             }
@@ -1756,20 +1785,21 @@
                             isGPSSatellite: isGPSSatellite
                         });
                         
-                        // 🔥 拒绝非GPS卫星定位和低精度定位
-                        if (!isGPSSatellite) {
+                        // 🔥 优先GPS卫星定位，但不强制要求
+                        if (!isGPSSatellite && positionCount < 3) {
                             console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
                             updateStatus('检测到网络定位，继续等待GPS卫星信号...', 'warning', true);
                             return; // 继续等待
                         }
                         
-                        if (accuracy > minAccuracy) {
-                            console.warn(`⚠️ 精度不足（${accuracy}米 > ${minAccuracy}米），继续等待更精确的位置...`);
+                        // 如果精度很差但已经尝试多次，也接受
+                        if (accuracy > acceptableAccuracy && positionCount < 3) {
+                            console.warn(`⚠️ 精度不足（${accuracy}米），继续等待更精确的位置...`);
                             updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
                             return; // 继续等待
                         }
                         
-                        // 记录最佳位置
+                        // 记录最佳位置（总是记录，不管精度如何）
                         if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
                             bestPosition = {
                                 coords: {
@@ -1781,7 +1811,14 @@
                                 timestamp: position.timestamp
                             };
                             console.log('✅ 更新最佳位置，精度:', accuracy, '米');
-                            updateStatus(`GPS精度: ${Math.round(accuracy)}米 ✓`, 'success', true);
+                            
+                            if (accuracy < idealAccuracy) {
+                                updateStatus(`GPS精度: ${Math.round(accuracy)}米 ✓`, 'success', true);
+                            } else if (accuracy < acceptableAccuracy) {
+                                updateStatus(`GPS精度: ${Math.round(accuracy)}米`, 'info', true);
+                            } else {
+                                updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'warning', true);
+                            }
                         }
                         
                         // 如果精度足够好（<20米），立即使用
@@ -1796,16 +1833,31 @@
                             return;
                         }
                         
-                        // 收集足够的位置后，使用最佳位置
-                        if (positionCount >= maxPositions) {
-                            console.log('✅ 已收集足够定位数据，使用最佳位置');
+                        // 如果精度没有改善，使用当前最佳位置
+                        if (positionCount >= 3 && accuracy >= lastAccuracy * 0.9) {
+                            console.log('✅ 精度已稳定，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
                             clearTimeout(watchTimeoutId);
                             if (watchId !== null) {
                                 navigator.geolocation.clearWatch(watchId);
                                 watchId = null;
                             }
                             convertAndUsePosition(bestPosition);
+                            return;
                         }
+                        
+                        // 收集足够的位置后，使用最佳位置
+                        if (positionCount >= maxPositions) {
+                            console.log('✅ 已收集足够定位数据，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
+                            clearTimeout(watchTimeoutId);
+                            if (watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                            }
+                            convertAndUsePosition(bestPosition);
+                            return;
+                        }
+                        
+                        lastAccuracy = accuracy;
                     },
                     function(error) {
                         console.error('❌ GPS定位错误:', error);
