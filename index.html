@@ -1520,13 +1520,81 @@
                     }, 1000);
                 });
 
-                // 地图点击事件 - 添加宝藏
+                // 地图点击事件 - 手动校准位置或添加宝藏
+                let manualCalibrationMode = false;
                 map.on('click', function(e) {
                     console.log('地图点击事件:', e.lnglat);
+                    
+                    // 如果处于手动校准模式，则校准位置
+                    if (manualCalibrationMode) {
+                        const clickedLng = e.lnglat.lng;
+                        const clickedLat = e.lnglat.lat;
+                        console.log('📍 手动校准位置:', { lng: clickedLng, lat: clickedLat });
+                        
+                        // 更新用户位置
+                        userLocation = [clickedLng, clickedLat];
+                        isLocationSet = true;
+                        
+                        // 更新用户标记
+                        if (userMarker) {
+                            userMarker.setPosition([clickedLng, clickedLat]);
+                        } else {
+                            createUserMarker();
+                        }
+                        
+                        // 移动地图到新位置
+                        map.setCenter([clickedLng, clickedLat]);
+                        map.setZoom(18);
+                        
+                        // 获取地址
+                        AMap.plugin('AMap.Geocoder', function() {
+                            const geocoder = new AMap.Geocoder({ timeout: 3000 });
+                            geocoder.getAddress([clickedLng, clickedLat], function(status, geoResult) {
+                                let address = '地址获取中...';
+                                if (status === 'complete' && geoResult.info === 'OK') {
+                                    address = geoResult.regeocode.formattedAddress;
+                                }
+                                updateStatus(`✅ 位置已手动校准: ${address}`, 'success');
+                                console.log('📮 校准位置地址:', address);
+                            });
+                        });
+                        
+                        manualCalibrationMode = false;
+                        const calBtn = document.getElementById('calibration-btn');
+                        if (calBtn) {
+                            calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
+                        }
+                        return;
+                    }
+                    
+                    // 普通点击 - 添加宝藏
                     if (userLocation && confirm('在此位置添加宝藏？')) {
                         addTreasureAtPosition([e.lnglat.lng, e.lnglat.lat]);
                     }
                 });
+                
+                // 手动校准功能
+                window.enableManualCalibration = function() {
+                    if (!map) {
+                        updateStatus('请先初始化地图！', 'warning');
+                        return;
+                    }
+                    manualCalibrationMode = true;
+                    const calBtn = document.getElementById('calibration-btn');
+                    if (calBtn) {
+                        calBtn.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
+                    }
+                    updateStatus('📍 手动校准模式已启用：请在地图上点击您的真实位置', 'info');
+                    setTimeout(() => {
+                        if (manualCalibrationMode) {
+                            manualCalibrationMode = false;
+                            if (calBtn) {
+                                calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
+                            }
+                            updateStatus('手动校准模式已自动关闭', 'info');
+                        }
+                    }, 30000); // 30秒后自动关闭
+                };
                 
                 // 地图移动事件（用于调试）
                 map.on('moveend', function() {
