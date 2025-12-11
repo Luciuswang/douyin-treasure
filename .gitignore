@@ -33,5 +33,5 @@ temp/
 Thumbs.db
 
 # API密钥（如果有配置文件）
-config.js
+/config.js
 keys.js

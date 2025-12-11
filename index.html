@@ -210,11 +210,17 @@
         </div>
     </div>
 
+    <!-- 外部 JavaScript 模块 -->
+    <script src="src/js/config.js"></script>
+    <script src="src/js/storage.js"></script>
+    <script src="src/js/auth.js"></script>
+
     <script>
-        // ==================== Firebase配置 ====================
-        // ⚠️ 重要：请先按照 FIREBASE_SETUP.md 中的说明配置Firebase
-        // 然后在这里填入你的Firebase配置信息
+        // ==================== 注意：外部模块已加载 ====================
+        // config.js, storage.js, auth.js 提供了基础定义
+        // 以下代码保留以确保兼容性，后续将逐步移除
         
+        // Firebase配置（已在 config.js 中定义，此处覆盖以确保兼容）
         const firebaseConfig = {
             // ✅ Firebase配置信息（已配置）
             apiKey: "AIzaSyAKsaHi4_VIRgCVR3_ZzkQdrkx91Iwq_u4",
