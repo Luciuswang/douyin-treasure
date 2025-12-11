@@ -313,8 +313,9 @@
         aspect-ratio: 1 / 1 !important;
         transform-origin: center center !important;
         -webkit-transform-origin: center center !important;
-        transition: transform 0.3s ease, filter 0.3s ease !important;
-        -webkit-transition: transform 0.3s ease, filter 0.3s ease !important;
+        /* 禁用 transition 避免动画位移 */
+        transition: none !important;
+        -webkit-transition: none !important;
     }
 
     /* 机器人聊天窗口 */
