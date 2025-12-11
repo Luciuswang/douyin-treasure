@@ -1534,6 +1534,30 @@
                             console.warn('   这可能是因为：1) GPS未开启 2) 在室内GPS信号弱 3) 浏览器使用网络定位');
                         }
                         
+                        // 🔥 如果是网络定位（精度 > 1000米），直接使用，不再等待
+                        if (accuracy > 1000) {
+                            console.log('📡 检测到网络定位（精度 > 1km），直接使用');
+                            bestPosition = {
+                                coords: {
+                                    latitude: wgs84Lat,
+                                    longitude: wgs84Lng,
+                                    accuracy: accuracy,
+                                    altitude: position.coords.altitude
+                                },
+                                timestamp: position.timestamp
+                            };
+                            
+                            clearTimeout(watchTimeoutId);
+                            if (watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                            }
+                            
+                            updateStatus(`网络定位完成，精度: ${Math.round(accuracy/1000)}km`, 'success');
+                            convertAndUsePosition(bestPosition);
+                            return;
+                        }
+                        
                         // 🔥 手机端：强制等待GPS卫星定位，精度达到5米内
                         if (isMobileDevice()) {
                             // 必须使用GPS卫星定位（altitude不为null）
