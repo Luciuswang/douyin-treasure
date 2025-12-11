@@ -2802,11 +2802,17 @@
             }, 500);
             
             // 如果用户标记存在，触发弹跳动画
-            if (userMarker) {
-                userMarker.setAnimation('AMAP_ANIMATION_BOUNCE');
-                setTimeout(() => {
-                    userMarker.setAnimation('AMAP_ANIMATION_NONE');
-                }, 1000);
+            if (userMarker && typeof userMarker.setAnimation === 'function') {
+                try {
+                    userMarker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                    setTimeout(() => {
+                        if (userMarker && typeof userMarker.setAnimation === 'function') {
+                            userMarker.setAnimation('AMAP_ANIMATION_NONE');
+                        }
+                    }, 1000);
+                } catch (e) {
+                    console.warn('⚠️ 标记动画不可用:', e.message);
+                }
             }
             
             updateStatus('🎯 正在回到您的位置...', 'info');
