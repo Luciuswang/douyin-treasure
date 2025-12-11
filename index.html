@@ -1606,19 +1606,31 @@
                             lastAccuracy = accuracy;
                             return; // 继续等待更高精度
                         } else {
-                            // PC端：可以等待更精确的位置
-                            if (!isGPSSatellite && positionCount < 2) {
-                                console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
-                                updateStatus('检测到网络定位，继续等待GPS卫星信号...', 'warning', true);
-                                return; // 继续等待
+                            // PC端：直接接受网络定位，不再等待GPS卫星
+                            // PC 通常没有 GPS 芯片，网络定位是唯一选择
+                            console.log('💻 PC端：接受网络定位结果');
+                            
+                            // 记录位置并立即使用
+                            bestPosition = {
+                                coords: {
+                                    latitude: wgs84Lat,
+                                    longitude: wgs84Lng,
+                                    accuracy: accuracy,
+                                    altitude: position.coords.altitude
+                                },
+                                timestamp: position.timestamp
+                            };
+                            
+                            // 清理并使用位置
+                            clearTimeout(watchTimeoutId);
+                            if (watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
                             }
                             
-                            // PC端：如果精度很差但已经尝试多次，也接受
-                            if (accuracy > acceptableAccuracy && positionCount < 2) {
-                                console.warn(`⚠️ 精度不足（${accuracy}米），继续等待更精确的位置...`);
-                                updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
-                                return; // 继续等待
-                            }
+                            updateStatus(`PC定位完成，精度: ${Math.round(accuracy)}米（网络定位）`, 'success');
+                            convertAndUsePosition(bestPosition);
+                            return;
                         }
                         
                         // 记录最佳位置（总是记录，不管精度如何）
