@@ -1765,6 +1765,37 @@
             console.log('📍 GPS返回WGS84坐标，需要转换为GCJ-02');
             console.log('📍 原始坐标 (WGS84):', { lat: wgs84Lat, lng: wgs84Lng });
             
+            // 🔧 网络定位偏移修正（针对精度 > 1km 的网络定位）
+            // 偏移量：经度 +0.015，纬度 +0.001（基于实测数据）
+            const NETWORK_LOCATION_OFFSET = {
+                lng: 0.015,  // 向东偏移约 1.5km
+                lat: 0.001   // 向北偏移约 130m
+            };
+            
+            // 如果是网络定位（精度 > 1000米），应用偏移修正
+            if (accuracy > 1000) {
+                const correctedLat = wgs84Lat + NETWORK_LOCATION_OFFSET.lat;
+                const correctedLng = wgs84Lng + NETWORK_LOCATION_OFFSET.lng;
+                console.log('🔧 应用网络定位偏移修正');
+                console.log('📍 修正前:', { lat: wgs84Lat, lng: wgs84Lng });
+                console.log('📍 修正后:', { lat: correctedLat, lng: correctedLng });
+                
+                // 使用修正后的坐标
+                const positionData = {
+                    coords: {
+                        latitude: correctedLat,
+                        longitude: correctedLng,
+                        accuracy: accuracy
+                    },
+                    timestamp: position.timestamp,
+                    address: '获取地址中...',
+                    locationType: '网络定位（已修正）'
+                };
+                
+                handleAmapLocationSuccess(positionData);
+                return;
+            }
+            
             // 使用高德地图API进行坐标转换
             if (typeof AMap !== 'undefined' && AMap.convertFrom) {
                 AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
