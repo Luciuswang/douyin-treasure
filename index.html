@@ -3853,6 +3853,8 @@
                     // 已登录，获取最新用户信息
                     const user = await authService.getCurrentUser();
                     if (user) {
+                        // 🔥 同步登录账户的用户名到所有系统
+                        syncUserInfoFromAuth(user);
                         authManager.updateUserDisplay();
                         console.log('✅ 用户已登录:', user.username);
                     } else {
@@ -4109,6 +4111,76 @@
         // ==================== 聊天功能 ====================
         
         // 聊天数据管理
+        // 🔥 同步用户信息到所有系统（登录/注册后调用）
+        function syncUserInfoFromAuth(authUser) {
+            if (!authUser) return;
+            
+            const username = authUser.username;
+            console.log('🔄 同步用户信息:', username);
+            
+            // 1. 同步到游戏昵称
+            userData.username = username;
+            saveUserData();
+            
+            // 2. 同步到聊天系统
+            if (chatManager.currentUser) {
+                chatManager.currentUser.name = username;
+                storageManager.save('chatUser', chatManager.currentUser);
+                
+                // 同步到Firebase
+                if (firebaseEnabled && database) {
+                    try {
+                        const userRef = database.ref(`users/${chatManager.currentUser.id}`);
+                        userRef.update({
+                            name: username,
+                            updatedAt: firebase.database.ServerValue.TIMESTAMP
+                        });
+                        console.log('✅ 用户名已同步到Firebase');
+                    } catch (error) {
+                        console.error('❌ Firebase同步失败:', error);
+                    }
+                }
+            }
+            
+            // 3. 更新页面显示
+            document.getElementById('user-name').textContent = username;
+            
+            // 4. 标记已完成设置
+            localStorage.setItem('totofun-setup-completed', 'true');
+            
+            console.log('✅ 用户信息已同步到所有系统');
+        }
+        
+        // 获取统一的用户显示名称（优先级：登录账户 > 游戏昵称 > 聊天昵称 > 游客）
+        function getUnifiedUsername() {
+            // 1. 优先使用登录账户的用户名
+            const authUser = authService.getUser();
+            if (authUser?.username) {
+                return authUser.username;
+            }
+            
+            // 2. 使用游戏昵称
+            if (userData.username) {
+                return userData.username;
+            }
+            
+            // 3. 使用聊天系统昵称
+            if (chatManager.currentUser?.name) {
+                return chatManager.currentUser.name;
+            }
+            
+            // 4. 默认游客
+            return '游客';
+        }
+        
+        // 获取统一的用户ID（使用聊天系统的短ID，因为好友添加用的是这个）
+        function getUnifiedUserId() {
+            if (chatManager.currentUser?.id) {
+                return chatManager.currentUser.id;
+            }
+            return null;
+        }
+
         // 认证管理器
         const authManager = {
             // 显示登录表单
@@ -4169,6 +4241,9 @@
                     errorDiv.style.background = '#e8f5e9';
                     errorDiv.style.color = '#2e7d32';
                     
+                    // 🔥 同步用户信息到所有系统
+                    syncUserInfoFromAuth(result.user);
+                    
                     // 更新用户信息显示
                     this.updateUserDisplay();
                     
@@ -4222,6 +4297,9 @@
                     errorDiv.textContent = '注册成功！正在登录...';
                     errorDiv.style.background = '#e8f5e9';
                     errorDiv.style.color = '#2e7d32';
+                    
+                    // 🔥 同步用户信息到所有系统
+                    syncUserInfoFromAuth(result.user);
                     
                     // 更新用户信息显示
                     this.updateUserDisplay();
@@ -5551,11 +5629,20 @@
                 document.getElementById('add-friend-panel').style.display = 'none';
                 document.getElementById('chat-container').style.display = 'none';
                 
+                // 🔥 使用统一的用户名（优先显示登录账户的用户名）
+                const unifiedName = getUnifiedUsername();
+                
                 // 填充信息
                 document.getElementById('profile-avatar').textContent = this.currentUser.avatar;
-                document.getElementById('profile-name-input').value = this.currentUser.name;
+                document.getElementById('profile-name-input').value = unifiedName;
                 document.getElementById('profile-my-id').textContent = this.currentUser.id;
                 document.getElementById('profile-friends-count').textContent = this.friends.length;
+                
+                // 同步聊天系统的名称
+                if (this.currentUser.name !== unifiedName) {
+                    this.currentUser.name = unifiedName;
+                    storageManager.save('chatUser', this.currentUser);
+                }
                 
                 // 计算消息总数
                 let totalMessages = 0;
