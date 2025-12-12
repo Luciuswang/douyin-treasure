@@ -2124,20 +2124,48 @@
         }
         
         // 处理高德定位成功（无需坐标转换）
+        // ==================== 定位偏移修正配置 ====================
+        // 基于实测数据计算的偏移量（上海地区）
+        // GPS定位: (121.399377, 31.165466) → 真实位置: (121.404100, 31.163571)
+        const LOCATION_OFFSET = {
+            enabled: true,           // 是否启用偏移修正
+            lng: 0.004723,           // 经度修正值（向东偏移约400米）
+            lat: -0.001895,          // 纬度修正值（向南偏移约210米）
+            onlyForMobile: true,     // 仅对移动设备应用
+            minAccuracy: 100         // 仅在精度低于此值时应用（米）
+        };
+        
         function handleAmapLocationSuccess(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+            let lat = position.coords.latitude;
+            let lng = position.coords.longitude;
             const accuracy = position.coords.accuracy || 100;
             const timestamp = new Date(position.timestamp).toLocaleString();
             const address = position.address || '未知位置';
             const isMobile = isMobileDevice();
             
             console.log('========== 定位成功处理开始 ==========');
-            console.log('✅ 定位成功 (GCJ-02):', { lat, lng, accuracy });
-            console.log('📍 准确坐标 [经度, 纬度]:', [lng, lat]);
+            console.log('✅ 原始定位 (GCJ-02):', { lat, lng, accuracy });
+            console.log('📍 原始坐标 [经度, 纬度]:', [lng, lat]);
             console.log('📮 详细地址:', address);
             console.log('📱 设备类型:', isMobile ? '移动设备' : 'PC');
             console.log('📍 坐标检查: 纬度在30-32之间?', lat > 30 && lat < 32, ', 经度在120-122之间?', lng > 120 && lng < 122);
+            
+            // 🔧 应用定位偏移修正
+            if (LOCATION_OFFSET.enabled) {
+                const shouldApply = (!LOCATION_OFFSET.onlyForMobile || isMobile) && 
+                                   (accuracy <= LOCATION_OFFSET.minAccuracy);
+                
+                if (shouldApply) {
+                    console.log('🔧 应用定位偏移修正...');
+                    console.log('📍 修正前:', { lng, lat });
+                    lng += LOCATION_OFFSET.lng;
+                    lat += LOCATION_OFFSET.lat;
+                    console.log('📍 修正后:', { lng, lat });
+                    console.log('📐 偏移量: 经度', LOCATION_OFFSET.lng, '纬度', LOCATION_OFFSET.lat);
+                } else {
+                    console.log('ℹ️ 未应用偏移修正 (设备:', isMobile ? '移动' : 'PC', ', 精度:', accuracy, '米)');
+                }
+            }
             
             // PC设备且精度较低时，显示特殊提示
             if (!isMobile && accuracy > 200) {
