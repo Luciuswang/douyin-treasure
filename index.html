@@ -44,9 +44,8 @@
     <link rel="stylesheet" href="src/css/chat.css">
     <link rel="stylesheet" href="src/css/responsive.css">
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <!-- Firebase SDK - 异步加载，支持国内网络 -->
+    <!-- 注意：Firebase SDK 将在页面加载后异步加载，避免阻塞页面 -->
 </head>
 <body>
     <div class="container">
@@ -191,6 +190,9 @@
                 <button class="btn" onclick="testGPS()" disabled id="gps-btn">
                     📍 重新定位
                 </button>
+                <button class="btn" onclick="toggleLocationTracking()" disabled id="tracking-btn" style="background: linear-gradient(135deg, #00BCD4 0%, #0097A7 100%);">
+                    🚶 实时追踪
+                </button>
                 <button class="btn" onclick="centerToUser()" disabled id="center-btn">
                     🎯 回到位置
                 </button>
@@ -271,20 +273,128 @@
         let database = null;
         let firebaseEnabled = false;
         
-        try {
-            // 检查是否配置了Firebase
-            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-                firebaseApp = firebase.initializeApp(firebaseConfig);
-                database = firebase.database();
-                firebaseEnabled = true;
-                console.log('✅ Firebase连接成功！实时通信已启用');
-            } else {
-                console.warn('⚠️ Firebase未配置，将使用本地存储模式（需要手动分享消息链接）');
-                console.log('💡 请按照 FIREBASE_SETUP.md 中的说明配置Firebase以启用实时通信');
+        // ==================== Firebase异步加载（支持国内网络） ====================
+        // Firebase SDK CDN 源列表（按优先级排序）
+        const FIREBASE_CDN_SOURCES = [
+            // 国内 CDN 镜像（优先）
+            {
+                app: 'https://cdn.bootcdn.net/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js',
+                database: 'https://cdn.bootcdn.net/ajax/libs/firebase/10.7.1/firebase-database-compat.min.js'
+            },
+            // unpkg CDN（国内可访问）
+            {
+                app: 'https://unpkg.com/firebase@10.7.1/firebase-app-compat.js',
+                database: 'https://unpkg.com/firebase@10.7.1/firebase-database-compat.js'
+            },
+            // jsDelivr CDN（国内可访问）
+            {
+                app: 'https://cdn.jsdelivr.net/npm/firebase@10.7.1/firebase-app-compat.js',
+                database: 'https://cdn.jsdelivr.net/npm/firebase@10.7.1/firebase-database-compat.js'
+            },
+            // Google 原始源（备用，可能被墙）
+            {
+                app: 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js',
+                database: 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'
             }
-        } catch (error) {
-            console.error('❌ Firebase初始化失败:', error);
-            console.log('💡 将使用本地存储模式（需要手动分享消息链接）');
+        ];
+        
+        // 动态加载脚本
+        function loadScript(url, timeout = 5000) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = url;
+                script.async = true;
+                
+                const timeoutId = setTimeout(() => {
+                    script.remove();
+                    reject(new Error(`加载超时: ${url}`));
+                }, timeout);
+                
+                script.onload = () => {
+                    clearTimeout(timeoutId);
+                    resolve();
+                };
+                
+                script.onerror = () => {
+                    clearTimeout(timeoutId);
+                    script.remove();
+                    reject(new Error(`加载失败: ${url}`));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+        
+        // 尝试从多个源加载 Firebase
+        async function loadFirebaseSDK() {
+            console.log('🔥 开始加载 Firebase SDK...');
+            
+            for (let i = 0; i < FIREBASE_CDN_SOURCES.length; i++) {
+                const source = FIREBASE_CDN_SOURCES[i];
+                console.log(`📦 尝试 CDN 源 ${i + 1}/${FIREBASE_CDN_SOURCES.length}...`);
+                
+                try {
+                    // 先加载 app
+                    await loadScript(source.app, 5000);
+                    console.log('✅ firebase-app 加载成功');
+                    
+                    // 再加载 database
+                    await loadScript(source.database, 5000);
+                    console.log('✅ firebase-database 加载成功');
+                    
+                    return true;
+                } catch (error) {
+                    console.warn(`⚠️ CDN 源 ${i + 1} 失败:`, error.message);
+                    // 继续尝试下一个源
+                }
+            }
+            
+            console.warn('❌ 所有 Firebase CDN 源都无法访问');
+            return false;
+        }
+        
+        // 初始化 Firebase
+        async function initFirebase() {
+            // 先尝试加载 SDK
+            const loaded = await loadFirebaseSDK();
+            
+            if (!loaded) {
+                console.log('💡 Firebase 不可用，将使用本地模式');
+                firebaseEnabled = false;
+                return;
+            }
+            
+            try {
+                // 检查是否配置了Firebase
+                if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && typeof firebase !== 'undefined') {
+                    firebaseApp = firebase.initializeApp(firebaseConfig);
+                    database = firebase.database();
+                    firebaseEnabled = true;
+                    console.log('✅ Firebase连接成功！实时通信已启用');
+                    
+                    // 通知聊天管理器 Firebase 已就绪
+                    if (typeof chatManager !== 'undefined' && chatManager.initFirebaseRealtime) {
+                        chatManager.initFirebaseRealtime();
+                    }
+                } else {
+                    console.warn('⚠️ Firebase未配置或SDK未加载');
+                    firebaseEnabled = false;
+                }
+            } catch (error) {
+                console.error('❌ Firebase初始化失败:', error);
+                console.log('💡 将使用本地存储模式');
+                firebaseEnabled = false;
+            }
+        }
+        
+        // 页面加载后异步初始化 Firebase（不阻塞主要功能）
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                // 延迟加载，确保不影响主要功能
+                setTimeout(initFirebase, 100);
+            });
+        } else {
+            setTimeout(initFirebase, 100);
         }
         
         // ==================== 全局变量 ====================
@@ -293,6 +403,14 @@
         let treasureMarkers = [];
         let userLocation = null;
         let watchId = null;
+        
+        // ==================== 实时位置追踪变量 ====================
+        let locationTrackingWatchId = null;  // 位置追踪的watch ID
+        let isTrackingLocation = false;      // 是否正在追踪位置
+        let lastTrackingUpdate = 0;          // 上次追踪更新时间
+        let followUserLocation = true;       // 地图是否跟随用户位置
+        const TRACKING_MIN_INTERVAL = 2000;  // 追踪更新最小间隔（毫秒）
+        const TRACKING_MIN_DISTANCE = 3;     // 最小移动距离（米），小于此距离不更新
 
         // 用户数据管理
         let userData = {
@@ -355,6 +473,33 @@
             // 云服务地址配置（部署到云服务后，在这里设置你的服务器地址）
             // 例如：'https://totofun-server.railway.app' 或 'https://totofun-server.onrender.com'
             CLOUD_API_URL: 'https://totofun-server-production.up.railway.app', // Railway部署地址
+            
+            // API 请求超时时间（毫秒）
+            TIMEOUT: 8000,
+            
+            // 是否已检测到 API 不可用
+            _apiUnavailable: false,
+            
+            // 带超时的 fetch 请求
+            async fetchWithTimeout(url, options = {}) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
+                
+                try {
+                    const response = await fetch(url, {
+                        ...options,
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    return response;
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    if (error.name === 'AbortError') {
+                        throw new Error('请求超时，服务器可能暂时不可用');
+                    }
+                    throw error;
+                }
+            },
             
             // 自动检测API地址
             get BASE_URL() {
@@ -441,6 +586,14 @@
             // 注册
             async register(username, email, password) {
                 try {
+                    // 如果已知 API 不可用，直接返回提示
+                    if (API_CONFIG._apiUnavailable) {
+                        return { 
+                            success: false, 
+                            message: '服务器暂时不可用，请稍后再试。\n\n💡 您可以先以游客身份体验游戏的主要功能！' 
+                        };
+                    }
+                    
                     const baseUrl = API_CONFIG.BASE_URL;
                     const apiUrl = baseUrl + API_CONFIG.ENDPOINTS.REGISTER;
                     console.log('📡 API配置信息:');
@@ -449,7 +602,7 @@
                     console.log('  - 完整请求URL:', apiUrl);
                     console.log('  - 当前页面:', window.location.href);
                     
-                    const response = await fetch(apiUrl, {
+                    const response = await API_CONFIG.fetchWithTimeout(apiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -491,18 +644,20 @@
                         stack: error.stack
                     });
                     
-                    const baseUrl = API_CONFIG.BASE_URL;
-                    let errorMessage = '网络错误，请检查服务器连接';
+                    // 标记 API 不可用
+                    if (error.message.includes('超时') || error.message.includes('Failed to fetch')) {
+                        API_CONFIG._apiUnavailable = true;
+                    }
                     
-                    // 检查是否是CORS错误
-                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                        if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-                            errorMessage = `CORS错误：无法连接到服务器 (${baseUrl})。\n\n可能的原因：\n1. 服务器未正确配置CORS\n2. 服务器地址不正确\n3. 网络连接问题\n\n请检查控制台中的API配置信息。`;
-                        } else {
-                            errorMessage = `无法连接到服务器 (${baseUrl})。\n\n请确保：\n1. 后端服务器正在运行\n2. API地址配置正确\n3. 网络连接正常`;
-                        }
+                    let errorMessage = '网络连接失败';
+                    
+                    // 检查是否是超时或网络错误
+                    if (error.message.includes('超时')) {
+                        errorMessage = '服务器响应超时，可能是网络问题。\n\n💡 您可以先以游客身份体验游戏！';
+                    } else if (error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
+                        errorMessage = '无法连接到服务器。\n\n可能原因：\n• 网络连接不稳定\n• 服务器暂时不可用\n\n💡 您可以先以游客身份体验游戏的主要功能！';
                     } else {
-                        errorMessage = `网络错误: ${error.message}`;
+                        errorMessage = `网络错误: ${error.message}\n\n💡 您可以先以游客身份体验游戏！`;
                     }
                     
                     return { success: false, message: errorMessage };
@@ -512,10 +667,18 @@
             // 登录
             async login(email, password) {
                 try {
+                    // 如果已知 API 不可用，直接返回提示
+                    if (API_CONFIG._apiUnavailable) {
+                        return { 
+                            success: false, 
+                            message: '服务器暂时不可用，请稍后再试。\n\n💡 您可以先以游客身份体验游戏的主要功能！' 
+                        };
+                    }
+                    
                     const apiUrl = API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.LOGIN;
                     console.log('📡 登录请求URL:', apiUrl);
                     
-                    const response = await fetch(apiUrl, {
+                    const response = await API_CONFIG.fetchWithTimeout(apiUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -551,13 +714,20 @@
                     }
                 } catch (error) {
                     console.error('登录错误:', error);
-                    const apiUrl = API_CONFIG.BASE_URL;
-                    let errorMessage = '网络错误，请检查服务器连接';
                     
-                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                        errorMessage = `无法连接到服务器 (${apiUrl})。请确保后端服务器正在运行在端口5000。`;
+                    // 标记 API 不可用
+                    if (error.message.includes('超时') || error.message.includes('Failed to fetch')) {
+                        API_CONFIG._apiUnavailable = true;
+                    }
+                    
+                    let errorMessage = '网络连接失败';
+                    
+                    if (error.message.includes('超时')) {
+                        errorMessage = '服务器响应超时，可能是网络问题。\n\n💡 您可以先以游客身份体验游戏！';
+                    } else if (error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
+                        errorMessage = '无法连接到服务器。\n\n💡 您可以先以游客身份体验游戏的主要功能！';
                     } else {
-                        errorMessage = `网络错误: ${error.message}`;
+                        errorMessage = `网络错误: ${error.message}\n\n💡 您可以先以游客身份体验游戏！`;
                     }
                     
                     return { success: false, message: errorMessage };
@@ -1267,6 +1437,15 @@
                     const center = map.getCenter();
                     console.log('地图中心:', center.lng, center.lat, '缩放级别:', map.getZoom());
                 });
+                
+                // 用户拖动地图时自动关闭跟随模式
+                map.on('dragstart', function() {
+                    if (isTrackingLocation && followUserLocation) {
+                        console.log('📍 用户拖动地图，关闭跟随模式');
+                        followUserLocation = false;
+                        updateTrackingIndicatorText();
+                    }
+                });
 
             } catch (error) {
                 console.error('地图创建失败:', error);
@@ -1294,6 +1473,343 @@
             console.log('🎯 优先使用浏览器GPS定位（精度更高）');
             useBrowserGPSFallback();
         }
+
+        // ==================== 实时位置追踪功能 ====================
+        
+        // 切换实时位置追踪
+        function toggleLocationTracking() {
+            if (isTrackingLocation) {
+                stopLocationTracking();
+            } else {
+                startLocationTracking();
+            }
+        }
+        
+        // 开始实时位置追踪
+        function startLocationTracking() {
+            if (!map) {
+                updateStatus('请先初始化地图！', 'warning');
+                return;
+            }
+            
+            if (!navigator.geolocation) {
+                updateStatus('浏览器不支持GPS定位功能', 'error');
+                return;
+            }
+            
+            if (isTrackingLocation) {
+                console.log('⚠️ 已在追踪位置中');
+                return;
+            }
+            
+            console.log('🚶 开始实时位置追踪...');
+            updateStatus('🚶 实时追踪已开启，正在监测您的位置...', 'info');
+            
+            isTrackingLocation = true;
+            lastTrackingUpdate = Date.now();
+            
+            // 更新按钮状态
+            updateTrackingButtonState();
+            
+            // 使用watchPosition持续监测位置变化
+            locationTrackingWatchId = navigator.geolocation.watchPosition(
+                // 成功回调
+                function(position) {
+                    const now = Date.now();
+                    
+                    // 检查是否满足最小更新间隔
+                    if (now - lastTrackingUpdate < TRACKING_MIN_INTERVAL) {
+                        return;
+                    }
+                    
+                    const wgs84Lat = position.coords.latitude;
+                    const wgs84Lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+                    
+                    console.log(`📍 实时位置更新: 纬度=${wgs84Lat.toFixed(6)}, 经度=${wgs84Lng.toFixed(6)}, 精度=${accuracy.toFixed(1)}米`);
+                    
+                    // 将WGS-84坐标转换为GCJ-02（高德地图使用的坐标系）
+                    if (typeof AMap !== 'undefined') {
+                        AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                            if (status === 'complete' && result.locations && result.locations.length > 0) {
+                                const gcj02 = result.locations[0];
+                                let newLng = gcj02.lng;
+                                let newLat = gcj02.lat;
+                                
+                                // 应用定位偏移修正
+                                const isMobile = isMobileDevice();
+                                if (LOCATION_OFFSET.enabled) {
+                                    const shouldApply = (!LOCATION_OFFSET.onlyForMobile || isMobile) && 
+                                                       (accuracy <= LOCATION_OFFSET.minAccuracy);
+                                    if (shouldApply) {
+                                        newLng += LOCATION_OFFSET.lng;
+                                        newLat += LOCATION_OFFSET.lat;
+                                    }
+                                }
+                                
+                                const newLocation = [newLng, newLat];
+                                
+                                // 计算与上次位置的距离
+                                if (userLocation) {
+                                    const distance = calculateDistance(userLocation, newLocation);
+                                    
+                                    // 如果移动距离小于最小距离，不更新
+                                    if (distance < TRACKING_MIN_DISTANCE) {
+                                        console.log(`📍 移动距离过小 (${distance.toFixed(1)}米)，跳过更新`);
+                                        return;
+                                    }
+                                    
+                                    console.log(`📍 移动了 ${distance.toFixed(1)} 米`);
+                                }
+                                
+                                // 更新用户位置
+                                updateUserLocationRealtime(newLocation, accuracy);
+                                lastTrackingUpdate = now;
+                            }
+                        });
+                    } else {
+                        // 如果AMap不可用，直接使用WGS-84坐标（会有一些偏差）
+                        const newLocation = [wgs84Lng, wgs84Lat];
+                        if (userLocation) {
+                            const distance = calculateDistance(userLocation, newLocation);
+                            if (distance < TRACKING_MIN_DISTANCE) {
+                                return;
+                            }
+                        }
+                        updateUserLocationRealtime(newLocation, accuracy);
+                        lastTrackingUpdate = now;
+                    }
+                },
+                // 错误回调
+                function(error) {
+                    console.error('📍 位置追踪错误:', error);
+                    let errorMsg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '位置权限被拒绝';
+                            stopLocationTracking();
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = 'GPS信号丢失';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '位置获取超时';
+                            break;
+                        default:
+                            errorMsg = '未知错误';
+                    }
+                    updateStatus(`⚠️ ${errorMsg}，实时追踪可能不稳定`, 'warning');
+                },
+                // 配置选项
+                {
+                    enableHighAccuracy: true,  // 启用高精度
+                    timeout: 10000,            // 10秒超时
+                    maximumAge: 1000           // 最多使用1秒前的缓存位置
+                }
+            );
+            
+            console.log('✅ 实时位置追踪已启动，watchId:', locationTrackingWatchId);
+        }
+        
+        // 停止实时位置追踪
+        function stopLocationTracking() {
+            if (locationTrackingWatchId !== null) {
+                navigator.geolocation.clearWatch(locationTrackingWatchId);
+                locationTrackingWatchId = null;
+                console.log('🛑 实时位置追踪已停止');
+            }
+            
+            isTrackingLocation = false;
+            updateTrackingButtonState();
+            updateStatus('实时追踪已关闭', 'info');
+        }
+        
+        // 更新追踪按钮状态
+        function updateTrackingButtonState() {
+            const trackingBtn = document.getElementById('tracking-btn');
+            if (trackingBtn) {
+                if (isTrackingLocation) {
+                    trackingBtn.innerHTML = '⏹️ 停止追踪';
+                    trackingBtn.style.background = 'linear-gradient(135deg, #F44336 0%, #D32F2F 100%)';
+                    trackingBtn.classList.add('tracking-active');
+                    // 显示追踪指示器
+                    showTrackingIndicator();
+                } else {
+                    trackingBtn.innerHTML = '🚶 实时追踪';
+                    trackingBtn.style.background = 'linear-gradient(135deg, #00BCD4 0%, #0097A7 100%)';
+                    trackingBtn.classList.remove('tracking-active');
+                    // 隐藏追踪指示器
+                    hideTrackingIndicator();
+                }
+            }
+        }
+        
+        // 显示追踪状态指示器
+        function showTrackingIndicator() {
+            let indicator = document.getElementById('tracking-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'tracking-indicator';
+                indicator.className = 'tracking-indicator';
+                indicator.style.cursor = 'pointer';
+                indicator.title = '点击切换地图跟随模式';
+                indicator.onclick = toggleFollowMode;
+                document.body.appendChild(indicator);
+            }
+            updateTrackingIndicatorText();
+            indicator.style.display = 'flex';
+        }
+        
+        // 更新追踪指示器文字
+        function updateTrackingIndicatorText() {
+            const indicator = document.getElementById('tracking-indicator');
+            if (indicator) {
+                if (followUserLocation) {
+                    indicator.innerHTML = '🚶 追踪中 · 跟随';
+                } else {
+                    indicator.innerHTML = '🚶 追踪中 · 自由';
+                }
+            }
+        }
+        
+        // 切换地图跟随模式
+        function toggleFollowMode() {
+            followUserLocation = !followUserLocation;
+            updateTrackingIndicatorText();
+            
+            if (followUserLocation && userLocation && map) {
+                // 如果重新开启跟随，立即移动到用户位置
+                map.setCenter(userLocation);
+                updateStatus('🔒 地图跟随模式已开启', 'info');
+            } else {
+                updateStatus('🔓 自由浏览模式 - 地图不再跟随您的位置', 'info');
+            }
+        }
+        
+        // 隐藏追踪状态指示器
+        function hideTrackingIndicator() {
+            const indicator = document.getElementById('tracking-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+        
+        // 实时更新用户位置（轻量级更新，不重新创建标记）
+        function updateUserLocationRealtime(newLocation, accuracy) {
+            const oldLocation = userLocation ? [...userLocation] : null;
+            userLocation = newLocation;
+            
+            console.log('🔄 实时更新位置:', newLocation);
+            
+            // 更新用户标记位置
+            if (userMarker) {
+                userMarker.setPosition(newLocation);
+                console.log('✅ 用户标记位置已更新');
+            } else {
+                // 如果标记不存在，创建新标记
+                createUserMarker();
+            }
+            
+            // 如果开启了跟随模式，让地图跟随用户移动
+            if (followUserLocation && map) {
+                // 平滑移动到新位置
+                map.setCenter(newLocation);
+            }
+            
+            // 更新坐标面板显示
+            if (typeof updateCoordinateDisplay === 'function') {
+                updateCoordinateDisplay();
+            }
+            
+            // 检查是否接近任何宝藏
+            checkNearbyTreasuresRealtime();
+            
+            // 更新状态显示
+            let accuracyText = '';
+            if (accuracy < 10) {
+                accuracyText = '🎯 极高';
+            } else if (accuracy < 20) {
+                accuracyText = '✅ 高';
+            } else if (accuracy < 50) {
+                accuracyText = '✅ 良好';
+            } else if (accuracy < 100) {
+                accuracyText = '⚠️ 一般';
+            } else {
+                accuracyText = '❌ 较差';
+            }
+            
+            // 计算移动距离
+            let distanceText = '';
+            if (oldLocation) {
+                const distance = calculateDistance(oldLocation, newLocation);
+                distanceText = ` | 移动 ${distance.toFixed(1)}米`;
+            }
+            
+            updateStatus(`🚶 追踪中 ${accuracyText} 精度:${Math.round(accuracy)}米${distanceText}`, 'success');
+        }
+        
+        // 实时检查附近的宝藏
+        function checkNearbyTreasuresRealtime() {
+            if (!userLocation || treasureMarkers.length === 0) return;
+            
+            treasureMarkers.forEach((marker, index) => {
+                const treasurePos = marker.getPosition();
+                const treasureLng = treasurePos.getLng();
+                const treasureLat = treasurePos.getLat();
+                
+                const distance = calculateDistance(userLocation, [treasureLng, treasureLat]);
+                
+                // 如果距离宝藏很近（30米内），给出提示
+                if (distance <= 30) {
+                    console.log(`🎯 你距离宝藏 #${index + 1} 只有 ${distance.toFixed(1)} 米了！`);
+                    
+                    // 避免重复提示，使用标记记录
+                    const alertKey = `treasure_alert_${index}`;
+                    const lastAlert = sessionStorage.getItem(alertKey);
+                    const now = Date.now();
+                    
+                    if (!lastAlert || now - parseInt(lastAlert) > 30000) {  // 30秒内不重复提示
+                        sessionStorage.setItem(alertKey, now.toString());
+                        
+                        // 震动提示（如果设备支持）
+                        if (navigator.vibrate) {
+                            navigator.vibrate([200, 100, 200]);  // 震动模式
+                        }
+                        
+                        // 显示醒目提示
+                        updateStatus(`🎉 你离宝藏只有 ${Math.round(distance)} 米了！快去找找！`, 'success');
+                        
+                        // 让宝藏标记跳动
+                        if (typeof marker.setAnimation === 'function') {
+                            marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                            setTimeout(() => {
+                                if (typeof marker.setAnimation === 'function') {
+                                    marker.setAnimation('AMAP_ANIMATION_NONE');
+                                }
+                            }, 2000);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 页面卸载时停止追踪
+        window.addEventListener('beforeunload', function() {
+            if (isTrackingLocation) {
+                stopLocationTracking();
+            }
+        });
+        
+        // 页面可见性变化时处理追踪
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isTrackingLocation) {
+                console.log('📱 页面进入后台，继续追踪...');
+                // 移动端可能会限制后台GPS，但我们保持追踪状态
+            } else if (!document.hidden && isTrackingLocation) {
+                console.log('📱 页面回到前台，恢复追踪...');
+                // 可以选择在这里强制刷新一次位置
+            }
+        });
 
         // 使用高德定位服务（优化版本：强制GPS，拒绝低精度定位）
         function useAmapGeolocation() {
@@ -1543,104 +2059,153 @@
             }
         }
         
-        // 浏览器GPS备用方案（优化版本：使用watchPosition持续定位）
+        // 浏览器GPS备用方案（优化版本：先快后准策略）
         function useBrowserGPSFallback() {
-            console.log('🛰️ 使用浏览器原生GPS定位（持续定位优化）...');
-            updateStatus('正在获取GPS位置，请允许位置权限...', 'info', true);
+            console.log('🛰️ 使用浏览器原生GPS定位（快速定位模式）...');
+            updateStatus('正在快速获取位置...', 'info', true);
             
             // 使用浏览器原生GPS获取WGS84坐标
             if (navigator.geolocation) {
-                console.log('🛰️ 开始持续GPS定位，等待信号稳定...');
-                updateStatus('正在等待GPS信号稳定，请保持设备静止...', 'info', true);
-                
+                let hasUsedPosition = false;  // 是否已经使用了位置
                 let watchId = null;
                 let bestPosition = null;
                 let positionCount = 0;
-                let lastAccuracy = Infinity;
-                const maxPositions = 5; // 最多收集5个定位结果
-                const idealAccuracy = 50; // 理想精度要求（米）
-                const acceptableAccuracy = 200; // 可接受精度（米）
-                const watchTimeout = 30000; // 30秒后停止watch
                 
-                // 设置超时保护
-                const watchTimeoutId = setTimeout(() => {
-                    if (watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                    }
-                    
-                    if (bestPosition) {
-                        console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
-                        convertAndUsePosition(bestPosition);
-                    } else {
-                        console.warn('⏰ GPS定位超时，未获得位置');
-                        updateStatus('GPS定位超时。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
-                    }
-                }, watchTimeout);
+                // ============ 第一步：快速获取（使用缓存，3秒超时） ============
+                console.log('⚡ 尝试快速定位（使用缓存）...');
                 
-                // 使用watchPosition持续定位
-                watchId = navigator.geolocation.watchPosition(
+                navigator.geolocation.getCurrentPosition(
+                    // 快速定位成功
                     function(position) {
-                        positionCount++;
-                        const wgs84Lat = position.coords.latitude;
-                        const wgs84Lng = position.coords.longitude;
                         const accuracy = position.coords.accuracy;
-                        const altitude = position.coords.altitude;
-                        const heading = position.coords.heading;
-                        const speed = position.coords.speed;
-                        const isGPSSatellite = altitude !== null && altitude !== undefined;
+                        console.log('⚡ 快速定位成功！精度:', accuracy, '米');
                         
-                        console.log(`📍 GPS定位结果 #${positionCount}:`, {
-                            lat: wgs84Lat,
-                            lng: wgs84Lng,
-                            accuracy: accuracy,
-                            altitude: altitude,
-                            heading: heading,
-                            speed: speed,
-                            isGPSSatellite: isGPSSatellite,
-                            timestamp: new Date(position.timestamp).toLocaleString()
-                        });
+                        bestPosition = {
+                            coords: {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: accuracy,
+                                altitude: position.coords.altitude
+                            },
+                            timestamp: position.timestamp
+                        };
                         
-                        // 详细日志：检查定位方式
-                        if (isGPSSatellite) {
-                            console.log('✅ 确认：使用GPS卫星定位');
+                        // 立即使用这个位置
+                        hasUsedPosition = true;
+                        convertAndUsePosition(bestPosition);
+                        
+                        // 如果精度不够好，启动后台优化
+                        if (accuracy > 30) {
+                            console.log('📡 精度较低，启动后台优化...');
+                            startBackgroundPositionOptimization();
                         } else {
-                            console.warn('⚠️ 警告：未使用GPS卫星定位（altitude为空）');
-                            console.warn('   这可能是因为：1) GPS未开启 2) 在室内GPS信号弱 3) 浏览器使用网络定位');
+                            console.log('✅ 精度良好，定位完成');
+                        }
+                    },
+                    // 快速定位失败，使用常规方式
+                    function(error) {
+                        console.warn('⚡ 快速定位失败，使用常规方式:', error.message);
+                        startRegularPositioning();
+                    },
+                    {
+                        enableHighAccuracy: false,  // 不要求高精度，快速返回
+                        timeout: 3000,              // 3秒超时
+                        maximumAge: 60000           // 允许使用1分钟内的缓存位置
+                    }
+                );
+                
+                // ============ 后台位置优化函数 ============
+                function startBackgroundPositionOptimization() {
+                    if (watchId !== null) return;
+                    
+                    console.log('🔄 开始后台位置优化...');
+                    updateStatus('位置已获取，正在优化精度...', 'info');
+                    
+                    const optimizeTimeout = 10000; // 10秒后停止优化
+                    
+                    const optimizeTimeoutId = setTimeout(() => {
+                        if (watchId !== null) {
+                            navigator.geolocation.clearWatch(watchId);
+                            watchId = null;
+                            console.log('🔄 后台优化完成');
+                        }
+                    }, optimizeTimeout);
+                    
+                    watchId = navigator.geolocation.watchPosition(
+                        function(position) {
+                            const accuracy = position.coords.accuracy;
+                            
+                            // 如果新位置精度更好，更新
+                            if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
+                                console.log('📍 更新位置，新精度:', accuracy, '米');
+                                bestPosition = {
+                                    coords: {
+                                        latitude: position.coords.latitude,
+                                        longitude: position.coords.longitude,
+                                        accuracy: accuracy,
+                                        altitude: position.coords.altitude
+                                    },
+                                    timestamp: position.timestamp
+                                };
+                                
+                                // 更新地图上的位置
+                                convertAndUsePosition(bestPosition, true); // true表示是更新，不是首次
+                                
+                                // 如果精度足够好，停止优化
+                                if (accuracy < 20) {
+                                    console.log('✅ 精度已优化到', accuracy, '米，停止优化');
+                                    clearTimeout(optimizeTimeoutId);
+                                    if (watchId !== null) {
+                                        navigator.geolocation.clearWatch(watchId);
+                                        watchId = null;
+                                    }
+                                }
+                            }
+                        },
+                        function(error) {
+                            console.warn('后台优化出错:', error.message);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+                
+                // ============ 常规定位函数（快速定位失败时使用） ============
+                function startRegularPositioning() {
+                    console.log('🛰️ 开始常规GPS定位...');
+                    updateStatus('正在获取GPS位置...', 'info', true);
+                    
+                    const watchTimeout = 15000; // 缩短到15秒
+                    
+                    // 设置超时保护
+                    const watchTimeoutId = setTimeout(() => {
+                        if (watchId !== null) {
+                            navigator.geolocation.clearWatch(watchId);
+                            watchId = null;
                         }
                         
-                        // 🔥 如果是网络定位（精度 > 1000米），直接使用，不再等待
-                        if (accuracy > 1000) {
-                            console.log('📡 检测到网络定位（精度 > 1km），直接使用');
-                            bestPosition = {
-                                coords: {
-                                    latitude: wgs84Lat,
-                                    longitude: wgs84Lng,
-                                    accuracy: accuracy,
-                                    altitude: position.coords.altitude
-                                },
-                                timestamp: position.timestamp
-                            };
-                            
-                            clearTimeout(watchTimeoutId);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
-                            }
-                            
-                            updateStatus(`网络定位完成，精度: ${Math.round(accuracy/1000)}km`, 'success');
+                        if (bestPosition && !hasUsedPosition) {
+                            console.log('✅ 定位完成，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
+                            hasUsedPosition = true;
                             convertAndUsePosition(bestPosition);
-                            return;
+                        } else if (!hasUsedPosition) {
+                            console.warn('⏰ GPS定位超时');
+                            updateStatus('GPS定位超时。请点击"手动校准位置"按钮', 'warning');
                         }
-                        
-                        // 🔥 手机端：强制等待GPS卫星定位，精度达到5米内
-                        if (isMobileDevice()) {
-                            // 必须使用GPS卫星定位（altitude不为null）
-                            if (!isGPSSatellite) {
-                                console.warn('⚠️ 未使用GPS卫星定位，继续等待...');
-                                updateStatus('等待GPS卫星信号...', 'info', true);
-                                return; // 继续等待GPS卫星
-                            }
+                    }, watchTimeout);
+                    
+                    // 使用watchPosition持续定位
+                    watchId = navigator.geolocation.watchPosition(
+                        function(position) {
+                            positionCount++;
+                            const wgs84Lat = position.coords.latitude;
+                            const wgs84Lng = position.coords.longitude;
+                            const accuracy = position.coords.accuracy;
+                            
+                            console.log(`📍 GPS定位结果 #${positionCount}: 精度=${accuracy}米`);
                             
                             // 记录最佳位置
                             if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
@@ -1653,178 +2218,74 @@
                                     },
                                     timestamp: position.timestamp
                                 };
-                                console.log('✅ 更新最佳位置，精度:', accuracy, '米');
+                            }
+                            
+                            // 🔥 快速响应策略：第一个结果就使用，后续优化
+                            if (!hasUsedPosition) {
+                                console.log('⚡ 使用第一个定位结果，精度:', accuracy, '米');
+                                hasUsedPosition = true;
+                                clearTimeout(watchTimeoutId);
                                 
-                                if (accuracy < 5) {
-                                    updateStatus(`🎯 GPS精度: ${Math.round(accuracy)}米（极高精度）`, 'success', true);
-                                } else if (accuracy < 10) {
-                                    updateStatus(`✅ GPS精度: ${Math.round(accuracy)}米（高精度）`, 'success', true);
-                                } else if (accuracy < 20) {
-                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'info', true);
+                                // 先使用当前位置
+                                convertAndUsePosition(bestPosition);
+                                
+                                // 如果精度较低，继续优化
+                                if (accuracy > 50) {
+                                    // 继续监听更好的位置，但设置更短的超时
+                                    setTimeout(() => {
+                                        if (watchId !== null) {
+                                            navigator.geolocation.clearWatch(watchId);
+                                            watchId = null;
+                                            console.log('📍 位置优化完成');
+                                        }
+                                    }, 8000);
                                 } else {
-                                    updateStatus(`GPS精度: ${Math.round(accuracy)}米，等待更高精度...`, 'warning', true);
+                                    // 精度已经不错，停止
+                                    if (watchId !== null) {
+                                        navigator.geolocation.clearWatch(watchId);
+                                        watchId = null;
+                                    }
                                 }
-                            }
-                            
-                            // 如果精度达到5米内，立即使用
-                            if (accuracy < 5) {
-                                console.log('🎯 获得极高精度位置（精度:', accuracy, '米），立即使用');
-                                clearTimeout(watchTimeoutId);
-                                if (watchId !== null) {
-                                    navigator.geolocation.clearWatch(watchId);
-                                    watchId = null;
-                                }
-                                convertAndUsePosition(bestPosition);
-                                return;
-                            }
-                            
-                            // 如果精度达到10米内，且已经稳定，使用
-                            if (accuracy < 10 && positionCount >= 3 && accuracy >= lastAccuracy * 0.95) {
-                                console.log('✅ 精度已稳定（精度:', accuracy, '米），使用最佳位置');
-                                clearTimeout(watchTimeoutId);
-                                if (watchId !== null) {
-                                    navigator.geolocation.clearWatch(watchId);
-                                    watchId = null;
-                                }
-                                convertAndUsePosition(bestPosition);
-                                return;
-                            }
-                            
-                            // 如果精度达到20米内，且已经收集足够数据，使用
-                            if (accuracy < 20 && positionCount >= 5) {
-                                console.log('✅ 已收集足够数据（精度:', accuracy, '米），使用最佳位置');
-                                clearTimeout(watchTimeoutId);
-                                if (watchId !== null) {
-                                    navigator.geolocation.clearWatch(watchId);
-                                    watchId = null;
-                                }
-                                convertAndUsePosition(bestPosition);
-                                return;
-                            }
-                            
-                            lastAccuracy = accuracy;
-                            return; // 继续等待更高精度
-                        } else {
-                            // PC端：直接接受网络定位，不再等待GPS卫星
-                            // PC 通常没有 GPS 芯片，网络定位是唯一选择
-                            console.log('💻 PC端：接受网络定位结果');
-                            
-                            // 记录位置并立即使用
-                            bestPosition = {
-                                coords: {
-                                    latitude: wgs84Lat,
-                                    longitude: wgs84Lng,
-                                    accuracy: accuracy,
-                                    altitude: position.coords.altitude
-                                },
-                                timestamp: position.timestamp
-                            };
-                            
-                            // 清理并使用位置
-                            clearTimeout(watchTimeoutId);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
-                            }
-                            
-                            updateStatus(`PC定位完成，精度: ${Math.round(accuracy)}米（网络定位）`, 'success');
-                            convertAndUsePosition(bestPosition);
-                            return;
-                        }
-                        
-                        // 记录最佳位置（总是记录，不管精度如何）
-                        if (!bestPosition || accuracy < bestPosition.coords.accuracy) {
-                            bestPosition = {
-                                coords: {
-                                    latitude: wgs84Lat,
-                                    longitude: wgs84Lng,
-                                    accuracy: accuracy,
-                                    altitude: position.coords.altitude
-                                },
-                                timestamp: position.timestamp
-                            };
-                            console.log('✅ 更新最佳位置，精度:', accuracy, '米');
-                            
-                            if (accuracy < idealAccuracy) {
-                                updateStatus(`GPS精度: ${Math.round(accuracy)}米 ✓`, 'success', true);
-                            } else if (accuracy < acceptableAccuracy) {
-                                updateStatus(`GPS精度: ${Math.round(accuracy)}米`, 'info', true);
                             } else {
-                                updateStatus(`GPS精度: ${Math.round(accuracy)}米，继续优化中...`, 'warning', true);
+                                // 已经使用过位置，检查是否需要更新
+                                if (accuracy < bestPosition.coords.accuracy * 0.7) {
+                                    // 精度提升超过30%，更新位置
+                                    console.log('📍 精度明显提升，更新位置:', accuracy, '米');
+                                    convertAndUsePosition(bestPosition, true);
+                                }
                             }
-                        }
-                        
-                        // 如果精度足够好（<20米），立即使用
-                        if (accuracy < 20) {
-                            console.log('🎯 获得高精度位置（精度:', accuracy, '米），立即使用');
+                        },
+                        function(error) {
+                            console.error('📍 GPS定位错误:', error);
                             clearTimeout(watchTimeoutId);
                             if (watchId !== null) {
                                 navigator.geolocation.clearWatch(watchId);
                                 watchId = null;
                             }
-                            convertAndUsePosition(bestPosition);
-                            return;
-                        }
-                        
-                        // 如果精度没有改善，使用当前最佳位置
-                        if (positionCount >= 3 && accuracy >= lastAccuracy * 0.9) {
-                            console.log('✅ 精度已稳定，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
-                            clearTimeout(watchTimeoutId);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
+                            
+                            let errorMsg = '';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED:
+                                    errorMsg = '位置权限被拒绝，请在浏览器设置中允许位置访问';
+                                    break;
+                                case error.POSITION_UNAVAILABLE:
+                                    errorMsg = 'GPS信号不可用，请到室外或靠近窗户';
+                                    break;
+                                case error.TIMEOUT:
+                                    errorMsg = '定位超时，请检查GPS是否开启';
+                                    break;
+                                default:
+                                    errorMsg = '定位失败: ' + error.message;
                             }
-                            convertAndUsePosition(bestPosition);
-                            return;
+                            updateStatus(errorMsg + '。可使用"手动校准位置"', 'error');
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,        // 10秒超时
+                            maximumAge: 30000      // 允许使用30秒内的缓存
                         }
-                        
-                        // 收集足够的位置后，使用最佳位置
-                        if (positionCount >= maxPositions) {
-                            console.log('✅ 已收集足够定位数据，使用最佳位置（精度:', bestPosition.coords.accuracy, '米）');
-                            clearTimeout(watchTimeoutId);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
-                            }
-                            convertAndUsePosition(bestPosition);
-                            return;
-                        }
-                        
-                        lastAccuracy = accuracy;
-                    },
-                    function(error) {
-                        console.error('❌ GPS定位错误:', error);
-                        
-                        // 根据错误类型显示不同提示
-                        if (error.code === 1) {
-                            updateStatus('位置权限被拒绝，正在使用备用定位...', 'warning', true);
-                        } else if (error.code === 2) {
-                            updateStatus('位置信息不可用，正在使用备用定位...', 'warning', true);
-                        } else if (error.code === 3) {
-                            // 超时错误，继续等待
-                            console.warn('⏰ GPS定位超时，继续等待...');
-                            return;
-                        }
-                        
-                        // 如果持续失败，尝试高德定位
-                        if (positionCount === 0 && watchId !== null) {
-                            clearTimeout(watchTimeoutId);
-                            navigator.geolocation.clearWatch(watchId);
-                            watchId = null;
-                            console.log('🔄 浏览器GPS失败，尝试高德定位服务...');
-                            useAmapLocationFallback();
-                        } else if (positionCount === 0) {
-                            // 如果完全没有定位结果，提示用户手动校准
-                            console.warn('⚠️ 无法获取GPS位置');
-                            updateStatus('无法获取GPS位置。请点击"手动校准位置"按钮在地图上设置您的位置', 'warning');
-                        }
-                    },
-                    {
-                        enableHighAccuracy: true,  // 强制高精度GPS
-                        timeout: 30000,            // 30秒超时
-                        maximumAge: 0              // 不使用缓存
-                    }
-                );
+                    );
+                }
             } else {
                 console.warn('⚠️ 浏览器不支持GPS，使用高德定位');
                 useAmapLocationFallback();
@@ -1832,12 +2293,17 @@
         }
         
         // 转换坐标并使用位置（WGS84 → GCJ-02）
-        function convertAndUsePosition(position) {
+        // isUpdate: 是否是位置更新（而非首次定位）
+        function convertAndUsePosition(position, isUpdate = false) {
             const wgs84Lat = position.coords.latitude;
             const wgs84Lng = position.coords.longitude;
             const accuracy = position.coords.accuracy;
             
-            console.log('📍 GPS返回WGS84坐标，需要转换为GCJ-02');
+            if (isUpdate) {
+                console.log('📍 位置更新 (精度优化):', accuracy, '米');
+            } else {
+                console.log('📍 GPS返回WGS84坐标，需要转换为GCJ-02');
+            }
             console.log('📍 原始坐标 (WGS84):', { lat: wgs84Lat, lng: wgs84Lng });
             
             // 🔧 网络定位偏移修正（针对精度 > 1km 的网络定位）
@@ -1846,6 +2312,50 @@
                 lng: 0.0151,  // 向东偏移约 1.51km
                 lat: 0.0012   // 向北偏移约 133m
             };
+            
+            // 如果是位置更新模式，使用轻量级更新
+            if (isUpdate && userLocation) {
+                // 直接进行坐标转换和位置更新
+                if (typeof AMap !== 'undefined' && AMap.convertFrom) {
+                    AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                        if (status === 'complete' && result.locations && result.locations.length > 0) {
+                            const gcj02 = result.locations[0];
+                            let newLng = gcj02.lng;
+                            let newLat = gcj02.lat;
+                            
+                            // 应用定位偏移修正
+                            const isMobile = isMobileDevice();
+                            if (LOCATION_OFFSET.enabled) {
+                                const shouldApply = (!LOCATION_OFFSET.onlyForMobile || isMobile) && 
+                                                   (accuracy <= LOCATION_OFFSET.minAccuracy);
+                                if (shouldApply) {
+                                    newLng += LOCATION_OFFSET.lng;
+                                    newLat += LOCATION_OFFSET.lat;
+                                }
+                            }
+                            
+                            const newLocation = [newLng, newLat];
+                            
+                            // 更新用户位置
+                            userLocation = newLocation;
+                            
+                            // 更新用户标记
+                            if (userMarker) {
+                                userMarker.setPosition(newLocation);
+                            }
+                            
+                            // 更新坐标面板
+                            if (typeof updateCoordinateDisplay === 'function') {
+                                updateCoordinateDisplay();
+                            }
+                            
+                            console.log('✅ 位置已优化更新，精度:', accuracy, '米');
+                            updateStatus(`位置已优化，精度: ${Math.round(accuracy)}米`, 'success');
+                        }
+                    });
+                }
+                return;
+            }
             
             // 如果是网络定位（精度 > 1000米），应用偏移修正
             if (accuracy > 1000) {
@@ -3089,14 +3599,206 @@
             document.body.removeChild(textArea);
         }
 
+        // 显示美观的欢迎弹窗
+        function showWelcomeDialog(userId) {
+            // 创建弹窗容器
+            const overlay = document.createElement('div');
+            overlay.id = 'welcome-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.6);
+                backdrop-filter: blur(5px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease;
+            `;
+            
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                background: white;
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 360px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            `;
+            
+            dialog.innerHTML = `
+                <div style="font-size: 50px; margin-bottom: 15px;">🎉</div>
+                <h2 style="margin: 0 0 10px 0; color: #333; font-size: 22px;">欢迎来到 Totofun!</h2>
+                <p style="color: #666; margin-bottom: 20px; font-size: 14px;">设置你的游戏昵称，开始寻宝之旅</p>
+                
+                <input type="text" id="welcome-nickname-input" 
+                    placeholder="输入昵称（3-10个字符）" 
+                    value="寻宝探险家"
+                    maxlength="10"
+                    style="
+                        width: 100%;
+                        padding: 12px 15px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        box-sizing: border-box;
+                        margin-bottom: 15px;
+                        transition: border-color 0.3s;
+                        outline: none;
+                    "
+                    onfocus="this.style.borderColor='#4FC3F7'"
+                    onblur="this.style.borderColor='#e0e0e0'"
+                />
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button id="welcome-skip-btn" style="
+                        flex: 1;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        background: white;
+                        color: #666;
+                        border-radius: 10px;
+                        font-size: 15px;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    ">跳过</button>
+                    <button id="welcome-confirm-btn" style="
+                        flex: 1;
+                        padding: 12px;
+                        border: none;
+                        background: linear-gradient(135deg, #4FC3F7 0%, #22C55E 100%);
+                        color: white;
+                        border-radius: 10px;
+                        font-size: 15px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    ">确定</button>
+                </div>
+                
+                <p style="color: #999; font-size: 12px; margin-top: 15px;">
+                    💡 昵称可以稍后在"我的信息"中修改
+                </p>
+            `;
+            
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            
+            // 添加动画样式
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(30px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // 聚焦输入框并选中文本
+            const input = document.getElementById('welcome-nickname-input');
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 300);
+            
+            // 确定按钮点击
+            document.getElementById('welcome-confirm-btn').onclick = function() {
+                const nickname = input.value.trim();
+                if (nickname.length >= 3 && nickname.length <= 10) {
+                    completeSetup(nickname, userId);
+                    overlay.remove();
+                } else {
+                    input.style.borderColor = '#f44336';
+                    input.placeholder = '请输入3-10个字符';
+                    setTimeout(() => {
+                        input.style.borderColor = '#e0e0e0';
+                    }, 2000);
+                }
+            };
+            
+            // 跳过按钮点击
+            document.getElementById('welcome-skip-btn').onclick = function() {
+                // 使用默认昵称
+                completeSetup('寻宝探险家', userId);
+                overlay.remove();
+            };
+            
+            // 回车确认
+            input.onkeypress = function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('welcome-confirm-btn').click();
+                }
+            };
+        }
+        
+        // 完成首次设置
+        function completeSetup(nickname, userId) {
+            // 标记已完成设置
+            localStorage.setItem('totofun-setup-completed', 'true');
+            
+            // 保存昵称
+            userData.username = nickname;
+            saveUserData();
+            
+            // 更新显示
+            document.getElementById('user-name').textContent = nickname;
+            updateStatus(`欢迎，${nickname}！`, 'success');
+            
+            // 同步到聊天系统
+            if (chatManager.currentUser) {
+                chatManager.currentUser.name = nickname;
+                storageManager.save('chatUser', chatManager.currentUser);
+                
+                // 同步到Firebase
+                if (firebaseEnabled && database) {
+                    try {
+                        const userRef = database.ref(`users/${userId}`);
+                        userRef.set({
+                            id: userId,
+                            name: nickname,
+                            avatar: chatManager.currentUser.avatar || '👤',
+                            online: true,
+                            lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                            updatedAt: firebase.database.ServerValue.TIMESTAMP
+                        });
+                        console.log('✅ 用户信息已同步到Firebase');
+                    } catch (error) {
+                        console.error('❌ Firebase同步失败:', error);
+                    }
+                }
+            }
+            
+            // 显示用户ID（简洁提示，不用 alert）
+            setTimeout(() => {
+                updateStatus(`🆔 你的ID: ${userId}，好友可以通过此ID添加你`, 'info');
+            }, 2000);
+        }
+
         // 首次使用检查
         function checkFirstTimeUser() {
-            // 检查是否有游戏数据（更可靠的检查方式）
+            // 检查是否已经完成过首次设置
+            const hasCompletedSetup = localStorage.getItem('totofun-setup-completed') === 'true';
             const gameData = storageManager.load('totofun-treasure-user');
-            const isFirstTime = !gameData || !gameData.username;
+            
+            // 如果已有昵称，自动标记为已完成设置（兼容老用户）
+            if (gameData?.username && !hasCompletedSetup) {
+                localStorage.setItem('totofun-setup-completed', 'true');
+            }
+            
+            // 只有真正的新用户（没有设置标记 且 没有昵称）才显示欢迎弹窗
+            const isFirstTime = !hasCompletedSetup && (!gameData || !gameData.username);
             
             if (isFirstTime) {
-                // 首次使用，显示欢迎和昵称设置
+                // 首次使用，显示美观的欢迎弹窗
                 setTimeout(() => {
                     // 确保聊天系统已初始化（获取用户ID）
                     if (!chatManager.currentUser) {
@@ -3108,50 +3810,8 @@
                     const currentUserId = chatManager.currentUser.id;
                     console.log('📝 首次使用，当前用户ID:', currentUserId);
                     
-                    const username = prompt('🎉 欢迎来到 Totofun 突突翻！\n\n请输入你的游戏昵称（3-10个字符）:\n\n💡 提示：昵称会自动保存，下次访问时无需重新输入', '寻宝探险家');
-                    if (username && username.length >= 3 && username.length <= 10) {
-                        userData.username = username;
-                        saveUserData();
-                        updateStatus(`欢迎，${username}！你的昵称已保存`, 'success');
-                        
-                        // 更新显示
-                        document.getElementById('user-name').textContent = username;
-                        
-                        // 确保用户ID一致性（重要！）
-                        if (chatManager.currentUser.id !== currentUserId) {
-                            console.warn('⚠️ 用户ID不一致，修复中...');
-                            chatManager.currentUser.id = currentUserId;
-                            storageManager.save('chatUser', chatManager.currentUser);
-                        }
-                        
-                        // 同步到Firebase
-                        if (firebaseEnabled && database) {
-                            try {
-                                const userRef = database.ref(`users/${currentUserId}`);
-                                userRef.set({
-                                    id: currentUserId,
-                                    name: username,
-                                    avatar: chatManager.currentUser.avatar || '👤',
-                                    online: true,
-                                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
-                                    updatedAt: firebase.database.ServerValue.TIMESTAMP
-                                });
-                                console.log('✅ 用户信息已同步到Firebase');
-                            } catch (error) {
-                                console.error('❌ Firebase同步失败:', error);
-                            }
-                        }
-                        
-                        // 显示用户ID提示
-                        setTimeout(() => {
-                            if (chatManager.currentUser) {
-                                alert(`✅ 你的游戏昵称：${username}\n🆔 你的用户ID：${chatManager.currentUser.id}\n\n💡 用户ID是永久的，好友可以通过这个ID添加你！\n\n你可以在"我的信息"中查看和分享你的ID。`);
-                            }
-                        }, 1000);
-                    } else if (username) {
-                        alert('昵称长度应该在3-10个字符之间');
-                        checkFirstTimeUser();
-                    }
+                    // 显示美观的欢迎弹窗
+                    showWelcomeDialog(currentUserId);
                 }, 1000);
             } else {
                 // 老用户，显示欢迎回来消息

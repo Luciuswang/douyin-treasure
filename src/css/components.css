@@ -4,6 +4,95 @@
  */
 
 /* =====================================================
+   实时位置追踪按钮样式
+   ===================================================== */
+.tracking-active {
+    position: relative;
+    animation: trackingPulse 1.5s ease-in-out infinite;
+}
+
+.tracking-active::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #F44336, #D32F2F);
+    opacity: 0.3;
+    animation: trackingGlow 1.5s ease-in-out infinite;
+    z-index: -1;
+}
+
+@keyframes trackingPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+    }
+}
+
+@keyframes trackingGlow {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.05);
+    }
+}
+
+/* 追踪状态指示器 */
+.tracking-indicator {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+    z-index: 1000;
+    animation: slideDown 0.3s ease-out;
+}
+
+.tracking-indicator::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* =====================================================
    好友列表项样式
    ===================================================== */
 .friend-item {
