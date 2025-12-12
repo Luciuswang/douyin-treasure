@@ -202,8 +202,8 @@
                 <button class="btn" onclick="generateNearbyTreasures()" disabled id="generate-btn">
                     🗺️ 生成宝藏
                 </button>
-                <button class="btn" onclick="addTreasure()" disabled id="treasure-btn">
-                    ✨ 添加宝藏
+                <button class="btn" onclick="showPublishTreasureDialog()" disabled id="publish-btn" style="background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);">
+                    📤 发布宝藏
                 </button>
                 <button class="btn" onclick="clearMap()" disabled id="clear-btn">
                     🗑️ 删除宝藏
@@ -967,6 +967,763 @@
             // GPS数据面板已移除到游戏说明页面
             console.log('GPS数据:', data);
         }
+
+        // ==================== 自定义宝藏类型配置 ====================
+        const CUSTOM_TREASURE_TYPES = [
+            { id: 'note', name: '纸条留言', icon: '📝', color: '#FFB74D', description: '留下一段话给发现者' },
+            { id: 'coupon', name: '优惠券', icon: '🎫', color: '#4FC3F7', description: '分享折扣或优惠码' },
+            { id: 'ticket', name: '门票', icon: '🎬', color: '#F06292', description: '电影票、演出票等' },
+            { id: 'job', name: '招聘信息', icon: '💼', color: '#7986CB', description: '发布工作机会' },
+            { id: 'event', name: '活动邀请', icon: '🎉', color: '#81C784', description: '聚会、活动通知' },
+            { id: 'gift', name: '实物礼品', icon: '🎁', color: '#FF8A65', description: '线下领取的礼物' },
+            { id: 'puzzle', name: '谜题挑战', icon: '❓', color: '#BA68C8', description: '解谜才能打开' },
+            { id: 'custom', name: '自定义', icon: '💌', color: '#E57373', description: '任意内容' }
+        ];
+        
+        // 用户发布的宝藏列表
+        let userPublishedTreasures = [];
+        
+        // 加载用户发布的宝藏
+        function loadUserPublishedTreasures() {
+            const saved = storageManager.load('user-published-treasures');
+            if (saved) {
+                userPublishedTreasures = saved;
+            }
+        }
+        
+        // 保存用户发布的宝藏
+        function saveUserPublishedTreasures() {
+            storageManager.save('user-published-treasures', userPublishedTreasures);
+        }
+        
+        // ==================== 发布宝藏功能 ====================
+        
+        // 当前发布宝藏的位置
+        let publishTreasureLocation = null;
+        
+        // 显示发布宝藏弹窗
+        function showPublishTreasureDialog() {
+            if (!userLocation) {
+                updateStatus('请先获取GPS定位！', 'warning');
+                return;
+            }
+            
+            // 默认使用当前位置
+            publishTreasureLocation = [...userLocation];
+            
+            // 创建弹窗
+            const overlay = document.createElement('div');
+            overlay.id = 'publish-treasure-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                backdrop-filter: blur(5px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            overlay.innerHTML = `
+                <div id="publish-treasure-dialog" style="
+                    background: white;
+                    border-radius: 20px;
+                    width: 100%;
+                    max-width: 400px;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    animation: slideUp 0.3s ease;
+                ">
+                    <!-- 头部 -->
+                    <div style="
+                        background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+                        padding: 20px;
+                        border-radius: 20px 20px 0 0;
+                        color: white;
+                        text-align: center;
+                    ">
+                        <div style="font-size: 40px; margin-bottom: 10px;">📤</div>
+                        <h2 style="margin: 0; font-size: 20px;">发布宝藏</h2>
+                        <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 13px;">在这里留下你的宝藏，等待有缘人发现</p>
+                    </div>
+                    
+                    <!-- 表单内容 -->
+                    <div style="padding: 20px;">
+                        <!-- 宝藏类型选择 -->
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 10px; color: #333;">
+                                选择宝藏类型
+                            </label>
+                            <div id="treasure-type-grid" style="
+                                display: grid;
+                                grid-template-columns: repeat(4, 1fr);
+                                gap: 10px;
+                            ">
+                                ${CUSTOM_TREASURE_TYPES.map((type, index) => `
+                                    <div class="treasure-type-item" data-type="${type.id}" 
+                                        onclick="selectTreasureType('${type.id}')"
+                                        style="
+                                            background: ${index === 0 ? type.color : '#f5f5f5'};
+                                            color: ${index === 0 ? 'white' : '#333'};
+                                            border-radius: 12px;
+                                            padding: 12px 8px;
+                                            text-align: center;
+                                            cursor: pointer;
+                                            transition: all 0.3s;
+                                            border: 2px solid ${index === 0 ? type.color : 'transparent'};
+                                        ">
+                                        <div style="font-size: 24px;">${type.icon}</div>
+                                        <div style="font-size: 11px; margin-top: 5px;">${type.name}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <!-- 宝藏标题 -->
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">
+                                宝藏标题 <span style="color: #999; font-weight: normal;">*</span>
+                            </label>
+                            <input type="text" id="treasure-title" placeholder="给你的宝藏起个名字" maxlength="30"
+                                style="
+                                    width: 100%;
+                                    padding: 12px 15px;
+                                    border: 2px solid #e0e0e0;
+                                    border-radius: 10px;
+                                    font-size: 15px;
+                                    box-sizing: border-box;
+                                    transition: border-color 0.3s;
+                                    outline: none;
+                                "
+                                onfocus="this.style.borderColor='#FF9800'"
+                                onblur="this.style.borderColor='#e0e0e0'"
+                            />
+                        </div>
+                        
+                        <!-- 宝藏内容 -->
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">
+                                宝藏内容 <span style="color: #999; font-weight: normal;">*</span>
+                            </label>
+                            <textarea id="treasure-content" placeholder="写下你想分享的内容...&#10;可以是一段话、优惠码、活动详情等" 
+                                rows="4" maxlength="500"
+                                style="
+                                    width: 100%;
+                                    padding: 12px 15px;
+                                    border: 2px solid #e0e0e0;
+                                    border-radius: 10px;
+                                    font-size: 15px;
+                                    box-sizing: border-box;
+                                    resize: none;
+                                    transition: border-color 0.3s;
+                                    outline: none;
+                                    font-family: inherit;
+                                "
+                                onfocus="this.style.borderColor='#FF9800'"
+                                onblur="this.style.borderColor='#e0e0e0'"
+                            ></textarea>
+                            <div style="text-align: right; font-size: 12px; color: #999; margin-top: 5px;">
+                                <span id="content-counter">0</span>/500
+                            </div>
+                        </div>
+                        
+                        <!-- 位置设置 -->
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">
+                                宝藏位置
+                            </label>
+                            <div style="
+                                background: #f5f5f5;
+                                border-radius: 10px;
+                                padding: 12px 15px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                            ">
+                                <div>
+                                    <div style="font-size: 14px; color: #333;">📍 当前位置</div>
+                                    <div id="publish-location-text" style="font-size: 12px; color: #666; margin-top: 3px;">
+                                        ${userLocation ? `${userLocation[1].toFixed(5)}, ${userLocation[0].toFixed(5)}` : '未知'}
+                                    </div>
+                                </div>
+                                <button onclick="pickLocationOnMap()" style="
+                                    background: #FF9800;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 8px;
+                                    padding: 8px 12px;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                ">选择位置</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 高级设置 -->
+                        <div style="margin-bottom: 20px;">
+                            <details style="background: #f9f9f9; border-radius: 10px; padding: 12px 15px;">
+                                <summary style="cursor: pointer; font-weight: 600; color: #333;">
+                                    ⚙️ 高级设置
+                                </summary>
+                                <div style="margin-top: 15px;">
+                                    <!-- 有效期 -->
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">有效期</label>
+                                        <select id="treasure-expiry" style="
+                                            width: 100%;
+                                            padding: 10px;
+                                            border: 1px solid #e0e0e0;
+                                            border-radius: 8px;
+                                            font-size: 14px;
+                                            background: white;
+                                        ">
+                                            <option value="1">1天</option>
+                                            <option value="3">3天</option>
+                                            <option value="7" selected>7天</option>
+                                            <option value="30">30天</option>
+                                            <option value="0">永久</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- 可领取次数 -->
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">可领取次数</label>
+                                        <select id="treasure-max-claims" style="
+                                            width: 100%;
+                                            padding: 10px;
+                                            border: 1px solid #e0e0e0;
+                                            border-radius: 8px;
+                                            font-size: 14px;
+                                            background: white;
+                                        ">
+                                            <option value="1">仅1人</option>
+                                            <option value="5">5人</option>
+                                            <option value="10">10人</option>
+                                            <option value="50">50人</option>
+                                            <option value="0" selected>不限</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- 领取密码 -->
+                                    <div>
+                                        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">领取密码（可选）</label>
+                                        <input type="text" id="treasure-password" placeholder="设置后需输入密码才能领取" maxlength="20"
+                                            style="
+                                                width: 100%;
+                                                padding: 10px;
+                                                border: 1px solid #e0e0e0;
+                                                border-radius: 8px;
+                                                font-size: 14px;
+                                                box-sizing: border-box;
+                                            "
+                                        />
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                        
+                        <!-- 按钮 -->
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="closePublishTreasureDialog()" style="
+                                flex: 1;
+                                padding: 14px;
+                                border: 2px solid #e0e0e0;
+                                background: white;
+                                color: #666;
+                                border-radius: 12px;
+                                font-size: 15px;
+                                cursor: pointer;
+                            ">取消</button>
+                            <button onclick="submitPublishTreasure()" style="
+                                flex: 2;
+                                padding: 14px;
+                                border: none;
+                                background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+                                color: white;
+                                border-radius: 12px;
+                                font-size: 15px;
+                                font-weight: 600;
+                                cursor: pointer;
+                            ">📤 发布宝藏</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            // 绑定字数统计
+            const contentInput = document.getElementById('treasure-content');
+            const counter = document.getElementById('content-counter');
+            contentInput.addEventListener('input', function() {
+                counter.textContent = this.value.length;
+            });
+            
+            // 点击背景关闭
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    closePublishTreasureDialog();
+                }
+            });
+        }
+        
+        // 选择宝藏类型
+        let selectedTreasureType = CUSTOM_TREASURE_TYPES[0];
+        
+        function selectTreasureType(typeId) {
+            selectedTreasureType = CUSTOM_TREASURE_TYPES.find(t => t.id === typeId);
+            
+            // 更新UI
+            document.querySelectorAll('.treasure-type-item').forEach(item => {
+                const type = CUSTOM_TREASURE_TYPES.find(t => t.id === item.dataset.type);
+                if (item.dataset.type === typeId) {
+                    item.style.background = type.color;
+                    item.style.color = 'white';
+                    item.style.borderColor = type.color;
+                } else {
+                    item.style.background = '#f5f5f5';
+                    item.style.color = '#333';
+                    item.style.borderColor = 'transparent';
+                }
+            });
+        }
+        
+        // 在地图上选择位置
+        function pickLocationOnMap() {
+            closePublishTreasureDialog();
+            
+            updateStatus('👆 点击地图选择宝藏位置', 'info');
+            
+            // 进入位置选择模式
+            const pickHandler = function(e) {
+                publishTreasureLocation = [e.lnglat.lng, e.lnglat.lat];
+                map.off('click', pickHandler);
+                
+                updateStatus('✅ 位置已选择，继续编辑宝藏', 'success');
+                
+                // 重新打开发布弹窗
+                setTimeout(() => {
+                    showPublishTreasureDialog();
+                    // 更新位置显示
+                    const locationText = document.getElementById('publish-location-text');
+                    if (locationText) {
+                        locationText.textContent = `${publishTreasureLocation[1].toFixed(5)}, ${publishTreasureLocation[0].toFixed(5)}`;
+                    }
+                }, 500);
+            };
+            
+            map.on('click', pickHandler);
+        }
+        
+        // 关闭发布弹窗
+        function closePublishTreasureDialog() {
+            const overlay = document.getElementById('publish-treasure-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+        
+        // 提交发布宝藏
+        function submitPublishTreasure() {
+            const title = document.getElementById('treasure-title').value.trim();
+            const content = document.getElementById('treasure-content').value.trim();
+            const expiry = parseInt(document.getElementById('treasure-expiry').value);
+            const maxClaims = parseInt(document.getElementById('treasure-max-claims').value);
+            const password = document.getElementById('treasure-password').value.trim();
+            
+            // 验证
+            if (!title) {
+                alert('请输入宝藏标题');
+                return;
+            }
+            if (!content) {
+                alert('请输入宝藏内容');
+                return;
+            }
+            if (title.length < 2) {
+                alert('标题至少2个字符');
+                return;
+            }
+            
+            // 创建宝藏数据
+            const treasureData = {
+                id: 'treasure_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                type: selectedTreasureType.id,
+                typeName: selectedTreasureType.name,
+                typeIcon: selectedTreasureType.icon,
+                typeColor: selectedTreasureType.color,
+                title: title,
+                content: content,
+                location: {
+                    coordinates: publishTreasureLocation,
+                    discoveryRadius: 30  // 30米内可领取
+                },
+                settings: {
+                    expiresAt: expiry > 0 ? new Date(Date.now() + expiry * 24 * 60 * 60 * 1000).toISOString() : null,
+                    maxClaims: maxClaims,
+                    password: password || null,
+                    isPublic: true
+                },
+                creator: {
+                    id: getUnifiedUserId(),
+                    name: getUnifiedUsername()
+                },
+                stats: {
+                    views: 0,
+                    claims: 0
+                },
+                claimedBy: [],
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+            
+            // 保存到本地（后续可以改为API调用）
+            userPublishedTreasures.push(treasureData);
+            saveUserPublishedTreasures();
+            
+            // 在地图上显示
+            addUserTreasureToMap(treasureData);
+            
+            // 关闭弹窗
+            closePublishTreasureDialog();
+            
+            // 更新统计
+            userData.stats.treasuresCreated += 1;
+            saveUserData();
+            
+            updateStatus(`🎉 宝藏"${title}"发布成功！`, 'success');
+            
+            console.log('✅ 宝藏已发布:', treasureData);
+        }
+        
+        // 在地图上添加用户发布的宝藏
+        function addUserTreasureToMap(treasureData) {
+            if (!map) return;
+            
+            const position = treasureData.location.coordinates;
+            const type = treasureData;
+            
+            // 创建自定义宝藏图标
+            const treasureSvg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="50" height="60" viewBox="0 0 50 60">
+                    <!-- 定位针形状 -->
+                    <defs>
+                        <filter id="shadow-${treasureData.id}" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+                        </filter>
+                    </defs>
+                    <path d="M25 55 C25 55 5 35 5 20 C5 9 14 0 25 0 C36 0 45 9 45 20 C45 35 25 55 25 55 Z" 
+                          fill="${type.typeColor}" stroke="white" stroke-width="2" filter="url(#shadow-${treasureData.id})"/>
+                    <circle cx="25" cy="20" r="15" fill="white" opacity="0.9"/>
+                    <text x="25" y="26" text-anchor="middle" font-size="18">${type.typeIcon}</text>
+                </svg>
+            `;
+            const encodedSvg = encodeURIComponent(treasureSvg);
+            
+            const marker = new AMap.Marker({
+                position: position,
+                icon: new AMap.Icon({
+                    image: 'data:image/svg+xml;charset=utf-8,' + encodedSvg,
+                    size: new AMap.Size(50, 60),
+                    imageOffset: new AMap.Pixel(-25, -55)
+                }),
+                title: treasureData.title,
+                zIndex: 600
+            });
+            
+            // 存储宝藏数据
+            marker.treasureData = treasureData;
+            marker.isUserTreasure = true;
+            
+            // 添加点击事件 - 显示宝藏详情
+            marker.on('click', function() {
+                showTreasureDetail(treasureData, marker);
+            });
+            
+            map.add(marker);
+            treasureMarkers.push(marker);
+        }
+        
+        // 显示宝藏详情弹窗
+        function showTreasureDetail(treasureData, marker) {
+            const distance = userLocation ? calculateDistance(userLocation, treasureData.location.coordinates) : 9999;
+            const canClaim = distance <= treasureData.location.discoveryRadius;
+            const isCreator = treasureData.creator.id === getUnifiedUserId();
+            const alreadyClaimed = treasureData.claimedBy.includes(getUnifiedUserId());
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'treasure-detail-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                backdrop-filter: blur(5px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            let claimButtonHtml = '';
+            if (isCreator) {
+                claimButtonHtml = `<div style="text-align: center; color: #999; padding: 10px;">这是你发布的宝藏</div>`;
+            } else if (alreadyClaimed) {
+                claimButtonHtml = `<div style="text-align: center; color: #4CAF50; padding: 10px;">✅ 你已领取过此宝藏</div>`;
+            } else if (canClaim) {
+                claimButtonHtml = `
+                    <button onclick="claimTreasure('${treasureData.id}')" style="
+                        width: 100%;
+                        padding: 14px;
+                        background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+                        color: white;
+                        border: none;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                    ">🎁 领取宝藏</button>
+                `;
+            } else {
+                claimButtonHtml = `
+                    <div style="text-align: center; padding: 10px;">
+                        <div style="color: #FF9800; font-size: 14px;">📍 距离 ${Math.round(distance)} 米</div>
+                        <div style="color: #999; font-size: 12px; margin-top: 5px;">需要靠近到 ${treasureData.location.discoveryRadius} 米内才能领取</div>
+                    </div>
+                `;
+            }
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 20px;
+                    width: 100%;
+                    max-width: 360px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                ">
+                    <!-- 头部 -->
+                    <div style="
+                        background: ${treasureData.typeColor};
+                        padding: 25px 20px;
+                        text-align: center;
+                        color: white;
+                    ">
+                        <div style="font-size: 50px; margin-bottom: 10px;">${treasureData.typeIcon}</div>
+                        <h3 style="margin: 0; font-size: 18px;">${treasureData.title}</h3>
+                        <div style="opacity: 0.9; font-size: 13px; margin-top: 5px;">${treasureData.typeName}</div>
+                    </div>
+                    
+                    <!-- 内容 -->
+                    <div style="padding: 20px;">
+                        <!-- 宝藏内容（领取后才显示完整内容） -->
+                        <div style="
+                            background: #f9f9f9;
+                            border-radius: 12px;
+                            padding: 15px;
+                            margin-bottom: 15px;
+                        ">
+                            ${alreadyClaimed ? `
+                                <div style="color: #333; font-size: 14px; line-height: 1.6;">${treasureData.content}</div>
+                            ` : `
+                                <div style="color: #999; font-size: 14px; text-align: center;">
+                                    🔒 领取后查看内容
+                                </div>
+                            `}
+                        </div>
+                        
+                        <!-- 发布者信息 -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 10px;">
+                            <div style="width: 36px; height: 36px; background: ${treasureData.typeColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">
+                                ${treasureData.creator.name.charAt(0)}
+                            </div>
+                            <div>
+                                <div style="font-size: 14px; color: #333;">${treasureData.creator.name}</div>
+                                <div style="font-size: 11px; color: #999;">${new Date(treasureData.createdAt).toLocaleDateString()}</div>
+                            </div>
+                            <div style="margin-left: auto; font-size: 12px; color: #999;">
+                                ${treasureData.stats.claims} 人领取
+                            </div>
+                        </div>
+                        
+                        <!-- 领取按钮 -->
+                        ${claimButtonHtml}
+                        
+                        <!-- 关闭按钮 -->
+                        <button onclick="closeTreasureDetail()" style="
+                            width: 100%;
+                            padding: 12px;
+                            background: transparent;
+                            color: #999;
+                            border: none;
+                            font-size: 14px;
+                            cursor: pointer;
+                            margin-top: 10px;
+                        ">关闭</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            // 点击背景关闭
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    closeTreasureDetail();
+                }
+            });
+        }
+        
+        // 关闭宝藏详情
+        function closeTreasureDetail() {
+            const overlay = document.getElementById('treasure-detail-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+        
+        // 领取宝藏
+        function claimTreasure(treasureId) {
+            // 查找宝藏
+            const treasure = userPublishedTreasures.find(t => t.id === treasureId);
+            if (!treasure) {
+                alert('宝藏不存在');
+                return;
+            }
+            
+            // 检查密码
+            if (treasure.settings.password) {
+                const inputPassword = prompt('请输入领取密码：');
+                if (inputPassword !== treasure.settings.password) {
+                    alert('密码错误！');
+                    return;
+                }
+            }
+            
+            // 检查领取次数
+            if (treasure.settings.maxClaims > 0 && treasure.stats.claims >= treasure.settings.maxClaims) {
+                alert('此宝藏已被领完');
+                return;
+            }
+            
+            // 记录领取
+            treasure.claimedBy.push(getUnifiedUserId());
+            treasure.stats.claims += 1;
+            saveUserPublishedTreasures();
+            
+            // 更新用户统计
+            userData.stats.treasuresDiscovered += 1;
+            saveUserData();
+            
+            // 关闭详情弹窗
+            closeTreasureDetail();
+            
+            // 显示领取成功
+            showClaimSuccessDialog(treasure);
+        }
+        
+        // 显示领取成功弹窗
+        function showClaimSuccessDialog(treasure) {
+            const overlay = document.createElement('div');
+            overlay.id = 'claim-success-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10001;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 20px;
+                    width: 100%;
+                    max-width: 340px;
+                    padding: 30px;
+                    text-align: center;
+                    animation: bounceIn 0.5s ease;
+                ">
+                    <div style="font-size: 60px; margin-bottom: 15px;">🎉</div>
+                    <h2 style="margin: 0 0 10px 0; color: #333;">恭喜！领取成功</h2>
+                    
+                    <div style="
+                        background: linear-gradient(135deg, ${treasure.typeColor}22 0%, ${treasure.typeColor}44 100%);
+                        border: 2px solid ${treasure.typeColor};
+                        border-radius: 15px;
+                        padding: 20px;
+                        margin: 20px 0;
+                    ">
+                        <div style="font-size: 30px; margin-bottom: 10px;">${treasure.typeIcon}</div>
+                        <div style="font-weight: 600; color: #333; margin-bottom: 10px;">${treasure.title}</div>
+                        <div style="
+                            background: white;
+                            border-radius: 10px;
+                            padding: 15px;
+                            color: #333;
+                            font-size: 14px;
+                            line-height: 1.6;
+                            text-align: left;
+                        ">${treasure.content}</div>
+                    </div>
+                    
+                    <button onclick="document.getElementById('claim-success-overlay').remove()" style="
+                        width: 100%;
+                        padding: 14px;
+                        background: ${treasure.typeColor};
+                        color: white;
+                        border: none;
+                        border-radius: 12px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                    ">太棒了！</button>
+                </div>
+            `;
+            
+            // 添加动画样式
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes bounceIn {
+                    0% { transform: scale(0.5); opacity: 0; }
+                    60% { transform: scale(1.1); }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(overlay);
+            
+            // 震动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 200]);
+            }
+            
+            updateStatus(`🎁 成功领取"${treasure.title}"！`, 'success');
+        }
+        
+        // 页面加载时加载用户发布的宝藏
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserPublishedTreasures();
+        });
 
         // 宝藏管理系统
         const treasureManager = {
@@ -3286,9 +4043,47 @@
                     addTreasureAtPosition(position, treasureType);
                     
                     if (i === treasureCount - 1) {
-                        updateStatus(`🗺️ 已生成${treasureCount}个宝藏！开始寻宝吧！`, 'success');
+                        // 生成完系统宝藏后，加载用户发布的宝藏
+                        setTimeout(() => {
+                            loadUserTreasuresToMap();
+                        }, 500);
                     }
                 }, i * 200);
+            }
+        }
+        
+        // 加载用户发布的宝藏到地图
+        function loadUserTreasuresToMap() {
+            if (!map || !userLocation) return;
+            
+            // 加载已保存的宝藏
+            loadUserPublishedTreasures();
+            
+            // 过滤出有效的宝藏（未过期、在附近5公里内）
+            const validTreasures = userPublishedTreasures.filter(treasure => {
+                // 检查是否过期
+                if (treasure.settings.expiresAt) {
+                    if (new Date(treasure.settings.expiresAt) < new Date()) {
+                        return false;
+                    }
+                }
+                // 检查状态
+                if (treasure.status !== 'active') {
+                    return false;
+                }
+                // 检查距离（5公里内）
+                const distance = calculateDistance(userLocation, treasure.location.coordinates);
+                return distance <= 5000;
+            });
+            
+            // 添加到地图
+            validTreasures.forEach(treasure => {
+                addUserTreasureToMap(treasure);
+            });
+            
+            if (validTreasures.length > 0) {
+                console.log(`📤 已加载 ${validTreasures.length} 个用户发布的宝藏`);
+                updateStatus(`🗺️ 发现 ${treasureMarkers.length} 个宝藏（含 ${validTreasures.length} 个玩家宝藏）`, 'success');
             }
         }
 
