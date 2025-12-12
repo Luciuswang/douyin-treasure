@@ -206,6 +206,45 @@
                 <button class="btn" onclick="clearMap()" disabled id="clear-btn">
                     🗑️ 删除宝藏
                 </button>
+                <button class="btn" onclick="showCoordinatePanel()" id="coord-btn" style="background: linear-gradient(135deg, #9C27B0 0%, #673AB7 100%);">
+                    📋 查看坐标
+                </button>
+            </div>
+            
+            <!-- 坐标显示面板 -->
+            <div id="coordinate-panel" style="
+                display: none;
+                background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+                border-radius: 15px;
+                padding: 20px;
+                margin-top: 15px;
+                border: 2px solid #9C27B0;
+            ">
+                <h4 style="color: #673AB7; margin-bottom: 15px; font-size: 1.1rem;">📍 当前定位坐标</h4>
+                <div style="display: grid; gap: 10px;">
+                    <div style="background: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: #666;">经度 (Longitude)</div>
+                            <div id="coord-lng" style="font-size: 1.2rem; font-weight: bold; color: #333; font-family: monospace;">--</div>
+                        </div>
+                        <button onclick="copyCoordinate('lng')" style="background: #9C27B0; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">复制</button>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: #666;">纬度 (Latitude)</div>
+                            <div id="coord-lat" style="font-size: 1.2rem; font-weight: bold; color: #333; font-family: monospace;">--</div>
+                        </div>
+                        <button onclick="copyCoordinate('lat')" style="background: #9C27B0; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">复制</button>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 10px;">
+                        <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">完整坐标 (可直接复制发送)</div>
+                        <div id="coord-full" style="font-size: 1rem; font-weight: bold; color: #333; font-family: monospace; word-break: break-all;">--</div>
+                        <button onclick="copyCoordinate('full')" style="background: #673AB7; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 10px; width: 100%;">📋 复制完整坐标</button>
+                    </div>
+                    <div style="background: #fff3e0; padding: 12px; border-radius: 10px; font-size: 0.85rem; color: #e65100;">
+                        💡 提示：复制坐标后发给我，我可以帮你计算偏移量！
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1111,20 +1150,27 @@
                     }, 1000);
                 });
 
-                // 地图点击事件 - 手动校准位置或添加宝藏
+                // 地图点击/触摸事件 - 手动校准位置或添加宝藏
                 let manualCalibrationMode = false;
-                map.on('click', function(e) {
-                    console.log('地图点击事件:', e.lnglat);
+                
+                // 处理地图点击的统一函数
+                function handleMapClick(lnglat) {
+                    console.log('地图点击/触摸事件:', lnglat);
                     
                     // 如果处于手动校准模式，则校准位置
                     if (manualCalibrationMode) {
-                        const clickedLng = e.lnglat.lng;
-                        const clickedLat = e.lnglat.lat;
+                        const clickedLng = lnglat.lng;
+                        const clickedLat = lnglat.lat;
                         console.log('📍 手动校准位置:', { lng: clickedLng, lat: clickedLat });
                         
                         // 更新用户位置
                         userLocation = [clickedLng, clickedLat];
                         isLocationSet = true;
+                        
+                        // 更新坐标面板显示
+                        if (typeof updateCoordinateDisplay === 'function') {
+                            updateCoordinateDisplay();
+                        }
                         
                         // 更新用户标记
                         if (userMarker) {
@@ -1154,37 +1200,66 @@
                         const calBtn = document.getElementById('calibration-btn');
                         if (calBtn) {
                             calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
+                            calBtn.textContent = '✏️ 手动校准位置';
                         }
-                        return;
+                        return true;
                     }
-                    
-                    // 普通点击 - 添加宝藏
-                    if (userLocation && confirm('在此位置添加宝藏？')) {
-                        addTreasureAtPosition([e.lnglat.lng, e.lnglat.lat]);
+                    return false;
+                }
+                
+                // 桌面端点击事件
+                map.on('click', function(e) {
+                    if (!handleMapClick(e.lnglat)) {
+                        // 普通点击 - 添加宝藏（仅在非校准模式）
+                        if (userLocation && confirm('在此位置添加宝藏？')) {
+                            addTreasureAtPosition([e.lnglat.lng, e.lnglat.lat]);
+                        }
                     }
                 });
                 
-                // 手动校准功能
+                // 移动端触摸事件 - 改善点击响应
+                map.on('touchend', function(e) {
+                    if (manualCalibrationMode && e.lnglat) {
+                        handleMapClick(e.lnglat);
+                    }
+                });
+                
+                // 手动校准功能 - 挂载到全局
                 window.enableManualCalibration = function() {
                     if (!map) {
-                        updateStatus('请先初始化地图！', 'warning');
+                        updateStatus('⚠️ 请先点击"启动寻宝之旅"初始化地图！', 'warning');
                         return;
                     }
-                    manualCalibrationMode = true;
+                    
+                    // 切换校准模式
+                    manualCalibrationMode = !manualCalibrationMode;
                     const calBtn = document.getElementById('calibration-btn');
-                    if (calBtn) {
-                        calBtn.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
-                    }
-                    updateStatus('📍 手动校准模式已启用：请在地图上点击您的真实位置', 'info');
-                    setTimeout(() => {
-                        if (manualCalibrationMode) {
-                            manualCalibrationMode = false;
-                            if (calBtn) {
-                                calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
-                            }
-                            updateStatus('手动校准模式已自动关闭', 'info');
+                    
+                    if (manualCalibrationMode) {
+                        if (calBtn) {
+                            calBtn.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
+                            calBtn.innerHTML = '🎯 点击地图选位置';
                         }
-                    }, 30000); // 30秒后自动关闭
+                        updateStatus('📍 手动校准模式已启用：请在地图上点击/触摸您的真实位置', 'info');
+                        
+                        // 60秒后自动关闭
+                        setTimeout(() => {
+                            if (manualCalibrationMode) {
+                                manualCalibrationMode = false;
+                                if (calBtn) {
+                                    calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
+                                    calBtn.innerHTML = '✏️ 手动校准位置';
+                                }
+                                updateStatus('手动校准模式已自动关闭（超时）', 'info');
+                            }
+                        }, 60000);
+                    } else {
+                        if (calBtn) {
+                            calBtn.style.background = 'linear-gradient(135deg, #FF6B6B 0%, #EE5A6F 100%)';
+                            calBtn.innerHTML = '✏️ 手动校准位置';
+                        }
+                        updateStatus('手动校准模式已取消', 'info');
+                    }
                 };
                 
                 // 地图移动事件（用于调试）
@@ -2076,6 +2151,11 @@
             isLocationSet = true;
             console.log('✅ userLocation已设置为:', userLocation);
             
+            // 更新坐标面板显示
+            if (typeof updateCoordinateDisplay === 'function') {
+                updateCoordinateDisplay();
+            }
+            
             // 立即设置地图中心和缩放（在创建标记之前）
             console.log('🗺️ 准备设置地图中心...');
             console.log('🗺️ 当前地图对象:', map ? '✅ 存在' : '❌ 不存在');
@@ -2896,6 +2976,89 @@
             treasureMarkers = [];
             updateStatus('🗑️ 已清空所有宝藏', 'success');
             updateStats();
+        }
+
+        // ==================== 坐标显示功能 ====================
+        // 显示/隐藏坐标面板
+        function showCoordinatePanel() {
+            const panel = document.getElementById('coordinate-panel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                updateCoordinateDisplay();
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        
+        // 更新坐标显示
+        function updateCoordinateDisplay() {
+            const lngEl = document.getElementById('coord-lng');
+            const latEl = document.getElementById('coord-lat');
+            const fullEl = document.getElementById('coord-full');
+            
+            if (userLocation && userLocation.length === 2) {
+                const lng = userLocation[0].toFixed(6);
+                const lat = userLocation[1].toFixed(6);
+                lngEl.textContent = lng;
+                latEl.textContent = lat;
+                fullEl.textContent = `经度: ${lng}, 纬度: ${lat}`;
+            } else {
+                lngEl.textContent = '未定位';
+                latEl.textContent = '未定位';
+                fullEl.textContent = '请先启动定位获取坐标';
+            }
+        }
+        
+        // 复制坐标到剪贴板
+        function copyCoordinate(type) {
+            let text = '';
+            if (!userLocation || userLocation.length !== 2) {
+                updateStatus('还没有定位信息可复制', 'warning');
+                return;
+            }
+            
+            const lng = userLocation[0].toFixed(6);
+            const lat = userLocation[1].toFixed(6);
+            
+            switch (type) {
+                case 'lng':
+                    text = lng;
+                    break;
+                case 'lat':
+                    text = lat;
+                    break;
+                case 'full':
+                    text = `GPS定位坐标 - 经度: ${lng}, 纬度: ${lat}`;
+                    break;
+            }
+            
+            // 复制到剪贴板
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    updateStatus('✅ 坐标已复制到剪贴板！', 'success');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+        
+        // 降级复制方案
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                updateStatus('✅ 坐标已复制！', 'success');
+            } catch (e) {
+                updateStatus('复制失败，请手动复制: ' + text, 'warning');
+            }
+            document.body.removeChild(textArea);
         }
 
         // 首次使用检查
