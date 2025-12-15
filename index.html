@@ -2346,17 +2346,25 @@
                                     return;
                                 }
                                 
-                                // 使用高德转换坐标
+                                // 使用高德转换坐标，如果转换失败则使用原始坐标
                                 AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                                    let newLng, newLat, locationType;
+                                    
                                     if (status === 'complete' && result.locations && result.locations.length > 0) {
                                         const gcj02 = result.locations[0];
-                                        const newLng = gcj02.lng;
-                                        const newLat = gcj02.lat;
-                                        const locationType = 'GPS实时';
-                                        
-                                        console.log(`📍 坐标转换: [${newLng.toFixed(6)}, ${newLat.toFixed(6)}]`);
-                                        
-                                        // 应用定位偏移修正
+                                        newLng = gcj02.lng;
+                                        newLat = gcj02.lat;
+                                        locationType = 'GPS实时';
+                                        console.log(`📍 坐标转换成功: [${newLng.toFixed(6)}, ${newLat.toFixed(6)}]`);
+                                    } else {
+                                        // 转换失败，直接使用原始坐标（可能有轻微偏差但能用）
+                                        console.warn('⚠️ 坐标转换失败，使用原始GPS坐标');
+                                        newLng = wgs84Lng;
+                                        newLat = wgs84Lat;
+                                        locationType = 'GPS原始';
+                                    }
+                                    
+                                    // 应用定位偏移修正
                                         let finalLng = newLng;
                                         let finalLat = newLat;
                                         const isMobile = isMobileDevice();
@@ -2390,10 +2398,9 @@
                                             console.log(`📍 移动了 ${distance.toFixed(1)} 米`);
                                         }
                                         
-                                        // 更新用户位置
-                                        updateUserLocationRealtime(newLocation, accuracy, locationType);
-                                        lastTrackingUpdate = now;
-                                    }
+                                    // 更新用户位置
+                                    updateUserLocationRealtime(newLocation, accuracy, locationType);
+                                    lastTrackingUpdate = now;
                                 });
                             },
                             function(error) {
