@@ -993,7 +993,9 @@
         
         // 保存用户发布的宝藏
         function saveUserPublishedTreasures() {
-            storageManager.save('user-published-treasures', userPublishedTreasures);
+            const result = storageManager.save('user-published-treasures', userPublishedTreasures);
+            console.log('💾 保存用户宝藏:', userPublishedTreasures.length, '个');
+            return result;
         }
         
         // ==================== 发布宝藏功能 ====================
@@ -1333,14 +1335,21 @@
         
         // 提交发布宝藏
         function submitPublishTreasure() {
+            console.log('📤 开始发布宝藏...');
+            console.log('📍 发布位置:', publishTreasureLocation);
+            console.log('📍 当前用户位置:', userLocation);
+            
             const title = document.getElementById('treasure-title').value.trim();
             const content = document.getElementById('treasure-content').value.trim();
             const expiry = parseInt(document.getElementById('treasure-expiry').value);
             const maxClaims = parseInt(document.getElementById('treasure-max-claims').value);
             const password = document.getElementById('treasure-password').value.trim();
             
+            console.log('📝 表单数据:', { title, content, expiry, maxClaims, hasPassword: !!password });
+            
             // 验证
             if (!title) {
+                console.error('❌ 验证失败: 缺少标题');
                 alert('请输入宝藏标题');
                 return;
             }
@@ -1387,7 +1396,14 @@
             
             // 保存到本地（后续可以改为API调用）
             userPublishedTreasures.push(treasureData);
-            saveUserPublishedTreasures();
+            console.log('📦 宝藏已添加到列表，当前总数:', userPublishedTreasures.length);
+            
+            const saveResult = saveUserPublishedTreasures();
+            console.log('💾 保存结果:', saveResult ? '成功' : '失败');
+            
+            // 验证保存
+            const verifyData = storageManager.load('user-published-treasures');
+            console.log('🔍 验证保存的数据:', verifyData ? verifyData.length + '个宝藏' : '无数据');
             
             // 在地图上显示
             addUserTreasureToMap(treasureData);
@@ -1728,6 +1744,10 @@
         // 页面加载时加载用户发布的宝藏
         document.addEventListener('DOMContentLoaded', function() {
             loadUserPublishedTreasures();
+            console.log('📦 已加载用户宝藏数据:', userPublishedTreasures.length, '个');
+            if (userPublishedTreasures.length > 0) {
+                console.log('📦 宝藏列表:', userPublishedTreasures.map(t => t.title));
+            }
         });
 
         // 宝藏管理系统
@@ -3791,6 +3811,12 @@
             } else {
                 console.log('⚠️ 追踪已在运行中，跳过自动启动');
             }
+            
+            // 📦 加载用户发布的宝藏到地图
+            setTimeout(() => {
+                console.log('📦 尝试加载用户发布的宝藏...');
+                loadUserTreasuresToMap();
+            }, 2000);
         }
 
 
@@ -4200,10 +4226,21 @@
         
         // 加载用户发布的宝藏到地图
         function loadUserTreasuresToMap() {
-            if (!map || !userLocation) return;
+            console.log('📦 loadUserTreasuresToMap 被调用');
+            console.log('📦 map:', !!map, 'userLocation:', userLocation);
+            
+            if (!map) {
+                console.warn('⚠️ 地图未初始化，无法加载宝藏');
+                return;
+            }
+            if (!userLocation) {
+                console.warn('⚠️ 用户位置未知，无法加载宝藏');
+                return;
+            }
             
             // 加载已保存的宝藏
             loadUserPublishedTreasures();
+            console.log('📦 已加载宝藏数据:', userPublishedTreasures.length, '个');
             
             // 过滤出有效的宝藏（未过期、在附近5公里内）
             const validTreasures = userPublishedTreasures.filter(treasure => {
@@ -10087,6 +10124,129 @@
             </div>
         </div>
     </div>
+    
+    <!-- 手机调试面板 -->
+    <div id="debug-panel" style="
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 40vh;
+        background: rgba(0, 0, 0, 0.9);
+        color: #0f0;
+        font-family: monospace;
+        font-size: 11px;
+        overflow-y: auto;
+        z-index: 99999;
+        padding: 10px;
+        border-top: 2px solid #0f0;
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="color: #fff; font-weight: bold;">📱 调试日志</span>
+            <div>
+                <button onclick="clearDebugLog()" style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-right: 5px;">清除</button>
+                <button onclick="toggleDebugPanel()" style="background: #666; color: white; border: none; padding: 5px 10px; border-radius: 5px;">关闭</button>
+            </div>
+        </div>
+        <div id="debug-log"></div>
+    </div>
+    
+    <!-- 调试按钮（右下角） -->
+    <button id="debug-toggle-btn" onclick="toggleDebugPanel()" style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+        color: white;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 99998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    ">🐛</button>
+    
+    <script>
+        // ==================== 手机调试日志系统 ====================
+        const debugLogs = [];
+        const MAX_DEBUG_LOGS = 100;
+        
+        // 重写 console.log 来捕获日志
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        function addDebugLog(type, ...args) {
+            const time = new Date().toLocaleTimeString();
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg);
+                    } catch (e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+            
+            debugLogs.push({ time, type, message });
+            if (debugLogs.length > MAX_DEBUG_LOGS) {
+                debugLogs.shift();
+            }
+            
+            updateDebugPanel();
+        }
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            addDebugLog('log', ...args);
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            addDebugLog('error', ...args);
+        };
+        
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            addDebugLog('warn', ...args);
+        };
+        
+        function updateDebugPanel() {
+            const logDiv = document.getElementById('debug-log');
+            if (!logDiv) return;
+            
+            logDiv.innerHTML = debugLogs.map(log => {
+                const color = log.type === 'error' ? '#f44336' : log.type === 'warn' ? '#ff9800' : '#0f0';
+                return `<div style="color: ${color}; margin-bottom: 3px; word-break: break-all;">[${log.time}] ${log.message}</div>`;
+            }).join('');
+            
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debug-panel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                updateDebugPanel();
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        
+        function clearDebugLog() {
+            debugLogs.length = 0;
+            updateDebugPanel();
+        }
+        
+        console.log('🐛 调试面板已加载 - 点击右下角🐛按钮查看日志');
+    </script>
 </body>
 </html>
 
