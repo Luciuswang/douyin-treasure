@@ -2259,13 +2259,18 @@
             }
             
             console.log('🚶 开始实时位置追踪（高德融合定位）...');
-            updateStatus('🚶 实时追踪已开启，正在监测您的位置...', 'info');
             
             isTrackingLocation = true;
             lastTrackingUpdate = Date.now();
             
             // 更新按钮状态
             updateTrackingButtonState();
+            
+            // 显示追踪状态指示器
+            showTrackingIndicator();
+            
+            // 给用户明确的反馈
+            updateStatus('🚶 实时追踪已开启！位置将自动更新', 'success');
             
             // 优先使用高德地图融合定位API（比浏览器GPS更准确）
             if (typeof AMap !== 'undefined') {
@@ -3747,12 +3752,16 @@
                 }
             }, 1000);
             
-            // 🚶 定位成功后自动启动实时位置追踪（移动设备）
-            if (isMobile && !isTrackingLocation) {
+            // 🚶 定位成功后自动启动实时位置追踪（所有设备）
+            if (!isTrackingLocation) {
                 setTimeout(() => {
-                    console.log('🚶 移动设备自动启动实时位置追踪...');
+                    console.log('🚶 自动启动实时位置追踪...');
+                    console.log('📱 设备类型:', isMobile ? '移动设备' : 'PC');
+                    console.log('📍 当前位置:', userLocation);
                     startLocationTracking();
-                }, 1500);
+                }, 500); // 更快启动
+            } else {
+                console.log('⚠️ 追踪已在运行中，跳过自动启动');
             }
         }
 
