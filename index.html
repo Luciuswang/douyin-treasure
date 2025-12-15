@@ -1626,20 +1626,28 @@
         // 显示宝藏详情弹窗
         function showTreasureDetail(treasureData, marker) {
             console.log('🔍 显示宝藏详情:', treasureData.title);
-            console.log('📦 宝藏数据:', JSON.stringify(treasureData).substring(0, 200) + '...');
             
-            // 先移除可能存在的旧弹窗
-            const existingOverlay = document.getElementById('treasure-detail-overlay');
-            if (existingOverlay) {
-                existingOverlay.remove();
-            }
-            
-            const distance = userLocation ? calculateDistance(userLocation, treasureData.location.coordinates) : 9999;
-            const canClaim = distance <= treasureData.location.discoveryRadius;
-            const isCreator = treasureData.creator.id === getUnifiedUserId();
-            const alreadyClaimed = treasureData.claimedBy.includes(getUnifiedUserId());
-            
-            console.log('📏 距离:', distance, '米, 可领取:', canClaim, '是创建者:', isCreator);
+            try {
+                // 先移除可能存在的旧弹窗
+                const existingOverlay = document.getElementById('treasure-detail-overlay');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+                
+                // 安全检查：确保必要的字段存在
+                if (!treasureData.claimedBy) treasureData.claimedBy = [];
+                if (!treasureData.location) treasureData.location = { coordinates: userLocation, discoveryRadius: 30 };
+                if (!treasureData.settings) treasureData.settings = {};
+                if (!treasureData.creator) treasureData.creator = { id: '', name: '' };
+                
+                const distance = userLocation ? calculateDistance(userLocation, treasureData.location.coordinates) : 9999;
+                const discoveryRadius = treasureData.location.discoveryRadius || 30;
+                const canClaim = distance <= discoveryRadius;
+                const isCreator = treasureData.creator.id === getUnifiedUserId();
+                const alreadyClaimed = treasureData.claimedBy.includes(getUnifiedUserId());
+                const hasPassword = treasureData.settings.password && treasureData.settings.password.length > 0;
+                
+                console.log('📏 距离:', Math.round(distance), '米, 可领取:', canClaim, '是创建者:', isCreator, '有密码:', hasPassword);
             
             const overlay = document.createElement('div');
             overlay.id = 'treasure-detail-overlay';
@@ -1660,57 +1668,64 @@
             `;
             
             // 判断是否可以查看内容
-            const canViewContent = isCreator || alreadyClaimed;
+            // 创建者或已领取者可以直接看，无密码的也可以看，有密码的需要领取后才能看
+            const canViewContent = isCreator || alreadyClaimed || !hasPassword;
             
             let claimButtonHtml = '';
+            let passwordHint = hasPassword ? `<div style="color: #9C27B0; font-size: 12px; margin-bottom: 10px;">🔐 此宝藏需要密码才能领取</div>` : '';
+            
             if (isCreator) {
+                // 创建者可以编辑
                 claimButtonHtml = `
                     <div style="text-align: center; padding: 10px;">
-                        <div style="color: #2196F3; font-size: 14px;">📝 这是你发布的宝藏</div>
-                        <button onclick="editTreasure('${treasureData.id}')" style="
-                            margin-top: 10px;
-                            padding: 10px 20px;
-                            background: #2196F3;
-                            color: white;
-                            border: none;
-                            border-radius: 8px;
-                            font-size: 14px;
-                            cursor: pointer;
-                        ">✏️ 编辑宝藏</button>
+                        <div style="color: #2196F3; font-size: 14px; margin-bottom: 10px;">📝 这是你发布的宝藏</div>
+                        <div style="display: flex; gap: 10px; justify-content: center;">
+                            <button onclick="editTreasure('${treasureData.id}')" style="
+                                padding: 10px 20px;
+                                background: #2196F3;
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                font-size: 14px;
+                                cursor: pointer;
+                            ">✏️ 编辑</button>
+                            <button onclick="deleteTreasure('${treasureData.id}')" style="
+                                padding: 10px 20px;
+                                background: #f44336;
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                font-size: 14px;
+                                cursor: pointer;
+                            ">🗑️ 删除</button>
+                        </div>
                     </div>
                 `;
             } else if (alreadyClaimed) {
+                // 已领取
                 claimButtonHtml = `<div style="text-align: center; color: #4CAF50; padding: 10px;">✅ 你已领取过此宝藏</div>`;
-            } else if (canClaim) {
-                claimButtonHtml = `
-                    <button onclick="claimTreasure('${treasureData.id}')" style="
-                        width: 100%;
-                        padding: 14px;
-                        background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 12px;
-                        font-size: 16px;
-                        font-weight: 600;
-                        cursor: pointer;
-                    ">🎁 领取宝藏</button>
-                `;
             } else {
-                // 距离太远时，也显示一个"强制领取"按钮（方便测试）
+                // 未领取的用户
+                const claimBtnStyle = canClaim 
+                    ? 'background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);'
+                    : 'background: #FF9800;';
+                const claimBtnText = canClaim ? '🎁 领取宝藏' : `🎁 领取（距离${Math.round(distance)}米）`;
+                
                 claimButtonHtml = `
                     <div style="text-align: center; padding: 10px;">
-                        <div style="color: #FF9800; font-size: 14px;">📍 距离 ${Math.round(distance)} 米</div>
-                        <div style="color: #999; font-size: 12px; margin-top: 5px;">需要靠近到 ${treasureData.location.discoveryRadius} 米内才能领取</div>
+                        ${passwordHint}
+                        ${!canClaim ? `<div style="color: #999; font-size: 12px; margin-bottom: 10px;">需要靠近到 ${discoveryRadius} 米内</div>` : ''}
                         <button onclick="claimTreasure('${treasureData.id}')" style="
-                            margin-top: 10px;
-                            padding: 10px 20px;
-                            background: #FF9800;
+                            width: 100%;
+                            padding: 14px;
+                            ${claimBtnStyle}
                             color: white;
                             border: none;
-                            border-radius: 8px;
-                            font-size: 14px;
+                            border-radius: 12px;
+                            font-size: 16px;
+                            font-weight: 600;
                             cursor: pointer;
-                        ">🎁 强制领取（测试用）</button>
+                        ">${claimBtnText}</button>
                     </div>
                 `;
             }
@@ -1794,6 +1809,11 @@
                     closeTreasureDetail();
                 }
             });
+            
+            } catch (error) {
+                console.error('❌ 显示宝藏详情出错:', error);
+                alert('打开宝藏失败，请重试');
+            }
         }
         
         // 关闭宝藏详情
