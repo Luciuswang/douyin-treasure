@@ -1010,6 +1010,7 @@
             
             // 默认使用当前位置
             publishTreasureLocation = [...userLocation];
+            console.log('📤 打开发布宝藏弹窗，当前位置:', publishTreasureLocation);
             
             // 创建弹窗
             const overlay = document.createElement('div');
@@ -1405,9 +1406,13 @@
         
         // 在地图上添加用户发布的宝藏
         function addUserTreasureToMap(treasureData) {
-            if (!map) return;
+            if (!map) {
+                console.error('❌ 无法添加宝藏：地图未初始化');
+                return;
+            }
             
             const position = treasureData.location.coordinates;
+            console.log('📍 添加用户宝藏到地图:', treasureData.title, '位置:', position);
             const type = treasureData;
             
             // 创建自定义宝藏图标
@@ -2296,71 +2301,94 @@
                     
                     console.log('✅ 高德融合定位实例已创建');
                     
-                    // 使用定时器轮询位置（高德JS API的watchPosition在某些手机上不稳定）
-                    // 每秒获取一次位置，模拟实时追踪
-                    trackingIntervalId = setInterval(function() {
-                        if (!isTrackingLocation) return;
-                        
-                        amapGeolocationInstance.getCurrentPosition(function(status, result) {
-                            if (status === 'complete' && result.position) {
+                    // 立即获取一次位置
+                    amapGeolocationInstance.getCurrentPosition(function(status, result) {
+                        console.log('📍 追踪初始定位:', status, result);
+                    });
+                    
+                    // 使用浏览器原生 watchPosition 获取实时位置（更可靠）
+                    // 然后用高德API转换坐标
+                    if (navigator.geolocation) {
+                        console.log('🔄 启动浏览器原生GPS监听...');
+                        locationTrackingWatchId = navigator.geolocation.watchPosition(
+                            function(position) {
+                                if (!isTrackingLocation) return;
+                                
                                 const now = Date.now();
+                                const wgs84Lat = position.coords.latitude;
+                                const wgs84Lng = position.coords.longitude;
+                                const accuracy = position.coords.accuracy;
+                                
+                                console.log(`📍 浏览器GPS: [${wgs84Lng.toFixed(6)}, ${wgs84Lat.toFixed(6)}], 精度=${accuracy.toFixed(1)}米`);
                                 
                                 // 检查最小更新间隔
                                 if (now - lastTrackingUpdate < TRACKING_MIN_INTERVAL) {
                                     return;
                                 }
                                 
-                                const newLng = result.position.lng;
-                                const newLat = result.position.lat;
-                                const accuracy = result.accuracy || 100;
-                                const locationType = result.location_type || '融合定位';
-                                
-                                console.log(`📍 高德融合定位: [${newLng.toFixed(6)}, ${newLat.toFixed(6)}], 精度=${accuracy}米, 类型=${locationType}`);
-                                
-                                // 应用定位偏移修正
-                                let finalLng = newLng;
-                                let finalLat = newLat;
-                                const isMobile = isMobileDevice();
-                                if (LOCATION_OFFSET.enabled) {
-                                    const shouldApply = (!LOCATION_OFFSET.onlyForMobile || isMobile) && 
-                                                       (accuracy <= LOCATION_OFFSET.minAccuracy);
-                                    if (shouldApply) {
-                                        finalLng += LOCATION_OFFSET.lng;
-                                        finalLat += LOCATION_OFFSET.lat;
-                                    }
-                                }
-                                
-                                const newLocation = [finalLng, finalLat];
-                                
-                                // 计算与上次位置的距离
-                                if (userLocation) {
-                                    const distance = calculateDistance(userLocation, newLocation);
-                                    
-                                    // 室内定位时降低阈值（更灵敏）
-                                    const minDistance = accuracy > 50 ? 1 : TRACKING_MIN_DISTANCE;
-                                    
-                                    if (distance < minDistance) {
-                                        // 静止不动时，每10秒至少更新一次状态
-                                        if (now - lastTrackingUpdate > 10000) {
-                                            updateTrackingStatus(accuracy, locationType);
-                                            lastTrackingUpdate = now;
+                                // 使用高德转换坐标
+                                AMap.convertFrom([wgs84Lng, wgs84Lat], 'gps', function(status, result) {
+                                    if (status === 'complete' && result.locations && result.locations.length > 0) {
+                                        const gcj02 = result.locations[0];
+                                        const newLng = gcj02.lng;
+                                        const newLat = gcj02.lat;
+                                        const locationType = 'GPS实时';
+                                        
+                                        console.log(`📍 坐标转换: [${newLng.toFixed(6)}, ${newLat.toFixed(6)}]`);
+                                        
+                                        // 应用定位偏移修正
+                                        let finalLng = newLng;
+                                        let finalLat = newLat;
+                                        const isMobile = isMobileDevice();
+                                        if (LOCATION_OFFSET.enabled) {
+                                            const shouldApply = (!LOCATION_OFFSET.onlyForMobile || isMobile) && 
+                                                               (accuracy <= LOCATION_OFFSET.minAccuracy);
+                                            if (shouldApply) {
+                                                finalLng += LOCATION_OFFSET.lng;
+                                                finalLat += LOCATION_OFFSET.lat;
+                                            }
                                         }
-                                        return;
+                                        
+                                        const newLocation = [finalLng, finalLat];
+                                        
+                                        // 计算与上次位置的距离
+                                        if (userLocation) {
+                                            const distance = calculateDistance(userLocation, newLocation);
+                                            
+                                            // 室内定位时降低阈值（更灵敏）
+                                            const minDistance = accuracy > 50 ? 1 : TRACKING_MIN_DISTANCE;
+                                            
+                                            if (distance < minDistance) {
+                                                // 静止不动时，每10秒至少更新一次状态
+                                                if (now - lastTrackingUpdate > 10000) {
+                                                    updateTrackingStatus(accuracy, locationType);
+                                                    lastTrackingUpdate = now;
+                                                }
+                                                return;
+                                            }
+                                            
+                                            console.log(`📍 移动了 ${distance.toFixed(1)} 米`);
+                                        }
+                                        
+                                        // 更新用户位置
+                                        updateUserLocationRealtime(newLocation, accuracy, locationType);
+                                        lastTrackingUpdate = now;
                                     }
-                                    
-                                    console.log(`📍 移动了 ${distance.toFixed(1)} 米`);
-                                }
-                                
-                                // 更新用户位置
-                                updateUserLocationRealtime(newLocation, accuracy, locationType);
-                                lastTrackingUpdate = now;
-                            } else {
-                                console.warn('⚠️ 高德定位失败:', result);
+                                });
+                            },
+                            function(error) {
+                                console.error('📍 GPS追踪错误:', error.code, error.message);
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 0  // 不使用缓存
                             }
-                        });
-                    }, 1000); // 每秒获取一次位置
+                        );
+                        console.log('✅ 浏览器GPS监听已启动，watchId:', locationTrackingWatchId);
+                    }
                     
-                    console.log('✅ 实时位置追踪已启动（高德融合定位，每秒更新）');
+                    console.log('✅ 实时位置追踪已启动（浏览器GPS + 高德坐标转换）');
                 });
             } else {
                 // 降级到浏览器原生GPS
