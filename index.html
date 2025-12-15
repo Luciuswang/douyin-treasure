@@ -1027,8 +1027,12 @@
         
         // 从云端加载所有宝藏
         function loadTreasuresFromCloud() {
+            console.log('☁️ 尝试从云端加载宝藏...');
+            console.log('☁️ Firebase状态:', firebaseEnabled ? '已启用' : '未启用');
+            console.log('☁️ Database状态:', database ? '已连接' : '未连接');
+            
             if (!firebaseEnabled || !database) {
-                console.warn('⚠️ Firebase未启用，无法加载云端宝藏');
+                console.warn('⚠️ Firebase未启用或未连接，无法加载云端宝藏');
                 return Promise.resolve([]);
             }
             
