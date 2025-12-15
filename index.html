@@ -409,8 +409,8 @@
         let isTrackingLocation = false;      // 是否正在追踪位置
         let lastTrackingUpdate = 0;          // 上次追踪更新时间
         let followUserLocation = true;       // 地图是否跟随用户位置
-        const TRACKING_MIN_INTERVAL = 2000;  // 追踪更新最小间隔（毫秒）
-        const TRACKING_MIN_DISTANCE = 3;     // 最小移动距离（米），小于此距离不更新
+        const TRACKING_MIN_INTERVAL = 1000;  // 追踪更新最小间隔（毫秒）- 1秒更灵敏
+        const TRACKING_MIN_DISTANCE = 2;     // 最小移动距离（米）- 2米更灵敏
 
         // 用户数据管理
         let userData = {
@@ -2357,15 +2357,30 @@
                     }
                     updateStatus(`⚠️ ${errorMsg}，实时追踪可能不稳定`, 'warning');
                 },
-                // 配置选项
+                // 配置选项 - 优化为更频繁更新
                 {
                     enableHighAccuracy: true,  // 启用高精度
-                    timeout: 10000,            // 10秒超时
-                    maximumAge: 1000           // 最多使用1秒前的缓存位置
+                    timeout: 5000,             // 5秒超时（更快响应）
+                    maximumAge: 0              // 不使用缓存，每次获取新位置
                 }
             );
             
             console.log('✅ 实时位置追踪已启动，watchId:', locationTrackingWatchId);
+            
+            // 设置定期检查，确保追踪正常运行
+            if (!window.trackingHealthCheck) {
+                window.trackingHealthCheck = setInterval(function() {
+                    if (isTrackingLocation && userLocation) {
+                        const timeSinceLastUpdate = Date.now() - lastTrackingUpdate;
+                        // 如果超过30秒没有更新，可能追踪已失效
+                        if (timeSinceLastUpdate > 30000) {
+                            console.warn('⚠️ 追踪超过30秒未更新，尝试重启...');
+                            stopLocationTracking();
+                            setTimeout(startLocationTracking, 1000);
+                        }
+                    }
+                }, 15000); // 每15秒检查一次
+            }
         }
         
         // 停止实时位置追踪
@@ -2562,9 +2577,21 @@
             if (document.hidden && isTrackingLocation) {
                 console.log('📱 页面进入后台，继续追踪...');
                 // 移动端可能会限制后台GPS，但我们保持追踪状态
-            } else if (!document.hidden && isTrackingLocation) {
-                console.log('📱 页面回到前台，恢复追踪...');
-                // 可以选择在这里强制刷新一次位置
+            } else if (!document.hidden) {
+                console.log('📱 页面回到前台');
+                
+                // 如果正在追踪，强制刷新一次位置
+                if (isTrackingLocation) {
+                    console.log('🔄 强制刷新位置...');
+                    // 重置更新时间，允许立即更新
+                    lastTrackingUpdate = 0;
+                }
+                
+                // 如果追踪已停止但在移动设备上，重新启动
+                if (!isTrackingLocation && isMobileDevice() && userLocation) {
+                    console.log('🚶 页面回到前台，重新启动追踪...');
+                    startLocationTracking();
+                }
             }
         });
 
@@ -3645,6 +3672,14 @@
                     generateNearbyTreasures();
                 }
             }, 1000);
+            
+            // 🚶 定位成功后自动启动实时位置追踪（移动设备）
+            if (isMobile && !isTrackingLocation) {
+                setTimeout(() => {
+                    console.log('🚶 移动设备自动启动实时位置追踪...');
+                    startLocationTracking();
+                }, 1500);
+            }
         }
 
 
