@@ -991,11 +991,99 @@
             }
         }
         
-        // 保存用户发布的宝藏
+        // 保存用户发布的宝藏（本地+云端）
         function saveUserPublishedTreasures() {
+            // 保存到本地
             const result = storageManager.save('user-published-treasures', userPublishedTreasures);
-            console.log('💾 保存用户宝藏:', userPublishedTreasures.length, '个');
+            console.log('💾 保存用户宝藏到本地:', userPublishedTreasures.length, '个');
             return result;
+        }
+        
+        // 保存宝藏到云端Firebase
+        function saveTreasureToCloud(treasureData) {
+            if (!firebaseEnabled || !database) {
+                console.warn('⚠️ Firebase未启用，宝藏只保存到本地');
+                return Promise.resolve(false);
+            }
+            
+            return new Promise((resolve, reject) => {
+                try {
+                    const treasureRef = database.ref(`treasures/${treasureData.id}`);
+                    treasureRef.set(treasureData, (error) => {
+                        if (error) {
+                            console.error('❌ 云端保存失败:', error);
+                            resolve(false);
+                        } else {
+                            console.log('☁️ 宝藏已保存到云端:', treasureData.title);
+                            resolve(true);
+                        }
+                    });
+                } catch (error) {
+                    console.error('❌ 云端保存异常:', error);
+                    resolve(false);
+                }
+            });
+        }
+        
+        // 从云端加载所有宝藏
+        function loadTreasuresFromCloud() {
+            if (!firebaseEnabled || !database) {
+                console.warn('⚠️ Firebase未启用，无法加载云端宝藏');
+                return Promise.resolve([]);
+            }
+            
+            return new Promise((resolve, reject) => {
+                try {
+                    const treasuresRef = database.ref('treasures');
+                    treasuresRef.once('value', (snapshot) => {
+                        const treasures = [];
+                        snapshot.forEach((child) => {
+                            const treasure = child.val();
+                            // 检查是否有效且未过期
+                            if (treasure && treasure.status === 'active') {
+                                if (treasure.settings && treasure.settings.expiresAt) {
+                                    if (new Date(treasure.settings.expiresAt) > new Date()) {
+                                        treasures.push(treasure);
+                                    }
+                                } else {
+                                    treasures.push(treasure);
+                                }
+                            }
+                        });
+                        console.log('☁️ 从云端加载了', treasures.length, '个宝藏');
+                        resolve(treasures);
+                    }, (error) => {
+                        console.error('❌ 云端加载失败:', error);
+                        resolve([]);
+                    });
+                } catch (error) {
+                    console.error('❌ 云端加载异常:', error);
+                    resolve([]);
+                }
+            });
+        }
+        
+        // 更新云端宝藏数据
+        function updateTreasureInCloud(treasureId, updates) {
+            if (!firebaseEnabled || !database) return Promise.resolve(false);
+            
+            return new Promise((resolve) => {
+                try {
+                    const treasureRef = database.ref(`treasures/${treasureId}`);
+                    treasureRef.update(updates, (error) => {
+                        if (error) {
+                            console.error('❌ 云端更新失败:', error);
+                            resolve(false);
+                        } else {
+                            console.log('☁️ 宝藏已更新到云端');
+                            resolve(true);
+                        }
+                    });
+                } catch (error) {
+                    console.error('❌ 云端更新异常:', error);
+                    resolve(false);
+                }
+            });
         }
         
         // ==================== 发布宝藏功能 ====================
@@ -1394,16 +1482,22 @@
                 status: 'active'
             };
             
-            // 保存到本地（后续可以改为API调用）
+            // 保存到本地
             userPublishedTreasures.push(treasureData);
             console.log('📦 宝藏已添加到列表，当前总数:', userPublishedTreasures.length);
             
             const saveResult = saveUserPublishedTreasures();
-            console.log('💾 保存结果:', saveResult ? '成功' : '失败');
+            console.log('💾 本地保存结果:', saveResult ? '成功' : '失败');
             
-            // 验证保存
-            const verifyData = storageManager.load('user-published-treasures');
-            console.log('🔍 验证保存的数据:', verifyData ? verifyData.length + '个宝藏' : '无数据');
+            // 保存到云端Firebase
+            saveTreasureToCloud(treasureData).then(cloudResult => {
+                if (cloudResult) {
+                    console.log('☁️ 云端保存成功，所有玩家都能看到这个宝藏！');
+                    updateStatus('🎉 宝藏已发布到云端，所有玩家都能看到！', 'success');
+                } else {
+                    console.warn('⚠️ 云端保存失败，宝藏只保存在本地');
+                }
+            });
             
             // 在地图上显示
             addUserTreasureToMap(treasureData);
@@ -1531,9 +1625,26 @@
                 box-sizing: border-box;
             `;
             
+            // 判断是否可以查看内容
+            const canViewContent = isCreator || alreadyClaimed;
+            
             let claimButtonHtml = '';
             if (isCreator) {
-                claimButtonHtml = `<div style="text-align: center; color: #999; padding: 10px;">这是你发布的宝藏</div>`;
+                claimButtonHtml = `
+                    <div style="text-align: center; padding: 10px;">
+                        <div style="color: #2196F3; font-size: 14px;">📝 这是你发布的宝藏</div>
+                        <button onclick="editTreasure('${treasureData.id}')" style="
+                            margin-top: 10px;
+                            padding: 10px 20px;
+                            background: #2196F3;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        ">✏️ 编辑宝藏</button>
+                    </div>
+                `;
             } else if (alreadyClaimed) {
                 claimButtonHtml = `<div style="text-align: center; color: #4CAF50; padding: 10px;">✅ 你已领取过此宝藏</div>`;
             } else if (canClaim) {
@@ -1551,10 +1662,21 @@
                     ">🎁 领取宝藏</button>
                 `;
             } else {
+                // 距离太远时，也显示一个"强制领取"按钮（方便测试）
                 claimButtonHtml = `
                     <div style="text-align: center; padding: 10px;">
                         <div style="color: #FF9800; font-size: 14px;">📍 距离 ${Math.round(distance)} 米</div>
                         <div style="color: #999; font-size: 12px; margin-top: 5px;">需要靠近到 ${treasureData.location.discoveryRadius} 米内才能领取</div>
+                        <button onclick="claimTreasure('${treasureData.id}')" style="
+                            margin-top: 10px;
+                            padding: 10px 20px;
+                            background: #FF9800;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        ">🎁 强制领取（测试用）</button>
                     </div>
                 `;
             }
@@ -1582,15 +1704,15 @@
                     
                     <!-- 内容 -->
                     <div style="padding: 20px;">
-                        <!-- 宝藏内容（领取后才显示完整内容） -->
+                        <!-- 宝藏内容（创建者或已领取者可以看到） -->
                         <div style="
                             background: #f9f9f9;
                             border-radius: 12px;
                             padding: 15px;
                             margin-bottom: 15px;
                         ">
-                            ${alreadyClaimed ? `
-                                <div style="color: #333; font-size: 14px; line-height: 1.6;">${treasureData.content}</div>
+                            ${canViewContent ? `
+                                <div style="color: #333; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${treasureData.content}</div>
                             ` : `
                                 <div style="color: #999; font-size: 14px; text-align: center;">
                                     🔒 领取后查看内容
@@ -1650,15 +1772,30 @@
         
         // 领取宝藏
         function claimTreasure(treasureId) {
+            console.log('🎁 尝试领取宝藏:', treasureId);
+            
             // 查找宝藏
             const treasure = userPublishedTreasures.find(t => t.id === treasureId);
             if (!treasure) {
-                alert('宝藏不存在');
+                console.error('❌ 宝藏不存在:', treasureId);
+                alert('宝藏不存在或已过期');
+                return;
+            }
+            
+            // 检查是否是自己的宝藏
+            if (treasure.creator.id === getUnifiedUserId()) {
+                alert('不能领取自己发布的宝藏哦！');
+                return;
+            }
+            
+            // 检查是否已领取
+            if (treasure.claimedBy && treasure.claimedBy.includes(getUnifiedUserId())) {
+                alert('你已经领取过这个宝藏了！');
                 return;
             }
             
             // 检查密码
-            if (treasure.settings.password) {
+            if (treasure.settings && treasure.settings.password) {
                 const inputPassword = prompt('请输入领取密码：');
                 if (inputPassword !== treasure.settings.password) {
                     alert('密码错误！');
@@ -1667,25 +1804,225 @@
             }
             
             // 检查领取次数
-            if (treasure.settings.maxClaims > 0 && treasure.stats.claims >= treasure.settings.maxClaims) {
+            if (treasure.settings && treasure.settings.maxClaims > 0 && treasure.stats.claims >= treasure.settings.maxClaims) {
                 alert('此宝藏已被领完');
                 return;
             }
             
             // 记录领取
+            if (!treasure.claimedBy) treasure.claimedBy = [];
             treasure.claimedBy.push(getUnifiedUserId());
+            if (!treasure.stats) treasure.stats = { views: 0, claims: 0 };
             treasure.stats.claims += 1;
+            
+            // 保存到本地
             saveUserPublishedTreasures();
+            
+            // 同步到云端
+            updateTreasureInCloud(treasureId, {
+                claimedBy: treasure.claimedBy,
+                stats: treasure.stats
+            });
             
             // 更新用户统计
             userData.stats.treasuresDiscovered += 1;
             saveUserData();
+            
+            console.log('✅ 宝藏领取成功:', treasure.title);
             
             // 关闭详情弹窗
             closeTreasureDetail();
             
             // 显示领取成功
             showClaimSuccessDialog(treasure);
+        }
+        
+        // 编辑宝藏
+        function editTreasure(treasureId) {
+            console.log('✏️ 编辑宝藏:', treasureId);
+            
+            const treasure = userPublishedTreasures.find(t => t.id === treasureId);
+            if (!treasure) {
+                alert('宝藏不存在');
+                return;
+            }
+            
+            // 关闭详情弹窗
+            closeTreasureDetail();
+            
+            // 创建编辑弹窗
+            const overlay = document.createElement('div');
+            overlay.id = 'edit-treasure-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    border-radius: 20px;
+                    width: 100%;
+                    max-width: 360px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                ">
+                    <div style="
+                        background: ${treasure.typeColor};
+                        padding: 20px;
+                        text-align: center;
+                        color: white;
+                    ">
+                        <div style="font-size: 40px;">${treasure.typeIcon}</div>
+                        <h3 style="margin: 10px 0 0 0;">编辑宝藏</h3>
+                    </div>
+                    
+                    <div style="padding: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">标题</label>
+                            <input type="text" id="edit-treasure-title" value="${treasure.title}" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #e0e0e0;
+                                border-radius: 10px;
+                                font-size: 14px;
+                                box-sizing: border-box;
+                            ">
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">内容</label>
+                            <textarea id="edit-treasure-content" rows="4" style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #e0e0e0;
+                                border-radius: 10px;
+                                font-size: 14px;
+                                resize: none;
+                                box-sizing: border-box;
+                            ">${treasure.content}</textarea>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="closeEditTreasure()" style="
+                                flex: 1;
+                                padding: 12px;
+                                background: #e0e0e0;
+                                color: #666;
+                                border: none;
+                                border-radius: 10px;
+                                font-size: 14px;
+                                cursor: pointer;
+                            ">取消</button>
+                            <button onclick="saveEditTreasure('${treasureId}')" style="
+                                flex: 1;
+                                padding: 12px;
+                                background: ${treasure.typeColor};
+                                color: white;
+                                border: none;
+                                border-radius: 10px;
+                                font-size: 14px;
+                                font-weight: 600;
+                                cursor: pointer;
+                            ">保存</button>
+                            <button onclick="deleteTreasure('${treasureId}')" style="
+                                padding: 12px;
+                                background: #f44336;
+                                color: white;
+                                border: none;
+                                border-radius: 10px;
+                                font-size: 14px;
+                                cursor: pointer;
+                            ">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    closeEditTreasure();
+                }
+            });
+        }
+        
+        // 关闭编辑弹窗
+        function closeEditTreasure() {
+            const overlay = document.getElementById('edit-treasure-overlay');
+            if (overlay) overlay.remove();
+        }
+        
+        // 保存编辑
+        function saveEditTreasure(treasureId) {
+            const treasure = userPublishedTreasures.find(t => t.id === treasureId);
+            if (!treasure) return;
+            
+            const newTitle = document.getElementById('edit-treasure-title').value.trim();
+            const newContent = document.getElementById('edit-treasure-content').value.trim();
+            
+            if (!newTitle || !newContent) {
+                alert('标题和内容不能为空');
+                return;
+            }
+            
+            treasure.title = newTitle;
+            treasure.content = newContent;
+            
+            // 保存到本地
+            saveUserPublishedTreasures();
+            
+            // 同步到云端
+            updateTreasureInCloud(treasureId, {
+                title: newTitle,
+                content: newContent
+            });
+            
+            closeEditTreasure();
+            updateStatus('✅ 宝藏已更新', 'success');
+            
+            // 刷新地图上的宝藏标记
+            // 找到并更新标记的标题
+            const marker = treasureMarkers.find(m => m.treasureData && m.treasureData.id === treasureId);
+            if (marker) {
+                marker.treasureData = treasure;
+            }
+        }
+        
+        // 删除宝藏
+        function deleteTreasure(treasureId) {
+            if (!confirm('确定要删除这个宝藏吗？')) return;
+            
+            // 从本地列表移除
+            const index = userPublishedTreasures.findIndex(t => t.id === treasureId);
+            if (index > -1) {
+                userPublishedTreasures.splice(index, 1);
+                saveUserPublishedTreasures();
+            }
+            
+            // 从云端删除（设置状态为deleted）
+            updateTreasureInCloud(treasureId, { status: 'deleted' });
+            
+            // 从地图移除标记
+            const markerIndex = treasureMarkers.findIndex(m => m.treasureData && m.treasureData.id === treasureId);
+            if (markerIndex > -1) {
+                treasureMarkers[markerIndex].setMap(null);
+                treasureMarkers.splice(markerIndex, 1);
+            }
+            
+            closeEditTreasure();
+            updateStatus('🗑️ 宝藏已删除', 'info');
         }
         
         // 显示领取成功弹窗
@@ -4265,8 +4602,8 @@
             }
         }
         
-        // 加载用户发布的宝藏到地图
-        function loadUserTreasuresToMap() {
+        // 加载用户发布的宝藏到地图（本地+云端）
+        async function loadUserTreasuresToMap() {
             console.log('📦 loadUserTreasuresToMap 被调用');
             console.log('📦 map:', !!map, 'userLocation:', userLocation);
             
@@ -4279,9 +4616,23 @@
                 return;
             }
             
-            // 加载已保存的宝藏
+            // 加载本地宝藏
             loadUserPublishedTreasures();
-            console.log('📦 已加载宝藏数据:', userPublishedTreasures.length, '个');
+            console.log('📦 本地宝藏数据:', userPublishedTreasures.length, '个');
+            
+            // 从云端加载宝藏
+            const cloudTreasures = await loadTreasuresFromCloud();
+            console.log('☁️ 云端宝藏数据:', cloudTreasures.length, '个');
+            
+            // 合并云端宝藏到本地列表（避免重复）
+            cloudTreasures.forEach(cloudTreasure => {
+                const exists = userPublishedTreasures.some(t => t.id === cloudTreasure.id);
+                if (!exists) {
+                    userPublishedTreasures.push(cloudTreasure);
+                }
+            });
+            
+            console.log('📦 合并后总宝藏数:', userPublishedTreasures.length, '个');
             
             // 过滤出有效的宝藏（未过期、在附近5公里内）
             const validTreasures = userPublishedTreasures.filter(treasure => {
