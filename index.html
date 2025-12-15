@@ -10203,19 +10203,32 @@
             updateDebugPanel();
         }
         
+        // 过滤掉不重要的日志关键词
+        const LOG_FILTER_KEYWORDS = ['sprite', 'animation', '动画', 'Sprite', 'Animation', '机器人', 'bot-sprite', '帧'];
+        
+        function shouldFilterLog(message) {
+            return LOG_FILTER_KEYWORDS.some(keyword => message.includes(keyword));
+        }
+        
         console.log = function(...args) {
             originalConsoleLog.apply(console, args);
-            addDebugLog('log', ...args);
+            const message = args.join(' ');
+            if (!shouldFilterLog(message)) {
+                addDebugLog('log', ...args);
+            }
         };
         
         console.error = function(...args) {
             originalConsoleError.apply(console, args);
-            addDebugLog('error', ...args);
+            addDebugLog('error', ...args);  // 错误始终显示
         };
         
         console.warn = function(...args) {
             originalConsoleWarn.apply(console, args);
-            addDebugLog('warn', ...args);
+            const message = args.join(' ');
+            if (!shouldFilterLog(message)) {
+                addDebugLog('warn', ...args);
+            }
         };
         
         function updateDebugPanel() {
@@ -10246,6 +10259,44 @@
         }
         
         console.log('🐛 调试面板已加载 - 点击右下角🐛按钮查看日志');
+        
+        // 检查localStorage状态
+        function checkLocalStorage() {
+            try {
+                const testKey = '__test__';
+                localStorage.setItem(testKey, 'test');
+                localStorage.removeItem(testKey);
+                console.log('✅ localStorage 可用');
+                
+                // 检查已保存的宝藏
+                const savedTreasures = localStorage.getItem('user-published-treasures');
+                if (savedTreasures) {
+                    const parsed = JSON.parse(savedTreasures);
+                    console.log('📦 已保存的宝藏数量:', parsed.length);
+                    parsed.forEach((t, i) => {
+                        console.log(`  ${i+1}. ${t.title} @ [${t.location.coordinates[0].toFixed(4)}, ${t.location.coordinates[1].toFixed(4)}]`);
+                    });
+                } else {
+                    console.log('📦 没有已保存的宝藏');
+                }
+                
+                // 显示localStorage使用情况
+                let totalSize = 0;
+                for (let key in localStorage) {
+                    if (localStorage.hasOwnProperty(key)) {
+                        totalSize += localStorage[key].length;
+                    }
+                }
+                console.log('💾 localStorage使用量:', (totalSize / 1024).toFixed(2) + ' KB');
+                
+            } catch (e) {
+                console.error('❌ localStorage 不可用:', e.message);
+                console.error('⚠️ 可能原因: 浏览器隐私模式、存储空间不足、或浏览器设置禁用');
+            }
+        }
+        
+        // 页面加载后检查localStorage
+        setTimeout(checkLocalStorage, 1000);
     </script>
 </body>
 </html>
