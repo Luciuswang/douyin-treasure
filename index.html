@@ -1429,35 +1429,49 @@
             
             const position = treasureData.location.coordinates;
             console.log('📍 添加用户宝藏到地图:', treasureData.title, '位置:', position);
-            const type = treasureData;
             
-            // 创建自定义宝藏图标
-            const treasureSvg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="50" height="60" viewBox="0 0 50 60">
-                    <!-- 定位针形状 -->
-                    <defs>
-                        <filter id="shadow-${treasureData.id}" x="-50%" y="-50%" width="200%" height="200%">
-                            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
-                        </filter>
-                    </defs>
-                    <path d="M25 55 C25 55 5 35 5 20 C5 9 14 0 25 0 C36 0 45 9 45 20 C45 35 25 55 25 55 Z" 
-                          fill="${type.typeColor}" stroke="white" stroke-width="2" filter="url(#shadow-${treasureData.id})"/>
-                    <circle cx="25" cy="20" r="15" fill="white" opacity="0.9"/>
-                    <text x="25" y="26" text-anchor="middle" font-size="18">${type.typeIcon}</text>
-                </svg>
+            // 使用简单的HTML内容作为标记（兼容性更好）
+            const markerContent = document.createElement('div');
+            markerContent.style.cssText = `
+                width: 40px;
+                height: 50px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                cursor: pointer;
             `;
-            const encodedSvg = encodeURIComponent(treasureSvg);
+            markerContent.innerHTML = `
+                <div style="
+                    width: 36px;
+                    height: 36px;
+                    background: ${treasureData.typeColor || '#FFB74D'};
+                    border-radius: 50% 50% 50% 0;
+                    transform: rotate(-45deg);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                    border: 2px solid white;
+                ">
+                    <span style="transform: rotate(45deg); font-size: 18px;">${treasureData.typeIcon || '📝'}</span>
+                </div>
+                <div style="
+                    width: 4px;
+                    height: 8px;
+                    background: ${treasureData.typeColor || '#FFB74D'};
+                    margin-top: -2px;
+                "></div>
+            `;
             
             const marker = new AMap.Marker({
                 position: position,
-                icon: new AMap.Icon({
-                    image: 'data:image/svg+xml;charset=utf-8,' + encodedSvg,
-                    size: new AMap.Size(50, 60),
-                    imageOffset: new AMap.Pixel(-25, -55)
-                }),
+                content: markerContent,
+                offset: new AMap.Pixel(-20, -50),
                 title: treasureData.title,
                 zIndex: 600
             });
+            
+            console.log('✅ 用户宝藏标记已创建');
             
             // 存储宝藏数据
             marker.treasureData = treasureData;
