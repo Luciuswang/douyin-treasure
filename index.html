@@ -1090,6 +1090,36 @@
             });
         }
         
+        // 同步所有本地宝藏到云端
+        async function syncLocalTreasuresToCloud() {
+            if (!firebaseEnabled || !database) {
+                console.warn('⚠️ Firebase未启用，无法同步');
+                return;
+            }
+            
+            console.log('☁️ 开始同步本地宝藏到云端...');
+            let syncCount = 0;
+            
+            for (const treasure of userPublishedTreasures) {
+                // 检查云端是否已存在
+                const treasureRef = database.ref(`treasures/${treasure.id}`);
+                const snapshot = await treasureRef.once('value');
+                
+                if (!snapshot.exists()) {
+                    // 不存在则上传
+                    await saveTreasureToCloud(treasure);
+                    syncCount++;
+                }
+            }
+            
+            if (syncCount > 0) {
+                console.log(`☁️ 已同步 ${syncCount} 个本地宝藏到云端`);
+                updateStatus(`☁️ 已同步 ${syncCount} 个宝藏到云端`, 'success');
+            } else {
+                console.log('☁️ 所有宝藏已在云端，无需同步');
+            }
+        }
+        
         // ==================== 发布宝藏功能 ====================
         
         // 当前发布宝藏的位置
@@ -4622,7 +4652,8 @@
             
             // 加载本地宝藏
             loadUserPublishedTreasures();
-            console.log('📦 本地宝藏数据:', userPublishedTreasures.length, '个');
+            const localCount = userPublishedTreasures.length;
+            console.log('📦 本地宝藏数据:', localCount, '个');
             
             // 从云端加载宝藏
             const cloudTreasures = await loadTreasuresFromCloud();
@@ -4637,6 +4668,12 @@
             });
             
             console.log('📦 合并后总宝藏数:', userPublishedTreasures.length, '个');
+            
+            // 如果有本地宝藏但云端没有，自动同步到云端
+            if (localCount > 0 && cloudTreasures.length < localCount) {
+                console.log('☁️ 检测到本地有未同步的宝藏，开始同步...');
+                syncLocalTreasuresToCloud();
+            }
             
             // 过滤出有效的宝藏（未过期、在附近5公里内）
             const validTreasures = userPublishedTreasures.filter(treasure => {
