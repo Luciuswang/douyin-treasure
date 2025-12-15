@@ -1477,21 +1477,41 @@
             marker.treasureData = treasureData;
             marker.isUserTreasure = true;
             
-            // 添加点击事件 - 显示宝藏详情
+            // 添加点击事件 - 显示宝藏详情（在标记和内容上都添加）
             marker.on('click', function() {
+                console.log('📝 点击了宝藏标记:', treasureData.title);
                 showTreasureDetail(treasureData, marker);
             });
             
+            // 也在HTML内容上添加点击事件（确保兼容性）
+            markerContent.onclick = function(e) {
+                e.stopPropagation();
+                console.log('📝 点击了宝藏内容:', treasureData.title);
+                showTreasureDetail(treasureData, marker);
+            };
+            
             map.add(marker);
             treasureMarkers.push(marker);
+            console.log('✅ 宝藏已添加到地图，当前宝藏标记数:', treasureMarkers.length);
         }
         
         // 显示宝藏详情弹窗
         function showTreasureDetail(treasureData, marker) {
+            console.log('🔍 显示宝藏详情:', treasureData.title);
+            console.log('📦 宝藏数据:', JSON.stringify(treasureData).substring(0, 200) + '...');
+            
+            // 先移除可能存在的旧弹窗
+            const existingOverlay = document.getElementById('treasure-detail-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+            
             const distance = userLocation ? calculateDistance(userLocation, treasureData.location.coordinates) : 9999;
             const canClaim = distance <= treasureData.location.discoveryRadius;
             const isCreator = treasureData.creator.id === getUnifiedUserId();
             const alreadyClaimed = treasureData.claimedBy.includes(getUnifiedUserId());
+            
+            console.log('📏 距离:', distance, '米, 可领取:', canClaim, '是创建者:', isCreator);
             
             const overlay = document.createElement('div');
             overlay.id = 'treasure-detail-overlay';
