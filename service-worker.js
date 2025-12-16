@@ -3,8 +3,8 @@
  * 提供离线缓存、后台同步等 PWA 功能
  */
 
-const CACHE_NAME = 'totofun-cache-v2';
-const RUNTIME_CACHE = 'totofun-runtime-v2';
+const CACHE_NAME = 'totofun-cache-v3';
+const RUNTIME_CACHE = 'totofun-runtime-v3';
 
 // 需要缓存的核心文件
 const CORE_ASSETS = [
