@@ -5975,9 +5975,29 @@
         // 注册 Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
+                // 检查是否需要强制清除缓存
+                const clearCache = new URLSearchParams(window.location.search).get('clearCache');
+                if (clearCache === 'true') {
+                    console.log('🗑️ 强制清除所有缓存...');
+                    caches.keys().then(cacheNames => {
+                        return Promise.all(
+                            cacheNames.map(cacheName => caches.delete(cacheName))
+                        );
+                    }).then(() => {
+                        console.log('✅ 缓存已清除');
+                        // 移除 URL 参数并刷新
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        window.location.reload(true);
+                    });
+                    return;
+                }
+                
+                navigator.serviceWorker.register('./service-worker.js?v=2')
                     .then((registration) => {
                         console.log('✅ Service Worker 注册成功:', registration.scope);
+                        
+                        // 强制更新检查
+                        registration.update();
                         
                         // 检查更新
                         registration.addEventListener('updatefound', () => {
@@ -5986,12 +6006,12 @@
                             
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('✨ 新版本可用！');
-                                    // 可以提示用户刷新页面
-                                    if (confirm('发现新版本，是否立即更新？')) {
-                                        newWorker.postMessage({ type: 'SKIP_WAITING' });
-                                        window.location.reload();
-                                    }
+                                    console.log('✨ 新版本可用！自动更新...');
+                                    // 自动更新，不再询问
+                                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                    setTimeout(() => {
+                                        window.location.reload(true);
+                                    }, 1000);
                                 }
                             });
                         });
@@ -6002,7 +6022,8 @@
                 
                 // 监听 Service Worker 控制权变化
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    console.log('🔄 Service Worker 已更新');
+                    console.log('🔄 Service Worker 已更新，刷新页面...');
+                    window.location.reload(true);
                 });
             });
         }

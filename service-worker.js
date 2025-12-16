@@ -3,8 +3,8 @@
  * 提供离线缓存、后台同步等 PWA 功能
  */
 
-const CACHE_NAME = 'totofun-cache-v1';
-const RUNTIME_CACHE = 'totofun-runtime-v1';
+const CACHE_NAME = 'totofun-cache-v2';
+const RUNTIME_CACHE = 'totofun-runtime-v2';
 
 // 需要缓存的核心文件
 const CORE_ASSETS = [
@@ -70,18 +70,39 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
-    // HTML 请求：网络优先策略
-    if (request.headers.get('accept').includes('text/html')) {
+    // 跳过 API 请求和外部资源
+    if (url.pathname.startsWith('/api/') || 
+        url.hostname.includes('github.com') ||
+        url.hostname.includes('deepseek.com') ||
+        url.hostname.includes('firebase')) {
+        return;
+    }
+    
+    // HTML 请求：网络优先策略（带超时）
+    if (request.headers.get('accept')?.includes('text/html')) {
         event.respondWith(
-            fetch(request)
+            Promise.race([
+                fetch(request, { 
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    }
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('网络超时')), 5000)
+                )
+            ])
                 .then((response) => {
-                    const responseClone = response.clone();
-                    caches.open(RUNTIME_CACHE).then((cache) => {
-                        cache.put(request, responseClone);
-                    });
+                    if (response && response.ok) {
+                        const responseClone = response.clone();
+                        caches.open(RUNTIME_CACHE).then((cache) => {
+                            cache.put(request, responseClone);
+                        });
+                    }
                     return response;
                 })
                 .catch(() => {
+                    console.log('使用缓存版本');
                     return caches.match(request);
                 })
         );
