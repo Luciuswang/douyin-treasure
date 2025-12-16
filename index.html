@@ -383,10 +383,15 @@
                     console.log('✅ Firebase连接成功！实时通信已启用');
                     
                     // 初始化 Storage（图片上传）
+                    // 注意：Storage 需要 Blaze（付费）计划才能使用
+                    // 目前禁用 Storage，使用 Base64 存储图片到 Realtime Database
                     try {
-                        storage = firebase.storage();
-                        storageEnabled = true;
-                        console.log('✅ Firebase Storage 已启用，可上传图片');
+                        // 暂时禁用 Storage，直接使用 Base64
+                        // 如果将来升级 Blaze 计划，可以取消注释下面的代码
+                        // storage = firebase.storage();
+                        // storageEnabled = true;
+                        storageEnabled = false;
+                        console.log('📸 图片将以 Base64 存储到数据库（Storage 已禁用）');
                     } catch (storageError) {
                         console.warn('⚠️ Firebase Storage 初始化失败:', storageError);
                         storageEnabled = false;
