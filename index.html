@@ -1145,6 +1145,10 @@
         // 当前发布宝藏的位置
         let publishTreasureLocation = null;
         
+        // 临时保存表单数据（用于位置选择后恢复）
+        let tempFormData = null;
+        let isPickingLocation = false;  // 是否正在选择位置
+        
         // 显示发布宝藏弹窗
         function showPublishTreasureDialog() {
             if (!userLocation) {
@@ -1152,9 +1156,14 @@
                 return;
             }
             
-            // 默认使用当前位置
-            publishTreasureLocation = [...userLocation];
-            console.log('📤 打开发布宝藏弹窗，当前位置:', publishTreasureLocation);
+            // 只有不是从位置选择返回时，才重置位置
+            if (!isPickingLocation) {
+                publishTreasureLocation = [...userLocation];
+                tempFormData = null;
+            }
+            isPickingLocation = false;
+            
+            console.log('📤 打开发布宝藏弹窗，位置:', publishTreasureLocation);
             
             // 创建弹窗
             const overlay = document.createElement('div');
@@ -1728,9 +1737,26 @@
         
         // 在地图上选择位置
         function pickLocationOnMap() {
-            closePublishTreasureDialog();
+            // 保存当前表单数据
+            tempFormData = {
+                title: document.getElementById('treasure-title')?.value || '',
+                content: document.getElementById('treasure-content')?.value || '',
+                expiry: document.getElementById('treasure-expiry')?.value || '7',
+                maxClaims: document.getElementById('treasure-max-claims')?.value || '0',
+                password: document.getElementById('treasure-password')?.value || '',
+                treasureType: selectedTreasureType,
+                imageBase64: selectedImageBase64  // 保存图片
+            };
             
-            updateStatus('👆 点击地图选择宝藏位置', 'info');
+            isPickingLocation = true;
+            
+            // 关闭弹窗但不清理图片
+            const overlay = document.getElementById('publish-treasure-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+            
+            updateStatus('👆 点击地图选择宝藏位置（点击任意位置）', 'info');
             
             // 进入位置选择模式
             const pickHandler = function(e) {
@@ -1742,12 +1768,52 @@
                 // 重新打开发布弹窗
                 setTimeout(() => {
                     showPublishTreasureDialog();
-                    // 更新位置显示
+                    
+                    // 恢复表单数据
+                    if (tempFormData) {
+                        const titleInput = document.getElementById('treasure-title');
+                        const contentInput = document.getElementById('treasure-content');
+                        const expirySelect = document.getElementById('treasure-expiry');
+                        const maxClaimsSelect = document.getElementById('treasure-max-claims');
+                        const passwordInput = document.getElementById('treasure-password');
+                        
+                        if (titleInput) titleInput.value = tempFormData.title;
+                        if (contentInput) {
+                            contentInput.value = tempFormData.content;
+                            // 更新字数统计
+                            const counter = document.getElementById('content-counter');
+                            if (counter) counter.textContent = tempFormData.content.length;
+                        }
+                        if (expirySelect) expirySelect.value = tempFormData.expiry;
+                        if (maxClaimsSelect) maxClaimsSelect.value = tempFormData.maxClaims;
+                        if (passwordInput) passwordInput.value = tempFormData.password;
+                        
+                        // 恢复宝藏类型
+                        if (tempFormData.treasureType) {
+                            selectTreasureType(tempFormData.treasureType.id);
+                        }
+                        
+                        // 恢复图片
+                        if (tempFormData.imageBase64) {
+                            selectedImageBase64 = tempFormData.imageBase64;
+                            const previewContainer = document.getElementById('image-preview-container');
+                            const preview = document.getElementById('image-preview');
+                            const uploadArea = document.getElementById('image-upload-area');
+                            
+                            if (preview && previewContainer && uploadArea) {
+                                preview.src = selectedImageBase64;
+                                previewContainer.style.display = 'block';
+                                uploadArea.style.display = 'none';
+                            }
+                        }
+                    }
+                    
+                    // 更新位置显示为选择的位置
                     const locationText = document.getElementById('publish-location-text');
                     if (locationText) {
-                        locationText.textContent = `${publishTreasureLocation[1].toFixed(5)}, ${publishTreasureLocation[0].toFixed(5)}`;
+                        locationText.innerHTML = `<span style="color: #4CAF50; font-weight: 600;">📍 已选择新位置</span><br>${publishTreasureLocation[1].toFixed(5)}, ${publishTreasureLocation[0].toFixed(5)}`;
                     }
-                }, 500);
+                }, 300);
             };
             
             map.on('click', pickHandler);
@@ -1963,6 +2029,8 @@
         // 显示宝藏详情弹窗
         function showTreasureDetail(treasureData, marker) {
             console.log('🔍 显示宝藏详情:', treasureData.title);
+            console.log('🔍 宝藏数据:', JSON.stringify(treasureData, null, 2).substring(0, 500));
+            console.log('🖼️ 图片数据:', treasureData.image ? (treasureData.image.substring(0, 100) + '...') : '无图片');
             
             try {
                 // 先移除可能存在的旧弹窗
@@ -1985,6 +2053,9 @@
                 const hasPassword = treasureData.settings.password && treasureData.settings.password.length > 0;
                 
                 console.log('📏 距离:', Math.round(distance), '米, 可领取:', canClaim, '是创建者:', isCreator, '有密码:', hasPassword);
+                console.log('🔑 当前用户ID:', getUnifiedUserId());
+                console.log('🔑 宝藏创建者ID:', treasureData.creator.id);
+                console.log('🔑 ID是否匹配:', treasureData.creator.id === getUnifiedUserId());
             
             const overlay = document.createElement('div');
             overlay.id = 'treasure-detail-overlay';
