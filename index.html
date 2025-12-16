@@ -363,13 +363,27 @@
             return false;
         }
         
-        // 初始化 Firebase
+        // 初始化 Firebase（国内网络优化版）
         async function initFirebase() {
+            console.log('🔥 开始初始化 Firebase（后台模式）...');
+            
+            // 快速检测网络连通性
+            try {
+                await Promise.race([
+                    fetch('https://www.gstatic.com/generate_204', { mode: 'no-cors' }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1000))
+                ]);
+            } catch (error) {
+                console.log('💡 检测到网络限制，跳过 Firebase 初始化，使用纯本地模式');
+                firebaseEnabled = false;
+                return;
+            }
+            
             // 先尝试加载 SDK
             const loaded = await loadFirebaseSDK();
             
             if (!loaded) {
-                console.log('💡 Firebase 不可用，将使用本地模式');
+                console.log('💡 Firebase SDK 加载失败，将使用本地模式');
                 firebaseEnabled = false;
                 return;
             }
@@ -379,6 +393,13 @@
                 if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && typeof firebase !== 'undefined') {
                     firebaseApp = firebase.initializeApp(firebaseConfig);
                     database = firebase.database();
+                    
+                    // 测试连接（带超时）
+                    await Promise.race([
+                        database.ref('.info/connected').once('value'),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), 3000))
+                    ]);
+                    
                     firebaseEnabled = true;
                     console.log('✅ Firebase连接成功！实时通信已启用');
                     
@@ -412,14 +433,19 @@
             }
         }
         
-        // 页面加载后异步初始化 Firebase（不阻塞主要功能）
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                // 延迟加载，确保不影响主要功能
-                setTimeout(initFirebase, 100);
-            });
+        // 页面加载后异步初始化 Firebase（国内网络优化：默认禁用）
+        if (ENABLE_FIREBASE) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    // 延迟加载，确保不影响主要功能
+                    setTimeout(initFirebase, 5000);  // 延迟5秒，避免阻塞页面
+                });
+            } else {
+                setTimeout(initFirebase, 5000);
+            }
         } else {
-            setTimeout(initFirebase, 100);
+            console.log('💡 Firebase 已禁用（国内网络优化），使用纯本地模式');
+            firebaseEnabled = false;
         }
         
         // ==================== 全局变量 ====================
