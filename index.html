@@ -1848,6 +1848,10 @@
             const maxClaims = parseInt(document.getElementById('treasure-max-claims').value);
             const password = document.getElementById('treasure-password').value.trim();
             
+            // ⚠️ 重要：在关闭弹窗前保存图片数据（因为关闭弹窗会清理图片）
+            const imageToUpload = selectedImageBase64;
+            console.log('📸 图片数据:', imageToUpload ? `有图片 (${(imageToUpload.length / 1024).toFixed(1)}KB)` : '无图片');
+            
             console.log('📝 表单数据:', { title, content, expiry, maxClaims, hasPassword: !!password });
             
             // 验证
@@ -1902,17 +1906,19 @@
             
             // 处理图片上传
             async function finishPublish() {
-                // 如果有图片，先上传
-                if (selectedImageBase64) {
-                    console.log('📸 正在上传图片...');
-                    updateStatus('📸 正在上传图片...', 'info');
+                // 如果有图片，先上传（使用保存的 imageToUpload，因为 selectedImageBase64 可能已被清理）
+                if (imageToUpload) {
+                    console.log('📸 正在处理图片...');
+                    updateStatus('📸 正在处理图片...', 'info');
                     
-                    const uploadResult = await uploadImageToStorage(selectedImageBase64, treasureId);
+                    const uploadResult = await uploadImageToStorage(imageToUpload, treasureId);
                     if (uploadResult.success) {
                         treasureData.image = uploadResult.url;
                         treasureData.imageIsBase64 = uploadResult.isBase64;
-                        console.log('✅ 图片处理完成，isBase64:', uploadResult.isBase64);
+                        console.log('✅ 图片处理完成，isBase64:', uploadResult.isBase64, '大小:', (uploadResult.url.length / 1024).toFixed(1) + 'KB');
                     }
+                } else {
+                    console.log('📸 没有图片需要处理');
                 }
                 
                 // 保存到本地
@@ -2122,13 +2128,32 @@
                 const claimBtnStyle = canClaim 
                     ? 'background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);'
                     : 'background: #FF9800;';
-                const claimBtnText = canClaim ? '🎁 领取宝藏' : `🎁 领取（距离${Math.round(distance)}米）`;
+                const claimBtnText = canClaim ? '🎁 领取宝藏' : `🎁 靠近后领取（距离${Math.round(distance)}米）`;
+                
+                // 密码输入框（如果需要密码）
+                const passwordInputHtml = hasPassword ? `
+                    <div style="margin-bottom: 12px;">
+                        <input type="text" id="claim-password-input" placeholder="请输入领取密码" 
+                            style="
+                                width: 100%;
+                                padding: 12px;
+                                border: 2px solid #9C27B0;
+                                border-radius: 8px;
+                                font-size: 14px;
+                                text-align: center;
+                                box-sizing: border-box;
+                                outline: none;
+                            "
+                        />
+                    </div>
+                ` : '';
                 
                 claimButtonHtml = `
                     <div style="text-align: center; padding: 10px;">
                         ${passwordHint}
-                        ${!canClaim ? `<div style="color: #999; font-size: 12px; margin-bottom: 10px;">需要靠近到 ${discoveryRadius} 米内</div>` : ''}
-                        <button onclick="claimTreasure('${treasureData.id}')" style="
+                        ${!canClaim ? `<div style="color: #999; font-size: 12px; margin-bottom: 10px;">需要靠近到 ${discoveryRadius} 米内才能领取</div>` : ''}
+                        ${canClaim ? passwordInputHtml : ''}
+                        <button onclick="claimTreasure('${treasureData.id}', ${hasPassword})" style="
                             width: 100%;
                             padding: 14px;
                             ${claimBtnStyle}
@@ -2138,7 +2163,8 @@
                             font-size: 16px;
                             font-weight: 600;
                             cursor: pointer;
-                        ">${claimBtnText}</button>
+                            ${!canClaim ? 'opacity: 0.7;' : ''}
+                        " ${!canClaim ? 'disabled' : ''}>${claimBtnText}</button>
                     </div>
                 `;
             }
@@ -2267,8 +2293,8 @@
         }
         
         // 领取宝藏
-        function claimTreasure(treasureId) {
-            console.log('🎁 尝试领取宝藏:', treasureId);
+        function claimTreasure(treasureId, hasPassword) {
+            console.log('🎁 尝试领取宝藏:', treasureId, '需要密码:', hasPassword);
             
             // 查找宝藏
             const treasure = userPublishedTreasures.find(t => t.id === treasureId);
@@ -2292,9 +2318,21 @@
             
             // 检查密码
             if (treasure.settings && treasure.settings.password) {
-                const inputPassword = prompt('请输入领取密码：');
+                const passwordInput = document.getElementById('claim-password-input');
+                const inputPassword = passwordInput ? passwordInput.value.trim() : '';
+                
+                if (!inputPassword) {
+                    alert('请输入领取密码！');
+                    if (passwordInput) passwordInput.focus();
+                    return;
+                }
+                
                 if (inputPassword !== treasure.settings.password) {
-                    alert('密码错误！');
+                    alert('密码错误！请重新输入');
+                    if (passwordInput) {
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
                     return;
                 }
             }
