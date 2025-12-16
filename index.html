@@ -252,6 +252,43 @@
     </div>
 
     <script>
+        // ==================== 全局错误处理（防止白屏） ====================
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('全局错误:', msg, url, line, col, error);
+            // 显示错误提示而不是白屏
+            if (document.body && !document.getElementById('error-banner')) {
+                var banner = document.createElement('div');
+                banner.id = 'error-banner';
+                banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff5722;color:white;padding:15px;text-align:center;z-index:99999;font-size:14px;';
+                banner.innerHTML = '⚠️ 页面加载出错，请刷新重试或更新浏览器<br><button onclick="location.reload(true)" style="margin-top:10px;padding:8px 20px;background:white;color:#ff5722;border:none;border-radius:5px;cursor:pointer;">刷新页面</button>';
+                document.body.insertBefore(banner, document.body.firstChild);
+            }
+            return false;
+        };
+        
+        // ==================== iOS Safari 兼容性检测 ====================
+        (function() {
+            // 检测是否支持可选链语法 ?.
+            try {
+                eval('var test = {a:{b:1}}; test?.a?.b;');
+            } catch(e) {
+                // 浏览器不支持 ES2020 语法
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui,sans-serif;">' +
+                        '<h2 style="color:#ff5722;">⚠️ 浏览器版本过低</h2>' +
+                        '<p style="color:#666;margin:20px 0;">您的浏览器不支持本网站所需的功能。</p>' +
+                        '<p style="color:#333;"><strong>请更新您的浏览器或操作系统：</strong></p>' +
+                        '<ul style="text-align:left;display:inline-block;color:#666;">' +
+                        '<li>iPhone: 升级到 iOS 14 或更高版本</li>' +
+                        '<li>安卓: 升级 Chrome 或使用最新版浏览器</li>' +
+                        '</ul>' +
+                        '<p style="margin-top:20px;"><a href="https://www.apple.com/ios/" style="color:#4FC3F7;">了解如何更新 iOS</a></p>' +
+                        '</div>';
+                });
+                throw new Error('浏览器不支持 ES2020 语法');
+            }
+        })();
+        
         // ==================== Firebase配置 ====================
         // ⚠️ 重要：请先按照 FIREBASE_SETUP.md 中的说明配置Firebase
         // 然后在这里填入你的Firebase配置信息
@@ -6010,7 +6047,7 @@
                     return;
                 }
                 
-                navigator.serviceWorker.register('./service-worker.js?v=2')
+                navigator.serviceWorker.register('./service-worker.js?v=3')
                     .then((registration) => {
                         console.log('✅ Service Worker 注册成功:', registration.scope);
                         
