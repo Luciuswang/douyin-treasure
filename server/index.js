@@ -84,15 +84,8 @@ mongoose.connect(mongoUri, mongooseOptions)
 // 中间件
 app.use(helmet({
     crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-            scriptSrc: ["'self'", "https:"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https:", "wss:"],
-        },
-    },
+    // 生产环境托管静态页面时禁用 CSP（页面包含内联脚本）
+    contentSecurityPolicy: false,
 }));
 
 app.use(compression());
