@@ -69,6 +69,9 @@ let userData = {
 
 // ==================== API 配置 ====================
 const API_CONFIG = {
+    // 腾讯云服务器地址（国内访问）
+    TENCENT_API_URL: 'http://1.15.11.140:3001',
+    // Railway 云服务地址（海外访问）
     CLOUD_API_URL: 'https://totofun-server-production.up.railway.app',
     
     // API 端点
@@ -82,25 +85,33 @@ const API_CONFIG = {
     },
     
     get BASE_URL() {
+        // 1. 优先使用用户手动设置的地址
         const localStorageApiUrl = localStorage.getItem('API_BASE_URL');
         if (localStorageApiUrl && localStorageApiUrl !== 'your-api-domain.com') {
             return localStorageApiUrl;
         }
         
+        // 2. 使用全局变量设置的地址
         if (window.API_BASE_URL && window.API_BASE_URL !== 'your-api-domain.com') {
             return window.API_BASE_URL;
         }
         
-        if (this.CLOUD_API_URL && this.CLOUD_API_URL !== 'your-api-domain.com') {
-            return this.CLOUD_API_URL;
-        }
-        
+        // 3. 本地开发环境
         const hostname = window.location.hostname;
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
             return 'http://localhost:5000';
         }
         
-        // GitHub Pages 或其他静态托管
+        // 4. 自动检测：国内用户优先使用腾讯云
+        // 通过检测时区或语言判断
+        const isChina = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Shanghai' ||
+                        navigator.language.startsWith('zh');
+        
+        if (isChina && this.TENCENT_API_URL) {
+            return this.TENCENT_API_URL;
+        }
+        
+        // 5. 海外用户使用 Railway
         return this.CLOUD_API_URL || 'http://localhost:5000';
     }
 };
