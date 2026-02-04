@@ -154,23 +154,14 @@ app.use(cors({
 }));
 
 // 限流
-// 在 Vercel 环境中，使用标准化的 keyGenerator 来处理代理头
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15分钟
     max: 100, // 限制每个IP 15分钟内最多100个请求
     message: '请求过于频繁，请稍后再试',
-    // 在 Serverless 环境中正确处理代理头
     standardHeaders: true,
     legacyHeaders: false,
-    // 使用自定义 keyGenerator 来处理 Forwarded 头
-    keyGenerator: (req) => {
-        // 优先使用 X-Forwarded-For（Vercel 会设置）
-        return req.headers['x-forwarded-for']?.split(',')[0] || 
-               req.headers['x-real-ip'] || 
-               req.ip || 
-               req.socket.remoteAddress || 
-               'unknown';
-    }
+    // 禁用 IPv6 验证（避免 ERR_ERL_KEY_GEN_IPV6 错误）
+    validate: { xForwardedForHeader: false, ip: false }
 });
 app.use('/api/', limiter);
 
@@ -204,14 +195,6 @@ if (process.env.NODE_ENV === 'production') {
     app.use('/src', express.static(path.join(__dirname, '..', 'src')));
     app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
     app.use(express.static(path.join(__dirname, '..')));
-    
-    // 所有非API请求返回 index.html
-    app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api/')) {
-            return next();
-        }
-        res.sendFile(path.join(__dirname, '..', 'index.html'));
-    });
 }
 
 // WebSocket处理（仅在非Serverless环境中）
@@ -227,6 +210,10 @@ app.use(errorHandler);
 
 // 404处理（必须在所有路由之后）
 app.use((req, res) => {
+    // 生产环境：非API请求返回 index.html（SPA fallback）
+    if (process.env.NODE_ENV === 'production' && !req.path.startsWith('/api/')) {
+        return res.sendFile(path.join(__dirname, '..', 'index.html'));
+    }
     res.status(404).json({
         success: false,
         message: '接口不存在',
