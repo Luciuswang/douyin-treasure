@@ -197,6 +197,23 @@ app.use('/api/ai', require('./routes/ai')); // AI代理路由（不需要认证�
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
 
+// 托管前端静态文件（生产环境）
+const path = require('path');
+if (process.env.NODE_ENV === 'production') {
+    // 静态资源
+    app.use('/src', express.static(path.join(__dirname, '..', 'src')));
+    app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
+    app.use(express.static(path.join(__dirname, '..')));
+    
+    // 所有非API请求返回 index.html
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) {
+            return next();
+        }
+        res.sendFile(path.join(__dirname, '..', 'index.html'));
+    });
+}
+
 // WebSocket处理（仅在非Serverless环境中）
 if (io) {
     io.on('connection', (socket) => {
