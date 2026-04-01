@@ -1,4 +1,4 @@
-const AMAP_KEY = import.meta.env.VITE_AMAP_KEY || '4a8a0168d872e89fbc6b4d8a27a85e42'
+const AMAP_KEY = import.meta.env.VITE_AMAP_KEY || 'a4fdcddda4024a6a4df12431a7e6c536'
 const AMAP_VERSION = '2.0'
 let loadPromise = null
 
