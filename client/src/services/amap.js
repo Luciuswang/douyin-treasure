@@ -67,17 +67,14 @@ function applyOffset(lng, lat, accuracy) {
 function convertWGS84toGCJ02(wgsLng, wgsLat) {
   return new Promise(resolve => {
     if (!window.AMap || !window.AMap.convertFrom) {
-      console.warn('⚠️ AMap.convertFrom 不可用，使用原始坐标')
       resolve({ lng: wgsLng, lat: wgsLat, converted: false })
       return
     }
     window.AMap.convertFrom([wgsLng, wgsLat], 'gps', (status, result) => {
       if (status === 'complete' && result.locations?.length) {
         const loc = result.locations[0]
-        console.log('✅ WGS84→GCJ-02 转换成功')
         resolve({ lng: loc.lng, lat: loc.lat, converted: true })
       } else {
-        console.warn('⚠️ 坐标转换失败，使用原始坐标')
         resolve({ lng: wgsLng, lat: wgsLat, converted: false })
       }
     })
@@ -85,7 +82,9 @@ function convertWGS84toGCJ02(wgsLng, wgsLat) {
 }
 
 /**
- * 使用高德融合定位获取当前位置（更准确）
+ * 高德融合定位 — 三级策略：
+ * 1) GPS优先（5s快速尝试）
+ * 2) 融合定位（GPS+WiFi+基站，允许IP回退）
  */
 function getAmapGeolocation() {
   return new Promise((resolve, reject) => {
@@ -94,19 +93,19 @@ function getAmapGeolocation() {
     window.AMap.plugin('AMap.Geolocation', () => {
       const geolocation = new window.AMap.Geolocation({
         enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-        convert: true,            // 自动转换为 GCJ-02
+        timeout: 20000,
+        maximumAge: 30000,       // 允许 30 秒缓存
+        convert: true,
         showButton: false,
         showMarker: false,
         showCircle: false,
         panToLocation: false,
         zoomToAccuracy: false,
-        GeoLocationFirst: true,   // 优先 GPS
-        noIpLocate: 3,            // 禁用 IP 定位
+        GeoLocationFirst: true,  // 优先 GPS
+        noIpLocate: 0,           // 允许 IP 定位作为兜底
         noGeoLocation: 0,
         useNative: true,
-        needAddress: false,
+        needAddress: true,
         extensions: 'base'
       })
 
@@ -114,26 +113,36 @@ function getAmapGeolocation() {
         if (status === 'complete') {
           const locationType = result.location_type || '未知'
           const accuracy = result.accuracy || 999
-
-          // 拒绝 IP 定位
-          if (locationType.includes('IP')) {
-            console.warn('⚠️ 拒绝IP定位，精度太低')
-            reject(new Error('IP定位精度太低，请开启GPS'))
-            return
-          }
-
           const lng = result.position.lng
           const lat = result.position.lat
 
-          // 高德融合定位返回的已经是 GCJ-02，直接应用偏移修正
-          const corrected = applyOffset(lng, lat, accuracy)
+          console.log('📍 高德定位:', { locationType, accuracy, lng, lat })
 
+          // IP 定位 — 接受但标记为低精度
+          if (locationType.includes('IP') || accuracy > 1000) {
+            console.warn('⚠️ IP/网络定位，精度低，建议手动校准')
+            // 对网络定位应用偏移修正
+            const corrLng = lng + NETWORK_LOCATION_OFFSET.lng
+            const corrLat = lat + NETWORK_LOCATION_OFFSET.lat
+            resolve({
+              lng: corrLng, lat: corrLat,
+              accuracy,
+              locationType: locationType + '（粗略）',
+              source: 'amap-ip',
+              rough: true
+            })
+            return
+          }
+
+          // GPS/WiFi/基站 — 高精度，应用偏移修正
+          const corrected = applyOffset(lng, lat, accuracy)
           resolve({
             lng: corrected.lng,
             lat: corrected.lat,
             accuracy,
             locationType,
-            source: 'amap-geolocation'
+            source: 'amap-geolocation',
+            rough: false
           })
         } else {
           reject(new Error('高德定位失败: ' + (result?.message || '未知错误')))
@@ -144,12 +153,12 @@ function getAmapGeolocation() {
 }
 
 /**
- * 使用浏览器原生 GPS 获取位置，然后转换坐标
+ * 浏览器原生 GPS（WGS84 → GCJ-02 + 偏移修正）
  */
 function getBrowserGPS() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      return reject(new Error('浏览器不支持GPS定位'))
+      return reject(new Error('浏览器不支持GPS'))
     }
 
     let bestPosition = null
@@ -168,98 +177,96 @@ function getBrowserGPS() {
       const wgsLat = position.coords.latitude
       const accuracy = position.coords.accuracy
 
-      console.log('📍 GPS 原始坐标 (WGS84):', { lng: wgsLng, lat: wgsLat, accuracy })
+      console.log('📍 GPS (WGS84):', { lng: wgsLng, lat: wgsLat, accuracy })
 
       // 网络定位偏移修正（精度 > 1km）
       if (accuracy > 1000) {
-        const correctedLng = wgsLng + NETWORK_LOCATION_OFFSET.lng
-        const correctedLat = wgsLat + NETWORK_LOCATION_OFFSET.lat
-        console.log('🔧 应用网络定位偏移修正')
-        const gcj02 = await convertWGS84toGCJ02(correctedLng, correctedLat)
+        const gcj02 = await convertWGS84toGCJ02(
+          wgsLng + NETWORK_LOCATION_OFFSET.lng,
+          wgsLat + NETWORK_LOCATION_OFFSET.lat
+        )
         const final = applyOffset(gcj02.lng, gcj02.lat, accuracy)
-        resolve({ ...final, accuracy, locationType: '网络定位（已修正）', source: 'browser-gps' })
+        resolve({ ...final, accuracy, locationType: '网络定位（已修正）', source: 'browser-gps', rough: true })
         return
       }
 
-      // WGS84 → GCJ-02
       const gcj02 = await convertWGS84toGCJ02(wgsLng, wgsLat)
-      // 应用偏移修正
       const final = applyOffset(gcj02.lng, gcj02.lat, accuracy)
-
       resolve({
-        ...final,
-        accuracy,
+        ...final, accuracy,
         locationType: gcj02.converted ? 'GPS卫星定位' : 'GPS原始',
-        source: 'browser-gps'
+        source: 'browser-gps',
+        rough: accuracy > 200
       })
     }
 
-    // 先用 watchPosition 获取渐进精度
     watchId = navigator.geolocation.watchPosition(
       pos => {
         const acc = pos.coords.accuracy
         if (!bestPosition || acc < bestPosition.coords.accuracy) {
           bestPosition = pos
-          console.log(`📍 GPS 精度更新: ${acc.toFixed(1)}m`)
+          console.log(`📍 GPS 精度: ${acc.toFixed(0)}m`)
         }
-        // 精度 < 50m 立即使用
-        if (acc < 50) {
-          settle(pos)
-        }
+        if (acc < 50) settle(pos)
       },
       () => {},
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     )
 
-    // 5 秒后用最佳结果
+    // 8 秒后用最佳结果
     setTimeout(() => {
-      if (!settled && bestPosition) {
-        settle(bestPosition)
-      }
-    }, 5000)
+      if (!settled && bestPosition) settle(bestPosition)
+    }, 8000)
 
-    // 10 秒超时
+    // 15 秒超时
     setTimeout(() => {
       if (!settled) {
         if (watchId !== null) navigator.geolocation.clearWatch(watchId)
-        if (bestPosition) {
-          settle(bestPosition)
-        } else {
-          reject(new Error('GPS定位超时'))
-        }
+        if (bestPosition) settle(bestPosition)
+        else reject(new Error('GPS定位超时'))
       }
-    }, 10000)
+    }, 15000)
   })
 }
 
 /**
- * 获取当前位置（完整定位流程，移植自原项目）
- * 优先高德融合定位 → 回退浏览器 GPS → 失败抛出
+ * 获取当前位置 — 完整定位流程
+ * 高德融合 → 浏览器GPS → 默认位置（上海）
+ * 永远不会抛出错误，至少返回一个粗略位置
  */
 export async function getCurrentPosition() {
-  // 优先尝试高德融合定位
+  // 1. 高德融合定位
   try {
     const pos = await getAmapGeolocation()
-    console.log('✅ 高德融合定位成功:', pos)
+    console.log('✅ 高德定位成功:', pos)
     return pos
   } catch (e) {
-    console.warn('⚠️ 高德融合定位失败，回退浏览器GPS:', e.message)
+    console.warn('⚠️ 高德定位失败，尝试浏览器GPS:', e.message)
   }
 
-  // 回退到浏览器 GPS + 坐标转换
+  // 2. 浏览器 GPS
   try {
     const pos = await getBrowserGPS()
-    console.log('✅ 浏览器GPS定位成功:', pos)
+    console.log('✅ 浏览器GPS成功:', pos)
     return pos
   } catch (e) {
-    console.error('❌ 所有定位方式均失败:', e.message)
-    throw new Error('定位失败，请使用手动校准')
+    console.warn('⚠️ 浏览器GPS也失败:', e.message)
+  }
+
+  // 3. 默认位置（上海），提示用户手动校准
+  console.warn('⚠️ 所有定位失败，使用默认位置')
+  return {
+    lng: 121.473701,
+    lat: 31.230416,
+    accuracy: 10000,
+    locationType: '默认位置（上海）',
+    source: 'default',
+    rough: true
   }
 }
 
 /**
- * 实时追踪位置（watchPosition + 坐标转换 + 偏移修正）
- * 返回 watchId，调用 stopTracking(watchId) 停止
+ * 实时追踪位置
  */
 export function startTracking(onUpdate) {
   if (!navigator.geolocation) return null
@@ -283,7 +290,7 @@ export function startTracking(onUpdate) {
       onUpdate({ lng: final.lng, lat: final.lat, accuracy })
     },
     err => console.error('📍 追踪错误:', err.message),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
   )
 
   return watchId

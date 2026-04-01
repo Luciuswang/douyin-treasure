@@ -59,27 +59,22 @@ function onMapReady() {
 
 async function relocate() {
   locationStatus.value = '定位中...'
-  try {
-    const pos = await getCurrentPosition()
-    mapStore.setLocation(pos)
-    mapStore.setCenter(pos)
 
-    const accText = pos.accuracy ? `${Math.round(pos.accuracy)}m` : ''
-    const srcText = pos.locationType || ''
-    locationStatus.value = `定位成功 ${accText} ${srcText}`
+  const pos = await getCurrentPosition()
+  mapStore.setLocation(pos)
+  mapStore.setCenter(pos)
 
-    if (!isMobileDevice() && pos.accuracy > 200) {
-      locationStatus.value = `PC定位精度较低（${Math.round(pos.accuracy)}m），建议手动校准`
-    }
+  // 加载附近宝藏
+  treasureStore.loadNearby(pos.lat, pos.lng).catch(() => {})
 
-    // 加载宝藏
-    treasureStore.loadNearby(pos.lat, pos.lng).catch(() => {})
+  const accText = pos.accuracy ? `${Math.round(pos.accuracy)}m` : ''
 
-    // 5秒后清除状态
+  if (pos.rough) {
+    // 粗略定位 → 提示手动校准
+    locationStatus.value = `⚠️ ${pos.locationType || '粗略定位'}，建议点击 ✏️ 手动校准`
+  } else {
+    locationStatus.value = `✅ ${pos.locationType || '定位成功'} 精度${accText}`
     setTimeout(() => { locationStatus.value = '' }, 5000)
-  } catch (err) {
-    console.error('定位失败:', err)
-    locationStatus.value = '定位失败，请点击 ✏️ 手动校准'
   }
 }
 
