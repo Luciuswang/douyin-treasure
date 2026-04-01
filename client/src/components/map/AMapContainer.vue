@@ -1,9 +1,18 @@
 <template>
-  <div ref="mapEl" class="amap-container"></div>
+  <div class="amap-wrapper">
+    <div ref="mapEl" class="amap-container"></div>
+    <div v-if="loading" class="map-loading">
+      <span>🗺️ 地图加载中...</span>
+    </div>
+    <div v-if="error" class="map-error">
+      <span>{{ error }}</span>
+      <button @click="initMap">重试</button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { loadAMap } from '../../services/amap.js'
 import { useMapStore } from '../../stores/map.js'
 import { useTreasureStore } from '../../stores/treasure.js'
@@ -12,6 +21,8 @@ const emit = defineEmits(['map-ready', 'treasure-click'])
 const mapEl = ref(null)
 const mapStore = useMapStore()
 const treasureStore = useTreasureStore()
+const loading = ref(true)
+const error = ref('')
 
 let map = null
 let userMarker = null
@@ -22,20 +33,45 @@ const typeIcons = {
   event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦'
 }
 
-onMounted(async () => {
+async function initMap() {
+  loading.value = true
+  error.value = ''
   try {
     const AMap = await loadAMap()
+    await nextTick()
+
+    if (!mapEl.value) {
+      error.value = '地图容器未就绪'
+      return
+    }
+
     map = new AMap.Map(mapEl.value, {
       zoom: 16,
       center: [116.397428, 39.90923],
-      mapStyle: 'amap://styles/fresh',
       touchZoom: true,
-      scrollWheel: true
+      scrollWheel: true,
+      resizeEnable: true
     })
-    emit('map-ready')
+
+    map.on('complete', () => {
+      loading.value = false
+      emit('map-ready')
+    })
+
+    setTimeout(() => {
+      loading.value = false
+      if (!map) return
+      emit('map-ready')
+    }, 3000)
   } catch (err) {
     console.error('地图初始化失败:', err)
+    loading.value = false
+    error.value = '地图加载失败，请检查网络后重试'
   }
+}
+
+onMounted(() => {
+  initMap()
 })
 
 watch(() => mapStore.mapCenter, center => {
@@ -71,7 +107,6 @@ function updateUserMarker(loc) {
 function renderTreasureMarkers(list) {
   treasureMarkers.forEach(m => map.remove(m))
   treasureMarkers = []
-
   if (!window.AMap || !list.length) return
 
   list.forEach(t => {
@@ -101,8 +136,43 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.amap-wrapper {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
 .amap-container {
   width: 100%;
   height: 100%;
+}
+
+.map-loading, .map-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,.9);
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: .9rem;
+  color: #333;
+  z-index: 10;
+  text-align: center;
+}
+
+.map-error button {
+  display: block;
+  margin: 10px auto 0;
+  padding: 8px 20px;
+  background: #00d4aa;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
 }
 </style>

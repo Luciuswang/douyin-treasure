@@ -57,7 +57,8 @@ async function relocate() {
     const pos = await getCurrentPosition()
     mapStore.setLocation(pos)
     mapStore.setCenter(pos)
-    await treasureStore.loadNearby(pos.lat, pos.lng)
+    // 加载宝藏（失败不影响地图显示）
+    treasureStore.loadNearby(pos.lat, pos.lng).catch(() => {})
   } catch (err) {
     console.error('定位失败:', err)
   }
@@ -127,6 +128,7 @@ onUnmounted(() => {
 .map-wrap {
   flex: 1;
   position: relative;
+  min-height: 0;
 }
 
 .map-controls {

@@ -8,7 +8,7 @@ export function loadAMap() {
 
   loadPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = `https://webapi.amap.com/maps?v=${AMAP_VERSION}&key=${AMAP_KEY}&plugin=AMap.Geocoder,AMap.Geolocation`
+    script.src = `https://webapi.amap.com/maps?v=${AMAP_VERSION}&key=${AMAP_KEY}&plugin=AMap.Geocoder,AMap.Geolocation,AMap.ConvertFrom`
     script.onload = () => {
       if (window.AMap) resolve(window.AMap)
       else reject(new Error('AMap SDK 加载失败'))
