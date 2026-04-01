@@ -1,12 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
+let multer;
+try {
+    multer = require('multer');
+} catch {
+    console.warn('⚠️ multer 未安装，文件上传功能不可用。请运行 npm install multer');
+}
 
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+if (!multer) {
+    router.post('/image', (req, res) => {
+        res.status(503).json({ success: false, message: '文件上传服务未就绪，请联系管理员安装 multer' });
+    });
+    router.post('/images', (req, res) => {
+        res.status(503).json({ success: false, message: '文件上传服务未就绪' });
+    });
+    module.exports = router;
+    return;
 }
 
 const storage = multer.diskStorage({

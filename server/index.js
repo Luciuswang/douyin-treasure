@@ -113,11 +113,19 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 生产环境：托管 Vue 前端（client/dist）
 if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(__dirname, '..', 'client', 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res, next) => {
-        if (req.path.startsWith('/api/')) return next();
-        res.sendFile(path.join(distPath, 'index.html'));
-    });
+    const fs = require('fs');
+    if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (req, res, next) => {
+            if (req.path.startsWith('/api/')) return next();
+            const indexFile = path.join(distPath, 'index.html');
+            if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
+            next();
+        });
+        console.log('📂 前端静态文件已挂载:', distPath);
+    } else {
+        console.warn('⚠️ client/dist 不存在，前端未部署。请先运行 cd client && npm run build');
+    }
 }
 
 // WebSocket（带认证）

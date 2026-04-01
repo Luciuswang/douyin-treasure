@@ -2,17 +2,33 @@ import api from './api.js'
 
 export const authService = {
   async register(username, email, password) {
-    return api.post('/auth/register', { username, email, password })
+    const res = await api.post('/auth/register', { username, email, password })
+    if (res.success && res.data?.tokens) {
+      localStorage.setItem('auth_token', res.data.tokens.accessToken)
+      localStorage.setItem('refresh_token', res.data.tokens.refreshToken)
+      if (res.data.user) localStorage.setItem('auth_user', JSON.stringify(res.data.user))
+    }
+    return {
+      success: res.success,
+      message: res.message,
+      token: res.data?.tokens?.accessToken,
+      user: res.data?.user
+    }
   },
 
   async login(email, password) {
     const res = await api.post('/auth/login', { email, password })
-    if (res.success) {
-      localStorage.setItem('auth_token', res.token)
-      if (res.refreshToken) localStorage.setItem('refresh_token', res.refreshToken)
-      if (res.user) localStorage.setItem('auth_user', JSON.stringify(res.user))
+    if (res.success && res.data?.tokens) {
+      localStorage.setItem('auth_token', res.data.tokens.accessToken)
+      localStorage.setItem('refresh_token', res.data.tokens.refreshToken)
+      if (res.data.user) localStorage.setItem('auth_user', JSON.stringify(res.data.user))
     }
-    return res
+    return {
+      success: res.success,
+      message: res.message,
+      token: res.data?.tokens?.accessToken,
+      user: res.data?.user
+    }
   },
 
   async logout() {
@@ -23,7 +39,11 @@ export const authService = {
   },
 
   async getMe() {
-    return api.get('/auth/me')
+    const res = await api.get('/auth/me')
+    return {
+      success: res.success,
+      user: res.data?.user
+    }
   },
 
   isLoggedIn() {

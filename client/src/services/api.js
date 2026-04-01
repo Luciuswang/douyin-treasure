@@ -40,9 +40,8 @@ async function tryRefreshToken() {
   if (!refreshToken) return false
   try {
     const { data } = await axios.post('/api/auth/refresh', { refreshToken })
-    if (data.success) {
-      localStorage.setItem('auth_token', data.token)
-      if (data.refreshToken) localStorage.setItem('refresh_token', data.refreshToken)
+    if (data.success && data.data?.accessToken) {
+      localStorage.setItem('auth_token', data.data.accessToken)
       return true
     }
   } catch { /* ignore */ }

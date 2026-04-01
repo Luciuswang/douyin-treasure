@@ -15,7 +15,7 @@ export const useUserStore = defineStore('user', () => {
     loading.value = true
     try {
       const res = await authService.login(email, password)
-      if (res.success) {
+      if (res.success && res.token) {
         token.value = res.token
         user.value = res.user
       }
@@ -25,10 +25,15 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  async function register(username, email, password) {
+  async function register(usernameVal, email, password) {
     loading.value = true
     try {
-      return await authService.register(username, email, password)
+      const res = await authService.register(usernameVal, email, password)
+      if (res.success && res.token) {
+        token.value = res.token
+        user.value = res.user
+      }
+      return res
     } finally {
       loading.value = false
     }
@@ -38,7 +43,9 @@ export const useUserStore = defineStore('user', () => {
     if (!token.value) return
     try {
       const res = await authService.getMe()
-      if (res.success) user.value = res.user || res.data
+      if (res.success && res.user) {
+        user.value = res.user
+      }
     } catch {
       token.value = ''
       user.value = null
