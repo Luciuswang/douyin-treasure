@@ -116,7 +116,7 @@ if (process.env.NODE_ENV === 'production') {
     const fs = require('fs');
     if (fs.existsSync(distPath)) {
         app.use(express.static(distPath));
-        app.get('*', (req, res, next) => {
+        app.get('{*path}', (req, res, next) => {
             if (req.path.startsWith('/api/')) return next();
             const indexFile = path.join(distPath, 'index.html');
             if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
