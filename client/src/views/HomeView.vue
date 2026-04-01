@@ -1,7 +1,7 @@
 <template>
   <div class="home">
     <section class="hero">
-      <img src="/totofun-logo.png" alt="Totofun" class="logo" @error="e => e.target.style.display='none'" />
+      <img :src="logoUrl" alt="Totofun" class="logo" @error="e => e.target.style.display='none'" />
       <h1 class="title">Totofun <span>突突翻</span></h1>
       <p class="subtitle">基于GPS的实时寻宝游戏 — 探索身边的宝藏</p>
 
@@ -46,6 +46,7 @@ import { useUserStore } from '../stores/user.js'
 
 const router = useRouter()
 const userStore = useUserStore()
+const logoUrl = '/totofun-logo.png'
 
 const treasuresFound = computed(() => userStore.user?.stats?.treasuresDiscovered || 0)
 
