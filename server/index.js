@@ -47,7 +47,24 @@ mongoose.connect(mongoUri, {
     maxPoolSize: 10,
     minPoolSize: 1
 })
-.then(() => console.log('✅ MongoDB 连接成功'))
+.then(async () => {
+    console.log('✅ MongoDB 连接成功');
+    // 清理旧的 2dsphere 索引，确保使用新的 GeoJSON 格式索引
+    try {
+        const Treasure = require('./models/Treasure');
+        const indexes = await Treasure.collection.indexes();
+        const oldIdx = indexes.find(i => i.key && i.key['location.coordinates']);
+        if (oldIdx) {
+            console.log('🔧 清理旧的 location.coordinates 索引...');
+            await Treasure.collection.dropIndex(oldIdx.name);
+            console.log('✅ 旧索引已清理');
+        }
+        await Treasure.syncIndexes();
+        console.log('✅ 索引同步完成');
+    } catch (e) {
+        console.warn('⚠️ 索引维护:', e.message);
+    }
+})
 .catch(err => {
     console.error('❌ MongoDB 连接失败:', err.message);
     console.log('⚠️  服务器继续运行，数据库相关功能不可用');

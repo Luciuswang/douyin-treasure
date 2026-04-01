@@ -113,6 +113,7 @@ router.post('/', authenticateToken, async (req, res) => {
             content: content || {},
             password: password || '',
             location: {
+                type: 'Point',
                 coordinates: location.coordinates, // [lng, lat]
                 address: location.address || '',
                 city: location.city || '',

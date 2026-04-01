@@ -41,12 +41,16 @@ const treasureSchema = new mongoose.Schema({
         default: ''
     },
 
-    // 地理位置
+    // 地理位置（GeoJSON + 元数据）
     location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
         coordinates: {
             type: [Number], // [longitude, latitude]
-            required: true,
-            index: '2dsphere'
+            required: true
         },
         address: {
             type: String,
@@ -136,8 +140,8 @@ const treasureSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// 索引
-treasureSchema.index({ 'location.coordinates': '2dsphere' });
+// 索引（location 整体作为 GeoJSON 使用 2dsphere）
+treasureSchema.index({ location: '2dsphere' });
 treasureSchema.index({ creator: 1, createdAt: -1 });
 treasureSchema.index({ type: 1, status: 1 });
 treasureSchema.index({ status: 1, 'settings.expiresAt': 1 });
@@ -163,7 +167,7 @@ treasureSchema.pre('save', function (next) {
 // 附近宝藏查询
 treasureSchema.statics.findNearby = function (lat, lng, radius = 5000, options = {}) {
     const query = {
-        'location.coordinates': {
+        location: {
             $near: {
                 $geometry: { type: 'Point', coordinates: [lng, lat] },
                 $maxDistance: radius
