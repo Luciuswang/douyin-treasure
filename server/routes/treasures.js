@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Treasure = require('../models/Treasure');
+const { authenticateToken } = require('../middleware/auth');
 
 /**
  * GET /api/treasures/nearby?lat=&lng=&radius=&type=&category=
@@ -31,7 +32,7 @@ router.get('/nearby', async (req, res) => {
  * GET /api/treasures/my
  * 我发布的宝藏
  */
-router.get('/my', async (req, res) => {
+router.get('/my', authenticateToken, async (req, res) => {
     try {
         const treasures = await Treasure.find({ creator: req.user.userId })
             .sort({ createdAt: -1 })
@@ -48,7 +49,7 @@ router.get('/my', async (req, res) => {
  * GET /api/treasures/discovered
  * 我发现的宝藏
  */
-router.get('/discovered', async (req, res) => {
+router.get('/discovered', authenticateToken, async (req, res) => {
     try {
         const treasures = await Treasure.find({
             'discoveredBy.user': req.user.userId
@@ -91,7 +92,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/treasures
  * 创建宝藏
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     try {
         const {
             title, description, type, content, password,
@@ -146,7 +147,7 @@ router.post('/', async (req, res) => {
  * PUT /api/treasures/:id
  * 编辑宝藏（仅创建者）
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
     try {
         const treasure = await Treasure.findById(req.params.id);
         if (!treasure) {
@@ -181,7 +182,7 @@ router.put('/:id', async (req, res) => {
  * DELETE /api/treasures/:id
  * 删除宝藏（仅创建者）
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const treasure = await Treasure.findById(req.params.id);
         if (!treasure) {
@@ -209,7 +210,7 @@ router.delete('/:id', async (req, res) => {
  * POST /api/treasures/:id/discover
  * 发现/领取宝藏（需要位置验证）
  */
-router.post('/:id/discover', async (req, res) => {
+router.post('/:id/discover', authenticateToken, async (req, res) => {
     try {
         const { lat, lng, password } = req.body;
         if (!lat || !lng) {
@@ -275,7 +276,7 @@ router.post('/:id/discover', async (req, res) => {
  * POST /api/treasures/:id/like
  * 点赞/取消点赞
  */
-router.post('/:id/like', async (req, res) => {
+router.post('/:id/like', authenticateToken, async (req, res) => {
     try {
         const treasure = await Treasure.findById(req.params.id);
         if (!treasure) {

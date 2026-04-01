@@ -13,7 +13,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const treasureRoutes = require('./routes/treasures');
 const uploadRoutes = require('./routes/upload');
-const { authenticateToken } = require('./middleware/auth');
+const { authenticateToken, optionalAuth } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
 const { socketAuth, socketHandler } = require('./sockets/socketHandler');
 
@@ -103,7 +103,7 @@ app.get('/health', (req, res) => {
 // API 路由
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
-app.use('/api/treasures', authenticateToken, treasureRoutes);
+app.use('/api/treasures', optionalAuth, treasureRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/ai', require('./routes/ai'));
 
