@@ -2,7 +2,8 @@
   <div class="location-bar">
     <router-link to="/" class="back-btn">←</router-link>
     <div class="loc-info">
-      <span v-if="mapStore.userLocation" class="accuracy">
+      <span v-if="props.status" class="accuracy status-msg">{{ props.status }}</span>
+      <span v-else-if="mapStore.userLocation" class="accuracy">
         📍 精度 {{ mapStore.gpsAccuracy }}m
       </span>
       <span v-else class="accuracy">📍 定位中...</span>
@@ -18,6 +19,10 @@
 import { useRouter } from 'vue-router'
 import { useMapStore } from '../../stores/map.js'
 import { useUserStore } from '../../stores/user.js'
+
+const props = defineProps({
+  status: { type: String, default: '' }
+})
 
 const router = useRouter()
 const mapStore = useMapStore()
@@ -53,6 +58,7 @@ function goProfile() {
 }
 
 .accuracy { font-size: .8rem; opacity: .8; }
+.status-msg { color: #00d4aa; opacity: 1; }
 
 .user-info {
   display: flex;

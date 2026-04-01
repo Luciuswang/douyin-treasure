@@ -1,16 +1,19 @@
 <template>
   <div class="map-page">
-    <LocationBar />
+    <LocationBar :status="locationStatus" />
     <div class="map-wrap">
       <AMapContainer
+        :calibrating="calibrating"
         @map-ready="onMapReady"
         @treasure-click="onTreasureClick"
+        @map-click="onMapClick"
       />
     </div>
 
     <div class="map-controls">
       <button class="ctrl-btn" @click="relocate" title="重新定位">📍</button>
       <button class="ctrl-btn" :class="{ active: mapStore.tracking }" @click="toggleTracking" title="实时追踪">🚶</button>
+      <button class="ctrl-btn" :class="{ active: calibrating }" @click="toggleCalibration" title="手动校准位置">✏️</button>
       <button class="ctrl-btn" @click="showPublish = true" title="发布宝藏">📤</button>
       <button class="ctrl-btn" @click="refreshTreasures" title="刷新宝藏">🔄</button>
     </div>
@@ -31,10 +34,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useMapStore } from '../stores/map.js'
 import { useTreasureStore } from '../stores/treasure.js'
-import { getCurrentPosition } from '../services/amap.js'
+import { getCurrentPosition, startTracking, stopTracking, isMobileDevice } from '../services/amap.js'
 import AMapContainer from '../components/map/AMapContainer.vue'
 import LocationBar from '../components/map/LocationBar.vue'
 import TreasureDetail from '../components/treasure/TreasureDetail.vue'
@@ -45,6 +48,8 @@ const treasureStore = useTreasureStore()
 
 const selectedTreasure = ref(null)
 const showPublish = ref(false)
+const calibrating = ref(false)
+const locationStatus = ref('')
 let watchId = null
 
 function onMapReady() {
@@ -53,43 +58,84 @@ function onMapReady() {
 }
 
 async function relocate() {
+  locationStatus.value = '定位中...'
   try {
     const pos = await getCurrentPosition()
     mapStore.setLocation(pos)
     mapStore.setCenter(pos)
-    // 加载宝藏（失败不影响地图显示）
+
+    const accText = pos.accuracy ? `${Math.round(pos.accuracy)}m` : ''
+    const srcText = pos.locationType || ''
+    locationStatus.value = `定位成功 ${accText} ${srcText}`
+
+    if (!isMobileDevice() && pos.accuracy > 200) {
+      locationStatus.value = `PC定位精度较低（${Math.round(pos.accuracy)}m），建议手动校准`
+    }
+
+    // 加载宝藏
     treasureStore.loadNearby(pos.lat, pos.lng).catch(() => {})
+
+    // 5秒后清除状态
+    setTimeout(() => { locationStatus.value = '' }, 5000)
   } catch (err) {
     console.error('定位失败:', err)
+    locationStatus.value = '定位失败，请点击 ✏️ 手动校准'
   }
 }
 
 function toggleTracking() {
   if (mapStore.tracking) {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+    if (watchId !== null) stopTracking(watchId)
     watchId = null
     mapStore.tracking = false
+    locationStatus.value = '追踪已关闭'
+    setTimeout(() => { locationStatus.value = '' }, 2000)
     return
   }
 
   mapStore.tracking = true
-  watchId = navigator.geolocation.watchPosition(
-    pos => {
-      const { longitude, latitude, accuracy } = pos.coords
-      if (window.AMap) {
-        window.AMap.convertFrom([longitude, latitude], 'gps', (status, result) => {
-          if (status === 'complete' && result.locations?.length) {
-            const loc = result.locations[0]
-            mapStore.setLocation({ lng: loc.lng, lat: loc.lat, accuracy })
-          }
-        })
-      } else {
-        mapStore.setLocation({ lng: longitude, lat: latitude, accuracy })
+  locationStatus.value = '🚶 实时追踪中...'
+
+  watchId = startTracking(pos => {
+    mapStore.setLocation(pos)
+    // 不自动移动地图中心，让用户自由移动
+  })
+
+  if (!watchId) {
+    mapStore.tracking = false
+    locationStatus.value = '追踪启动失败'
+  }
+}
+
+function toggleCalibration() {
+  calibrating.value = !calibrating.value
+  if (calibrating.value) {
+    locationStatus.value = '📍 请在地图上点击您的真实位置'
+    // 30秒后自动关闭
+    setTimeout(() => {
+      if (calibrating.value) {
+        calibrating.value = false
+        locationStatus.value = '校准模式已超时关闭'
+        setTimeout(() => { locationStatus.value = '' }, 2000)
       }
-    },
-    null,
-    { enableHighAccuracy: true, maximumAge: 3000 }
-  )
+    }, 30000)
+  } else {
+    locationStatus.value = ''
+  }
+}
+
+function onMapClick(lnglat) {
+  if (!calibrating.value) return
+
+  // 手动校准 → 直接使用 GCJ-02 坐标（地图上点的就是 GCJ-02）
+  const pos = { lng: lnglat.lng, lat: lnglat.lat, accuracy: 1 }
+  mapStore.setLocation(pos)
+  mapStore.setCenter(pos)
+  calibrating.value = false
+  locationStatus.value = '✅ 位置已手动校准'
+  setTimeout(() => { locationStatus.value = '' }, 3000)
+
+  treasureStore.loadNearby(pos.lat, pos.lng).catch(() => {})
 }
 
 function onTreasureClick(treasure) {
@@ -113,7 +159,7 @@ function onPublished() {
 }
 
 onUnmounted(() => {
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+  if (watchId !== null) stopTracking(watchId)
 })
 </script>
 
@@ -154,7 +200,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform .15s;
+  transition: transform .15s, background .2s;
 }
 
 .ctrl-btn:active { transform: scale(.9); }
