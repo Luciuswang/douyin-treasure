@@ -1,0 +1,87 @@
+/* ===== CSS Variables ===== */
+:root {
+  --color-primary: #00d4aa;
+  --color-primary-dark: #00b4d8;
+  --color-accent: #ff6b6b;
+  --color-bg-start: #0a2342;
+  --color-bg-mid: #134e5e;
+  --color-bg-end: #00d4aa;
+  --glass-bg: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 50px;
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: linear-gradient(135deg, var(--color-bg-start), var(--color-bg-mid), var(--color-bg-end));
+  background-attachment: fixed;
+  color: #333;
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.3); border-radius: 4px; }
+
+/* ===== Selection ===== */
+::selection {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* ===== Utilities ===== */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+/* ===== AMap overrides ===== */
+.amap-logo, .amap-copyright { display: none !important; }
+.amap-info-content { border-radius: 12px !important; }
+
+/* ===== Mobile optimizations ===== */
+@media (max-width: 480px) {
+  .chat-panel {
+    width: calc(100vw - 20px) !important;
+    left: 10px !important;
+    bottom: 70px !important;
+    height: 50vh !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .stats-bar { gap: 12px; }
+  .features { grid-template-columns: 1fr; }
+}
+
+/* ===== Safe area for notch devices ===== */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header { padding-top: env(safe-area-inset-top); }
+  .location-bar { padding-top: env(safe-area-inset-top); }
+  .map-controls { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .bot-chat { bottom: calc(20px + env(safe-area-inset-bottom)); }
+}

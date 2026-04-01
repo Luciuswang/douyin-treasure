@@ -30,13 +30,15 @@ const authenticateToken = async (req, res, next) => {
             });
         }
 
-        // 将用户信息添加到请求对象
+        // 将用户信息添加到请求对象（同时提供 id 和 userId 以兼容所有路由）
         req.user = {
+            id: decoded.userId,
             userId: decoded.userId,
             username: user.username,
             email: user.email,
             level: user.level.currentLevel,
-            isPremium: user.isPremium
+            isPremium: user.isPremium,
+            role: user.role || 'user'
         };
 
         // 更新用户最后活跃时间（异步，不阻塞请求）
@@ -89,11 +91,13 @@ const optionalAuth = async (req, res, next) => {
 
         if (user && user.isActive) {
             req.user = {
+                id: decoded.userId,
                 userId: decoded.userId,
                 username: user.username,
                 email: user.email,
                 level: user.level.currentLevel,
-                isPremium: user.isPremium
+                isPremium: user.isPremium,
+                role: user.role || 'user'
             };
 
             // 更新活跃时间

@@ -6,154 +6,83 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
-// 导入路由和中间件
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const treasureRoutes = require('./routes/treasures');
 const uploadRoutes = require('./routes/upload');
 const { authenticateToken } = require('./middleware/auth');
 const { errorHandler } = require('./middleware/errorHandler');
-
-// 导入WebSocket处理器
-const socketHandler = require('./sockets/socketHandler');
+const { socketAuth, socketHandler } = require('./sockets/socketHandler');
 
 const app = express();
-
-// 在 Vercel 等 Serverless 环境中，需要信任代理以正确获取客户端 IP
-// 这对于 express-rate-limit 等中间件很重要
-// 直接启用 trust proxy，因为 Vercel 总是使用代理
 app.set('trust proxy', true);
 
-// 在Serverless环境中，不需要HTTP服务器和WebSocket
+// HTTP + WebSocket
 let server, io;
 if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
     server = http.createServer(app);
     io = socketIo(server, {
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:3000",
-            methods: ["GET", "POST"]
+            origin: [
+                process.env.CLIENT_URL,
+                'https://youkongwa.com',
+                'http://youkongwa.com',
+                'http://localhost:3000',
+                'http://localhost:5173'
+            ].filter(Boolean),
+            methods: ['GET', 'POST']
         }
     });
 }
 
-// 数据库连接
-// 注意：Mongoose 6+ 不再需要 useNewUrlParser 和 useUnifiedTopology
-// Serverless环境需要更长的超时时间
-const mongooseOptions = {
-    serverSelectionTimeoutMS: 30000, // 30秒超时（Serverless环境需要更长时间）
-    socketTimeoutMS: 45000, // 45秒socket超时
-    connectTimeoutMS: 30000, // 30秒连接超时
-    maxPoolSize: 10, // 连接池大小
-    minPoolSize: 1, // 最小连接数
-    // 注意：Mongoose 9+ 已移除 bufferMaxEntries 和 bufferCommands 选项
-};
-
-// 在连接字符串中添加超时参数（确保生效）
+// MongoDB
 let mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/totofun-treasure';
-
-// 调试：检查连接字符串格式
-if (mongoUri) {
-    console.log('📋 MongoDB URI 长度:', mongoUri.length);
-    console.log('📋 MongoDB URI 开头:', mongoUri.substring(0, 20));
-    if (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://')) {
-        console.error('❌ MongoDB URI 格式错误:', mongoUri.substring(0, 50));
-    }
-}
-
-if (mongoUri && !mongoUri.includes('serverSelectionTimeoutMS')) {
-    // 如果URI中没有超时参数，添加它们
-    const separator = mongoUri.includes('?') ? '&' : '?';
-    mongoUri = `${mongoUri}${separator}serverSelectionTimeoutMS=30000&socketTimeoutMS=45000&connectTimeoutMS=30000`;
-}
-
-mongoose.connect(mongoUri, mongooseOptions)
-.then(() => {
-    console.log('✅ MongoDB 连接成功');
-    console.log('📊 MongoDB连接状态:', mongoose.connection.readyState);
+mongoose.connect(mongoUri, {
+    serverSelectionTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 30000,
+    maxPoolSize: 10,
+    minPoolSize: 1
 })
+.then(() => console.log('✅ MongoDB 连接成功'))
 .catch(err => {
     console.error('❌ MongoDB 连接失败:', err.message);
-    console.error('❌ 连接错误详情:', err);
-    console.log('⚠️  服务器将继续运行，但某些功能可能不可用');
-    console.log('💡 提示：请确保MongoDB正在运行，或使用MongoDB Atlas云端数据库');
-    console.log('💡 检查：MongoDB Atlas的IP白名单是否包含 0.0.0.0/0');
+    console.log('⚠️  服务器继续运行，数据库相关功能不可用');
 });
 
 // 中间件
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    // 生产环境托管静态页面时禁用 CSP（页面包含内联脚本）
-    contentSecurityPolicy: false,
-}));
-
+app.use(helmet({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: false }));
 app.use(compression());
-
 app.use(cors({
     origin: function (origin, callback) {
-        // 允许的源列表
-        const allowedOrigins = [
+        if (!origin) return callback(null, true);
+        const allowed = [
             process.env.CLIENT_URL,
-            "https://luciuswang.github.io",
-            "http://localhost:3000",
-            "http://localhost:5000",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5000",
-            "http://localhost",
-            "http://127.0.0.1",
-            // 允许所有本地开发环境
+            'https://youkongwa.com',
+            'http://youkongwa.com',
+            'http://localhost:3000',
+            'http://localhost:5173',
             /^http:\/\/localhost(:\d+)?$/,
-            /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-            // 允许GitHub Pages域名（包括子路径）
-            /^https:\/\/.*\.github\.io$/
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/
         ].filter(Boolean);
-        
-        // 如果没有origin（比如Postman或移动应用），允许
-        if (!origin) {
-            return callback(null, true);
-        }
-        
-        // 检查是否在允许列表中
-        const isAllowed = allowedOrigins.some(allowed => {
-            if (typeof allowed === 'string') {
-                return origin === allowed;
-            } else if (allowed instanceof RegExp) {
-                return allowed.test(origin);
-            }
-            return false;
-        });
-        
-        if (isAllowed) {
-            callback(null, true);
-        } else {
-            // 开发环境允许所有来源
-            if (process.env.NODE_ENV !== 'production') {
-                callback(null, true);
-            } else {
-                // 生产环境也允许GitHub Pages（更宽松的策略）
-                if (/^https:\/\/.*\.github\.io/.test(origin)) {
-                    callback(null, true);
-                } else {
-                    console.warn(`⚠️  CORS blocked origin: ${origin}`);
-                    callback(new Error('Not allowed by CORS'));
-                }
-            }
-        }
+        const ok = allowed.some(a =>
+            typeof a === 'string' ? origin === a : a.test(origin)
+        );
+        callback(ok || process.env.NODE_ENV !== 'production' ? null : new Error('CORS'), ok || process.env.NODE_ENV !== 'production');
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 限流
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15分钟
-    max: 100, // 限制每个IP 15分钟内最多100个请求
-    message: '请求过于频繁，请稍后再试',
+    windowMs: 15 * 60 * 1000,
+    max: 200,
     standardHeaders: true,
     legacyHeaders: false,
-    // 禁用 IPv6 验证（避免 ERR_ERL_KEY_GEN_IPV6 错误）
     validate: { xForwardedForHeader: false, ip: false }
 });
 app.use('/api/', limiter);
@@ -171,71 +100,56 @@ app.get('/health', (req, res) => {
     });
 });
 
-// API路由
+// API 路由
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/treasures', authenticateToken, treasureRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
-app.use('/api/ai', require('./routes/ai')); // AI代理路由（不需要认证，但有限流保护）
+app.use('/api/ai', require('./routes/ai'));
 
-// 静态文件服务
-app.use('/uploads', express.static('uploads'));
+// 静态文件
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 托管前端静态文件（生产环境）
-const path = require('path');
+// 生产环境：托管 Vue 前端（client/dist）
 if (process.env.NODE_ENV === 'production') {
-    // 静态资源
-    app.use('/src', express.static(path.join(__dirname, '..', 'src')));
-    app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
-    app.use(express.static(path.join(__dirname, '..')));
-}
-
-// WebSocket处理（仅在非Serverless环境中）
-if (io) {
-    io.on('connection', (socket) => {
-        console.log(`🔌 用户连接: ${socket.id}`);
-        socketHandler(io, socket);
+    const distPath = path.join(__dirname, '..', 'client', 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
     });
 }
 
-// 错误处理中间件
+// WebSocket（带认证）
+if (io) {
+    io.use(socketAuth);
+    io.on('connection', (socket) => socketHandler(io, socket));
+}
+
+// 错误处理
 app.use(errorHandler);
 
-// 404处理（必须在所有路由之后）
+// 404
 app.use((req, res) => {
-    // 生产环境：非API请求返回 index.html（SPA fallback）
-    if (process.env.NODE_ENV === 'production' && !req.path.startsWith('/api/')) {
-        return res.sendFile(path.join(__dirname, '..', 'index.html'));
-    }
-    res.status(404).json({
-        success: false,
-        message: '接口不存在',
-        path: req.originalUrl
-    });
+    res.status(404).json({ success: false, message: '接口不存在', path: req.originalUrl });
 });
 
-// 仅在非Serverless环境中启动HTTP服务器
+// 启动
 if (!process.env.VERCEL && !process.env.VERCEL_ENV && server) {
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT || 3001;
     server.listen(PORT, () => {
-        console.log(`🚀 Totofun 突突翻服务器运行在端口 ${PORT}`);
+        console.log(`🚀 Totofun 服务器运行在端口 ${PORT}`);
         console.log(`🌐 环境: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`📱 客户端地址: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
     });
 }
 
-// 优雅关闭
-process.on('SIGTERM', () => {
-    console.log('🛑 收到SIGTERM信号，正在关闭服务器...');
-    server.close(() => {
-        console.log('✅ 服务器已关闭');
-        mongoose.connection.close(false, () => {
-            console.log('✅ MongoDB连接已关闭');
-            process.exit(0);
+if (server) {
+    process.on('SIGTERM', () => {
+        console.log('🛑 收到 SIGTERM，正在关闭...');
+        server.close(() => {
+            mongoose.connection.close(false).then(() => process.exit(0));
         });
     });
-});
+}
 
-// 导出app供Serverless函数使用
-// Vercel Serverless环境 - 直接导出app
 module.exports = app;

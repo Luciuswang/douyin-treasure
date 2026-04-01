@@ -12,8 +12,12 @@ yarn-error.log*
 .env.production.local
 
 # 构建输出
+client/dist/
 dist/
 build/
+
+# 上传文件
+server/uploads/
 
 # 日志文件
 *.log

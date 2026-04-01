@@ -1,21 +1,60 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+        const ext = path.extname(file.originalname);
+        cb(null, `${unique}${ext}`);
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    const allowed = /^image\/(jpeg|jpg|png|gif|webp)$/;
+    cb(null, allowed.test(file.mimetype));
+};
+
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10 MB
+});
 
 /**
- * @route   POST /api/upload/image
- * @desc    上传图片（占位路由，待实现）
- * @access  Private
+ * POST /api/upload/image
+ * 上传单张图片
  */
-router.post('/image', (req, res) => {
-    // 暂时返回占位响应
-    // TODO: 实现文件上传功能（需要multer包）
-    res.status(501).json({
-        success: false,
-        message: '文件上传功能暂未实现'
-    });
+router.post('/image', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: '请上传有效的图片文件（jpg/png/gif/webp, <=10MB）' });
+    }
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ success: true, data: { url, filename: req.file.filename, size: req.file.size } });
+});
+
+/**
+ * POST /api/upload/images
+ * 上传多张图片（最多 9 张）
+ */
+router.post('/images', upload.array('images', 9), (req, res) => {
+    if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ success: false, message: '请上传有效的图片文件' });
+    }
+    const files = req.files.map(f => ({
+        url: `/uploads/${f.filename}`,
+        filename: f.filename,
+        size: f.size
+    }));
+    res.json({ success: true, data: files });
 });
 
 module.exports = router;
-
-module.exports = router;
-
