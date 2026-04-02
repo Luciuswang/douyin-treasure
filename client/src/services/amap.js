@@ -82,29 +82,31 @@ function convertWGS84toGCJ02(wgsLng, wgsLat) {
 }
 
 /**
- * 高德融合定位 — 三级策略：
- * 1) GPS优先（5s快速尝试）
- * 2) 融合定位（GPS+WiFi+基站，允许IP回退）
+ * 高德融合定位
+ * 移动端：GPS 优先 + IP 兜底
+ * PC 端：跳过浏览器 GPS（PC 没有 GPS 芯片），直接用 IP/网络定位
  */
 function getAmapGeolocation() {
   return new Promise((resolve, reject) => {
     if (!window.AMap) return reject(new Error('AMap 未加载'))
 
+    const mobile = isMobileDevice()
+
     window.AMap.plugin('AMap.Geolocation', () => {
       const geolocation = new window.AMap.Geolocation({
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 30000,       // 允许 30 秒缓存
+        enableHighAccuracy: mobile,
+        timeout: mobile ? 20000 : 10000,
+        maximumAge: 30000,
         convert: true,
         showButton: false,
         showMarker: false,
         showCircle: false,
         panToLocation: false,
         zoomToAccuracy: false,
-        GeoLocationFirst: true,  // 优先 GPS
-        noIpLocate: 0,           // 允许 IP 定位作为兜底
-        noGeoLocation: 0,
-        useNative: true,
+        GeoLocationFirst: mobile,    // 移动端优先 GPS
+        noIpLocate: 0,               // 允许 IP 定位
+        noGeoLocation: mobile ? 0 : 3, // PC 端跳过浏览器定位（会被拒绝）
+        useNative: mobile,
         needAddress: true,
         extensions: 'base'
       })
@@ -116,12 +118,11 @@ function getAmapGeolocation() {
           const lng = result.position.lng
           const lat = result.position.lat
 
-          console.log('📍 高德定位:', { locationType, accuracy, lng, lat })
+          console.log('📍 高德定位:', { locationType, accuracy, lng, lat, device: mobile ? '移动' : 'PC' })
 
-          // IP 定位 — 接受但标记为低精度
+          // IP/网络定位 — 接受但标记为粗略
           if (locationType.includes('IP') || accuracy > 1000) {
             console.warn('⚠️ IP/网络定位，精度低，建议手动校准')
-            // 对网络定位应用偏移修正
             const corrLng = lng + NETWORK_LOCATION_OFFSET.lng
             const corrLat = lat + NETWORK_LOCATION_OFFSET.lat
             resolve({
@@ -134,7 +135,7 @@ function getAmapGeolocation() {
             return
           }
 
-          // GPS/WiFi/基站 — 高精度，应用偏移修正
+          // GPS/WiFi/基站 — 高精度
           const corrected = applyOffset(lng, lat, accuracy)
           resolve({
             lng: corrected.lng,
@@ -244,13 +245,17 @@ export async function getCurrentPosition() {
     console.warn('⚠️ 高德定位失败，尝试浏览器GPS:', e.message)
   }
 
-  // 2. 浏览器 GPS
-  try {
-    const pos = await getBrowserGPS()
-    console.log('✅ 浏览器GPS成功:', pos)
-    return pos
-  } catch (e) {
-    console.warn('⚠️ 浏览器GPS也失败:', e.message)
+  // 2. 浏览器 GPS（仅移动端尝试，PC 没有 GPS 芯片）
+  if (isMobileDevice()) {
+    try {
+      const pos = await getBrowserGPS()
+      console.log('✅ 浏览器GPS成功:', pos)
+      return pos
+    } catch (e) {
+      console.warn('⚠️ 浏览器GPS也失败:', e.message)
+    }
+  } else {
+    console.log('ℹ️ PC端跳过浏览器GPS')
   }
 
   // 3. 默认位置（上海），提示用户手动校准
