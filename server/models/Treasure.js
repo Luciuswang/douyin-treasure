@@ -18,14 +18,12 @@ const treasureSchema = new mongoose.Schema({
         required: true
     },
 
-    // 宝藏类型
     type: {
         type: String,
         enum: ['note', 'coupon', 'ticket', 'job', 'event', 'redpacket', 'task', 'image', 'custom'],
         default: 'note'
     },
 
-    // 通用内容（根据 type 存储不同结构的数据）
     content: {
         text: { type: String, default: '' },
         imageUrl: { type: String, default: '' },
@@ -35,27 +33,18 @@ const treasureSchema = new mongoose.Schema({
         extra: { type: mongoose.Schema.Types.Mixed }
     },
 
-    // 密码保护（可选）
     password: {
         type: String,
         default: ''
     },
 
-    // 地理位置（GeoJSON + 元数据）
+    // 地理位置（纯数据，无地理索引）
     location: {
-        type: {
-            type: String,
-            enum: ['Point'],
-            default: 'Point'
-        },
         coordinates: {
             type: [Number], // [longitude, latitude]
             required: true
         },
-        address: {
-            type: String,
-            default: ''
-        },
+        address: { type: String, default: '' },
         city: String,
         district: String,
         landmark: String,
@@ -67,7 +56,6 @@ const treasureSchema = new mongoose.Schema({
         }
     },
 
-    // 挑战任务（可选）
     challenge: {
         type: {
             type: String,
@@ -80,7 +68,6 @@ const treasureSchema = new mongoose.Schema({
         timeLimit: { type: Number, default: 0 }
     },
 
-    // 奖励
     rewards: {
         experience: { type: Number, default: 10, min: 1, max: 100 },
         coins: { type: Number, default: 5, min: 0, max: 50 },
@@ -92,7 +79,6 @@ const treasureSchema = new mongoose.Schema({
         specialReward: { type: String, default: '' }
     },
 
-    // 统计
     stats: {
         views: { type: Number, default: 0 },
         likes: { type: Number, default: 0 },
@@ -140,14 +126,13 @@ const treasureSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// 索引（location 整体作为 GeoJSON 使用 2dsphere）
-treasureSchema.index({ location: '2dsphere' });
+// 普通索引（不使用 2dsphere，避免 GeoJSON 格式限制）
+treasureSchema.index({ 'location.coordinates': 1 });
 treasureSchema.index({ creator: 1, createdAt: -1 });
 treasureSchema.index({ type: 1, status: 1 });
 treasureSchema.index({ status: 1, 'settings.expiresAt': 1 });
 treasureSchema.index({ createdAt: -1 });
 
-// 虚拟字段
 treasureSchema.virtual('isExpired').get(function () {
     return this.settings.expiresAt && new Date() > this.settings.expiresAt;
 });
@@ -156,7 +141,6 @@ treasureSchema.virtual('discoveryCount').get(function () {
     return this.discoveredBy.length;
 });
 
-// 保存前更新成功率
 treasureSchema.pre('save', function (next) {
     if (this.stats.attempts > 0) {
         this.stats.successRate = Math.round((this.stats.discoveries / this.stats.attempts) * 100);
@@ -164,15 +148,15 @@ treasureSchema.pre('save', function (next) {
     next();
 });
 
-// 附近宝藏查询
+// 附近宝藏查询（经纬度范围 + Haversine 精确过滤）
 treasureSchema.statics.findNearby = function (lat, lng, radius = 5000, options = {}) {
+    // 经纬度范围粗筛（矩形框）
+    const latDelta = radius / 111000;
+    const lngDelta = radius / (111000 * Math.cos(lat * Math.PI / 180));
+
     const query = {
-        location: {
-            $near: {
-                $geometry: { type: 'Point', coordinates: [lng, lat] },
-                $maxDistance: radius
-            }
-        },
+        'location.coordinates.0': { $gte: lng - lngDelta, $lte: lng + lngDelta },
+        'location.coordinates.1': { $gte: lat - latDelta, $lte: lat + latDelta },
         status: 'active',
         'settings.isHidden': false,
         'settings.expiresAt': { $gt: new Date() }
@@ -200,7 +184,6 @@ treasureSchema.methods.getDistanceFrom = function (lat, lng) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-// 检查用户是否可以发现
 treasureSchema.methods.canBeDiscoveredBy = function (userId, userLocation) {
     const already = this.discoveredBy.some(
         d => d.user.toString() === userId.toString()
@@ -219,7 +202,6 @@ treasureSchema.methods.canBeDiscoveredBy = function (userId, userLocation) {
     return { canDiscover: true };
 };
 
-// 记录发现
 treasureSchema.methods.recordDiscovery = async function (userId, rating) {
     this.discoveredBy.push({ user: userId, discoveredAt: new Date(), rating });
     this.stats.discoveries += 1;
@@ -227,7 +209,6 @@ treasureSchema.methods.recordDiscovery = async function (userId, rating) {
     return this.save();
 };
 
-// 点赞/取消
 treasureSchema.methods.toggleLike = function (userId) {
     const idx = this.likedBy.indexOf(userId);
     if (idx === -1) {
@@ -240,7 +221,6 @@ treasureSchema.methods.toggleLike = function (userId) {
     return { action: 'unliked', likes: this.stats.likes };
 };
 
-// 安全输出（隐藏内部字段）
 treasureSchema.methods.toSafeObject = function (userId) {
     const obj = this.toObject();
     if (userId) {

@@ -49,15 +49,17 @@ mongoose.connect(mongoUri, {
 })
 .then(async () => {
     console.log('✅ MongoDB 连接成功');
-    // 清理旧的 2dsphere 索引，确保使用新的 GeoJSON 格式索引
+    // 清理所有旧的 2dsphere 索引（彻底移除地理索引，改用普通查询）
     try {
         const Treasure = require('./models/Treasure');
         const indexes = await Treasure.collection.indexes();
-        const oldIdx = indexes.find(i => i.key && i.key['location.coordinates']);
-        if (oldIdx) {
-            console.log('🔧 清理旧的 location.coordinates 索引...');
-            await Treasure.collection.dropIndex(oldIdx.name);
-            console.log('✅ 旧索引已清理');
+        for (const idx of indexes) {
+            const keyStr = JSON.stringify(idx.key);
+            if (keyStr.includes('2dsphere') || keyStr.includes('location')) {
+                if (idx.name === '_id_') continue;
+                console.log('🔧 清理旧索引:', idx.name, keyStr);
+                try { await Treasure.collection.dropIndex(idx.name); } catch (e) { /* ignore */ }
+            }
         }
         await Treasure.syncIndexes();
         console.log('✅ 索引同步完成');

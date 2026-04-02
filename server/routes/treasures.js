@@ -113,7 +113,6 @@ router.post('/', authenticateToken, async (req, res) => {
             content: content || {},
             password: password || '',
             location: {
-                type: 'Point',
                 coordinates: location.coordinates, // [lng, lat]
                 address: location.address || '',
                 city: location.city || '',
@@ -131,7 +130,6 @@ router.post('/', authenticateToken, async (req, res) => {
 
         await treasure.save();
 
-        // 更新用户的宝藏创建计数
         const User = require('../models/User');
         await User.findByIdAndUpdate(req.user.userId, {
             $inc: { 'stats.treasuresCreated': 1 }
@@ -139,8 +137,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
         res.status(201).json({ success: true, data: treasure });
     } catch (error) {
-        console.error('创建宝藏错误:', error);
-        res.status(500).json({ success: false, message: '服务器错误' });
+        console.error('创建宝藏错误:', error.message, error.stack);
+        res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
     }
 });
 
