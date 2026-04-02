@@ -143,18 +143,37 @@ function renderTreasureMarkers(list) {
     const coords = t.location?.coordinates
     if (!coords || coords.length < 2) return
 
-    const icon = typeIcons[t.type] || '📦'
     const discovered = t.isDiscovered
+    const maxed = t.settings?.maxDiscoverers > 0 &&
+                  (t.stats?.discoveries || 0) >= t.settings.maxDiscoverers
+
+    // 已用完的宝藏完全隐藏
+    if (maxed && !discovered) return
+
+    // 已发现的宝藏半透明小图标，未发现的大图标 + 呼吸动画
+    const icon = typeIcons[t.type] || '📦'
+
+    let markerHTML
+    if (discovered) {
+      markerHTML = `<div class="t-marker t-found">${icon}</div>`
+    } else {
+      markerHTML = `<div class="t-marker t-active"><span class="t-pulse"></span>${icon}</div>`
+    }
 
     const marker = new window.AMap.Marker({
       position: [coords[0], coords[1]],
-      content: `<div style="font-size:1.6rem;filter:${discovered ? 'grayscale(1) opacity(.5)' : 'none'};cursor:pointer">${icon}</div>`,
-      offset: new window.AMap.Pixel(-14, -14),
-      zIndex: 100,
+      content: markerHTML,
+      offset: new window.AMap.Pixel(-22, -22),
+      zIndex: discovered ? 80 : 100,
       extData: t
     })
 
     marker.on('click', () => emit('treasure-click', t))
+    // 移动端 touchend 也响应，提高可点击性
+    marker.on('touchend', e => {
+      e.originEvent?.stopPropagation?.()
+      emit('treasure-click', t)
+    })
     map.add(marker)
     treasureMarkers.push(marker)
   })
@@ -218,5 +237,49 @@ onUnmounted(() => {
 @keyframes pulse-bg {
   0%, 100% { opacity: 1; }
   50% { opacity: .7; }
+}
+</style>
+
+<style>
+/* 宝藏标记样式（非 scoped，因为 AMap Marker content 在 DOM 外） */
+.t-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.t-marker.t-active {
+  width: 44px;
+  height: 44px;
+  font-size: 1.8rem;
+  background: rgba(255,255,255,.85);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+
+.t-marker.t-found {
+  width: 30px;
+  height: 30px;
+  font-size: 1.1rem;
+  opacity: .45;
+  filter: grayscale(1);
+}
+
+.t-pulse {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(0, 212, 170, .3);
+  animation: t-breathe 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes t-breathe {
+  0%, 100% { transform: scale(1); opacity: .3; }
+  50% { transform: scale(1.6); opacity: 0; }
 }
 </style>
