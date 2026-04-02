@@ -11,6 +11,31 @@
     <div v-if="calibrating" class="calibration-banner">
       📍 手动校准模式：请在地图上点击您的真实位置
     </div>
+
+    <!-- 重叠宝藏选择列表 -->
+    <div v-if="clusterList.length" class="cluster-picker" @click.self="clusterList = []">
+      <div class="cluster-sheet">
+        <div class="cluster-header">
+          <span>📍 此处有 {{ clusterList.length }} 个宝藏</span>
+          <button @click="clusterList = []">×</button>
+        </div>
+        <div class="cluster-items">
+          <div
+            v-for="t in clusterList" :key="t._id"
+            class="cluster-item"
+            @click="pickFromCluster(t)"
+          >
+            <span class="ci-icon">{{ typeIcons[t.type] || '📦' }}</span>
+            <div class="ci-info">
+              <strong>{{ t.title }}</strong>
+              <span class="ci-meta">{{ typeLabels[t.type] || t.type }} · {{ t.stats?.discoveries || 0 }}人发现</span>
+            </div>
+            <span v-if="t.isDiscovered" class="ci-badge ci-done">已发现</span>
+            <span v-else class="ci-badge ci-go">前往</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -30,14 +55,20 @@ const mapStore = useMapStore()
 const treasureStore = useTreasureStore()
 const loading = ref(true)
 const error = ref('')
+const clusterList = ref([])
 
 let map = null
 let userMarker = null
-let treasureMarkers = []
+let markerCluster = null
+let treasureDataMap = new Map()
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
   event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
+}
+const typeLabels = {
+  note: '笔记', coupon: '优惠券', ticket: '票券', job: '招聘',
+  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分'
 }
 
 async function initMap() {
@@ -135,22 +166,25 @@ function updateUserMarker(loc) {
 }
 
 function renderTreasureMarkers(list) {
-  treasureMarkers.forEach(m => map.remove(m))
-  treasureMarkers = []
+  if (markerCluster) {
+    markerCluster.setMap(null)
+    markerCluster = null
+  }
+  treasureDataMap.clear()
   if (!window.AMap || !list.length) return
 
-  list.forEach(t => {
+  const validItems = list.filter(t => {
     const coords = t.location?.coordinates
-    if (!coords || coords.length < 2) return
-
-    const discovered = t.isDiscovered
+    if (!coords || coords.length < 2) return false
     const maxed = t.settings?.maxDiscoverers > 0 &&
                   (t.stats?.discoveries || 0) >= t.settings.maxDiscoverers
+    if (maxed && !t.isDiscovered) return false
+    return true
+  })
 
-    // 已用完的宝藏完全隐藏
-    if (maxed && !discovered) return
-
-    // 已发现的宝藏半透明小图标，未发现的大图标 + 呼吸动画
+  const markers = validItems.map(t => {
+    const coords = t.location.coordinates
+    const discovered = t.isDiscovered
     const icon = typeIcons[t.type] || '📦'
 
     let markerHTML
@@ -164,22 +198,66 @@ function renderTreasureMarkers(list) {
       position: [coords[0], coords[1]],
       content: markerHTML,
       offset: new window.AMap.Pixel(-22, -22),
-      zIndex: discovered ? 80 : 100,
-      extData: t
+      zIndex: discovered ? 80 : 100
     })
 
+    treasureDataMap.set(marker, t)
+
     marker.on('click', () => emit('treasure-click', t))
-    // 移动端 touchend 也响应，提高可点击性
     marker.on('touchend', e => {
       e.originEvent?.stopPropagation?.()
       emit('treasure-click', t)
     })
-    map.add(marker)
-    treasureMarkers.push(marker)
+    return marker
+  })
+
+  if (!markers.length) return
+
+  markerCluster = new window.AMap.MarkerCluster(map, markers, {
+    gridSize: 60,
+    maxZoom: 18,
+    renderClusterMarker(ctx) {
+      const count = ctx.count
+      const size = Math.min(24 + count * 3, 52)
+      ctx.marker.setContent(
+        `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${count}</div>`
+      )
+      ctx.marker.setOffset(new window.AMap.Pixel(-size / 2, -size / 2))
+    }
+  })
+
+  markerCluster.on('click', (ctx) => {
+    const clusterMarkers = ctx.clusterData
+    if (!clusterMarkers || clusterMarkers.length <= 1) return
+
+    const currentZoom = map.getZoom()
+    if (currentZoom < 19) {
+      map.setZoomAndCenter(currentZoom + 2, ctx.lnglat)
+      return
+    }
+
+    const items = clusterMarkers
+      .map(cm => {
+        const mk = cm.marker || cm
+        return treasureDataMap.get(mk)
+      })
+      .filter(Boolean)
+
+    if (items.length > 1) {
+      clusterList.value = items
+    } else if (items.length === 1) {
+      emit('treasure-click', items[0])
+    }
   })
 }
 
+function pickFromCluster(t) {
+  clusterList.value = []
+  emit('treasure-click', t)
+}
+
 onUnmounted(() => {
+  if (markerCluster) markerCluster.setMap(null)
   if (map) map.destroy()
 })
 </script>
@@ -238,6 +316,113 @@ onUnmounted(() => {
   0%, 100% { opacity: 1; }
   50% { opacity: .7; }
 }
+
+.cluster-picker {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.cluster-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 420px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  animation: sheet-up .25s ease-out;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.cluster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eee;
+  font-weight: 600;
+  font-size: .95rem;
+}
+
+.cluster-header button {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: #999;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.cluster-items {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cluster-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  gap: 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cluster-item:active {
+  background: #f0faf7;
+}
+
+.ci-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.ci-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ci-info strong {
+  font-size: .95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ci-meta {
+  font-size: .78rem;
+  color: #999;
+}
+
+.ci-badge {
+  font-size: .75rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.ci-done {
+  background: #eee;
+  color: #999;
+}
+
+.ci-go {
+  background: #e8faf5;
+  color: #00d4aa;
+}
 </style>
 
 <style>
@@ -281,5 +466,18 @@ onUnmounted(() => {
 @keyframes t-breathe {
   0%, 100% { transform: scale(1); opacity: .3; }
   50% { transform: scale(1.6); opacity: 0; }
+}
+
+.t-cluster {
+  background: linear-gradient(135deg, #00d4aa, #00b894);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 212, 170, .5);
+  border: 2px solid #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 </style>
