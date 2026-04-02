@@ -149,6 +149,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // WebSocket（带认证）
 if (io) {
+    app.set('io', io);
     io.use(socketAuth);
     io.on('connection', (socket) => socketHandler(io, socket));
 }

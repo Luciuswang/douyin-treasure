@@ -20,7 +20,7 @@ const treasureSchema = new mongoose.Schema({
 
     type: {
         type: String,
-        enum: ['note', 'coupon', 'ticket', 'job', 'event', 'redpacket', 'task', 'image', 'custom'],
+        enum: ['note', 'coupon', 'ticket', 'job', 'event', 'redpacket', 'task', 'image', 'custom', 'social'],
         default: 'note'
     },
 
@@ -30,6 +30,10 @@ const treasureSchema = new mongoose.Schema({
         link: { type: String, default: '' },
         couponCode: { type: String, default: '' },
         amount: { type: Number, default: 0 },
+        // 社交宝藏专用
+        intro: { type: String, maxlength: 200, default: '' },
+        interests: [{ type: String }],
+        contact: { type: String, default: '' },
         extra: { type: mongoose.Schema.Types.Mixed }
     },
 
@@ -138,6 +142,18 @@ const treasureSchema = new mongoose.Schema({
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         discoveredAt: { type: Date, default: Date.now },
         rating: { type: Number, min: 1, max: 5 }
+    }],
+
+    // 社交宝藏：谁表达了"想认识"
+    interestedBy: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        createdAt: { type: Date, default: Date.now }
+    }],
+
+    // 社交宝藏：双向匹配记录
+    matches: [{
+        users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        matchedAt: { type: Date, default: Date.now }
     }]
 }, {
     timestamps: true
@@ -258,11 +274,47 @@ treasureSchema.methods.addReport = async function (userId, reason, detail) {
 
 treasureSchema.methods.toSafeObject = function (userId) {
     const obj = this.toObject();
-    if (userId) {
-        obj.isLiked = this.likedBy.some(id => id.toString() === userId.toString());
-        obj.isDiscovered = this.discoveredBy.some(d => d.user.toString() === userId.toString());
-        obj.isReported = this.reports.some(r => r.user.toString() === userId.toString());
+    const uid = userId?.toString();
+
+    if (uid) {
+        obj.isLiked = this.likedBy.some(id => id.toString() === uid);
+        obj.isDiscovered = this.discoveredBy.some(d => d.user.toString() === uid);
+        obj.isReported = this.reports.some(r => r.user.toString() === uid);
     }
+
+    // 社交宝藏隐私处理
+    if (this.type === 'social') {
+        const isCreator = uid && this.creator.toString() === uid;
+        const isMatched = uid && this.matches.some(
+            m => m.users.some(u => u.toString() === uid)
+        );
+
+        if (uid) {
+            obj.isInterested = this.interestedBy.some(i => i.user.toString() === uid);
+            obj.isMatched = isMatched;
+        }
+
+        // 联系方式仅匹配后或创建者自己可见
+        if (!isMatched && !isCreator) {
+            if (obj.content) obj.content.contact = '';
+        }
+
+        // interestedBy 详情仅创建者可见，其他人只看到数量
+        if (!isCreator) {
+            obj.interestCount = this.interestedBy.length;
+            delete obj.interestedBy;
+        }
+
+        // matches 详情仅参与者可见
+        if (!isCreator && !isMatched) {
+            obj.matchCount = this.matches.length;
+            delete obj.matches;
+        }
+    } else {
+        delete obj.interestedBy;
+        delete obj.matches;
+    }
+
     delete obj.likedBy;
     delete obj.password;
     delete obj.reports;

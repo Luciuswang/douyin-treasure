@@ -39,5 +39,17 @@ export const treasureService = {
 
   async report(id, reason, detail) {
     return api.post(`/treasures/${id}/report`, { reason, detail })
+  },
+
+  async expressInterest(id) {
+    return api.post(`/treasures/${id}/interest`)
+  },
+
+  async acceptInterest(id, userId) {
+    return api.post(`/treasures/${id}/interest/${userId}/accept`)
+  },
+
+  async getInterests(id) {
+    return api.get(`/treasures/${id}/interests`)
   }
 }

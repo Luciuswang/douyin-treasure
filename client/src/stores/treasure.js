@@ -59,8 +59,21 @@ export const useTreasureStore = defineStore('treasure', () => {
     return treasureService.report(id, reason, detail)
   }
 
+  async function expressInterest(id) {
+    return treasureService.expressInterest(id)
+  }
+
+  async function acceptInterest(id, userId) {
+    return treasureService.acceptInterest(id, userId)
+  }
+
+  async function getInterests(id) {
+    return treasureService.getInterests(id)
+  }
+
   return {
     nearbyTreasures, myTreasures, discoveredTreasures, loading, selectedTreasure,
-    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, removeTreasure, reportTreasure
+    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, removeTreasure,
+    reportTreasure, expressInterest, acceptInterest, getInterests
   }
 })

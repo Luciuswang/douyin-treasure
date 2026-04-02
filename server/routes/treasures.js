@@ -327,6 +327,164 @@ router.post('/:id/report', authenticateToken, async (req, res) => {
 });
 
 /**
+ * POST /api/treasures/:id/interest
+ * 表达"想认识"（社交宝藏）
+ */
+router.post('/:id/interest', authenticateToken, async (req, res) => {
+    try {
+        const treasure = await Treasure.findById(req.params.id);
+        if (!treasure) {
+            return res.status(404).json({ success: false, message: '宝藏不存在' });
+        }
+        if (treasure.type !== 'social') {
+            return res.status(400).json({ success: false, message: '仅社交宝藏支持此操作' });
+        }
+        if (treasure.creator.toString() === req.user.userId) {
+            return res.status(400).json({ success: false, message: '不能对自己的宝藏操作' });
+        }
+
+        const already = treasure.interestedBy.some(
+            i => i.user.toString() === req.user.userId
+        );
+        if (already) {
+            return res.status(400).json({ success: false, message: '你已经表达过兴趣了' });
+        }
+
+        treasure.interestedBy.push({ user: req.user.userId, createdAt: new Date() });
+        await treasure.save();
+
+        // Socket 通知创建者
+        const io = req.app.get('io');
+        if (io) {
+            const User = require('../models/User');
+            const interestUser = await User.findById(req.user.userId, 'username avatar');
+            io.to(`user:${treasure.creator}`).emit('social:interest', {
+                treasureId: treasure._id,
+                treasureTitle: treasure.title,
+                user: { id: req.user.userId, username: interestUser?.username || '某人' },
+                message: `${interestUser?.username || '有人'}对你的缘分宝藏感兴趣！`
+            });
+        }
+
+        res.json({ success: true, message: '已发送，等待对方回应' });
+    } catch (error) {
+        console.error('表达兴趣错误:', error);
+        res.status(500).json({ success: false, message: '服务器错误' });
+    }
+});
+
+/**
+ * POST /api/treasures/:id/interest/:userId/accept
+ * 创建者接受匹配（双向达成）
+ */
+router.post('/:id/interest/:userId/accept', authenticateToken, async (req, res) => {
+    try {
+        const treasure = await Treasure.findById(req.params.id);
+        if (!treasure) {
+            return res.status(404).json({ success: false, message: '宝藏不存在' });
+        }
+        if (treasure.type !== 'social') {
+            return res.status(400).json({ success: false, message: '仅社交宝藏支持此操作' });
+        }
+        if (treasure.creator.toString() !== req.user.userId) {
+            return res.status(403).json({ success: false, message: '仅创建者可接受匹配' });
+        }
+
+        const targetUserId = req.params.userId;
+        const hasInterest = treasure.interestedBy.some(
+            i => i.user.toString() === targetUserId
+        );
+        if (!hasInterest) {
+            return res.status(400).json({ success: false, message: '该用户未表达兴趣' });
+        }
+
+        const alreadyMatched = treasure.matches.some(
+            m => m.users.some(u => u.toString() === targetUserId)
+        );
+        if (alreadyMatched) {
+            return res.status(400).json({ success: false, message: '已经匹配过了' });
+        }
+
+        treasure.matches.push({
+            users: [req.user.userId, targetUserId],
+            matchedAt: new Date()
+        });
+        await treasure.save();
+
+        // Socket 通知双方匹配成功
+        const io = req.app.get('io');
+        if (io) {
+            const User = require('../models/User');
+            const [creator, target] = await Promise.all([
+                User.findById(req.user.userId, 'username avatar'),
+                User.findById(targetUserId, 'username avatar')
+            ]);
+
+            const contact = treasure.content?.contact || '';
+
+            io.to(`user:${targetUserId}`).emit('social:match', {
+                treasureId: treasure._id,
+                matchedUser: { id: req.user.userId, username: creator?.username },
+                contact,
+                message: `恭喜！你和 ${creator?.username} 双向匹配成功！`
+            });
+
+            io.to(`user:${req.user.userId}`).emit('social:match', {
+                treasureId: treasure._id,
+                matchedUser: { id: targetUserId, username: target?.username },
+                message: `恭喜！你和 ${target?.username} 双向匹配成功！`
+            });
+        }
+
+        res.json({ success: true, message: '匹配成功！双方可以查看联系方式了' });
+    } catch (error) {
+        console.error('接受匹配错误:', error);
+        res.status(500).json({ success: false, message: '服务器错误' });
+    }
+});
+
+/**
+ * GET /api/treasures/:id/interests
+ * 创建者查看谁对自己的宝藏感兴趣
+ */
+router.get('/:id/interests', authenticateToken, async (req, res) => {
+    try {
+        const treasure = await Treasure.findById(req.params.id)
+            .populate('interestedBy.user', 'username avatar bio preferences.interests level.currentLevel');
+
+        if (!treasure) {
+            return res.status(404).json({ success: false, message: '宝藏不存在' });
+        }
+        if (treasure.creator.toString() !== req.user.userId) {
+            return res.status(403).json({ success: false, message: '仅创建者可查看' });
+        }
+
+        const matchedUserIds = new Set(
+            treasure.matches.flatMap(m => m.users.map(u => u.toString()))
+        );
+
+        const interests = treasure.interestedBy.map(i => {
+            const u = i.user;
+            return {
+                userId: u._id,
+                username: u.username,
+                avatar: u.avatar,
+                bio: u.bio,
+                interests: u.preferences?.interests || [],
+                level: u.level?.currentLevel || 1,
+                interestedAt: i.createdAt,
+                isMatched: matchedUserIds.has(u._id.toString())
+            };
+        });
+
+        res.json({ success: true, data: interests });
+    } catch (error) {
+        console.error('查看兴趣列表错误:', error);
+        res.status(500).json({ success: false, message: '服务器错误' });
+    }
+});
+
+/**
  * POST /api/treasures/:id/like
  * 点赞/取消点赞
  */

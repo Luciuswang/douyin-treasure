@@ -19,29 +19,92 @@
         <span>🎯 {{ treasure.stats?.discoveries || 0 }} 人发现</span>
       </div>
 
-      <div class="content-preview" v-if="treasure.content?.text">
-        <p>{{ treasure.isDiscovered ? treasure.content.text : '到达指定地点后解锁内容...' }}</p>
-      </div>
-
-      <div class="rewards" v-if="treasure.rewards">
-        <span>🏆 +{{ treasure.rewards.experience || 10 }} 经验</span>
-        <span>🪙 +{{ treasure.rewards.coins || 5 }} 金币</span>
-      </div>
-
-      <div v-if="treasure.isDiscovered" class="discovered-badge">
-        ✅ 你已经发现了这个宝藏
-      </div>
-
-      <div v-else class="action-area">
-        <p class="safety-tip">请注意周围环境安全，切勿进入危险区域</p>
-        <div v-if="treasure.password" class="password-input">
-          <input v-model="password" type="text" placeholder="输入宝藏密码" />
+      <!-- 社交宝藏专属区域 -->
+      <template v-if="treasure.type === 'social'">
+        <div class="social-interests" v-if="treasure.content?.interests?.length">
+          <span v-for="tag in treasure.content.interests" :key="tag" class="interest-tag">{{ tag }}</span>
         </div>
-        <button class="btn-discover" @click="handleDiscover" :disabled="discovering">
-          {{ discovering ? '发现中...' : '🎯 发现宝藏' }}
-        </button>
-        <p class="hint">需要到达宝藏 {{ treasure.location?.discoveryRadius || 50 }}m 范围内</p>
-      </div>
+
+        <!-- 联系方式：仅匹配后可见 -->
+        <div class="contact-area" v-if="treasure.isMatched && treasure.content?.contact">
+          <div class="match-badge">💕 双向匹配成功！</div>
+          <div class="contact-info">
+            <span>联系方式：</span>
+            <strong>{{ treasure.content.contact }}</strong>
+          </div>
+        </div>
+        <div class="contact-locked" v-else-if="!isCreator">
+          <span>🔒 双方都点"想认识"后可见联系方式</span>
+        </div>
+
+        <!-- 非创建者：想认识按钮 -->
+        <div v-if="!isCreator" class="action-area">
+          <button
+            v-if="!treasure.isInterested && !treasure.isMatched"
+            class="btn-interest"
+            @click="handleInterest"
+            :disabled="interestLoading"
+          >{{ interestLoading ? '发送中...' : '💕 想认识' }}</button>
+          <p v-else-if="treasure.isInterested && !treasure.isMatched" class="interest-sent">
+            ✅ 已发送，等待对方回应
+          </p>
+        </div>
+
+        <!-- 创建者：查看谁感兴趣 -->
+        <div v-if="isCreator" class="interest-list-area">
+          <button v-if="!showInterestList" class="btn-show-interests" @click="loadInterestList">
+            💌 查看谁对你感兴趣 ({{ treasure.interestedBy?.length || treasure.interestCount || 0 }})
+          </button>
+          <div v-if="showInterestList" class="interest-list">
+            <h4>对你感兴趣的人：</h4>
+            <div v-if="!interestList.length" class="no-interests">还没有人表达兴趣</div>
+            <div v-for="p in interestList" :key="p.userId" class="interest-person">
+              <div class="person-info">
+                <strong>{{ p.username }}</strong>
+                <span class="person-level">Lv.{{ p.level }}</span>
+                <p v-if="p.bio" class="person-bio">{{ p.bio }}</p>
+                <div class="person-tags" v-if="p.interests?.length">
+                  <span v-for="t in p.interests" :key="t" class="mini-tag">{{ t }}</span>
+                </div>
+              </div>
+              <button
+                v-if="!p.isMatched"
+                class="btn-accept"
+                @click="handleAccept(p.userId)"
+                :disabled="acceptLoading"
+              >也想认识</button>
+              <span v-else class="matched-label">💕 已匹配</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 普通宝藏区域 -->
+      <template v-else>
+        <div class="content-preview" v-if="treasure.content?.text">
+          <p>{{ treasure.isDiscovered ? treasure.content.text : '到达指定地点后解锁内容...' }}</p>
+        </div>
+
+        <div class="rewards" v-if="treasure.rewards">
+          <span>🏆 +{{ treasure.rewards.experience || 10 }} 经验</span>
+          <span>🪙 +{{ treasure.rewards.coins || 5 }} 金币</span>
+        </div>
+
+        <div v-if="treasure.isDiscovered" class="discovered-badge">
+          ✅ 你已经发现了这个宝藏
+        </div>
+
+        <div v-else class="action-area">
+          <p class="safety-tip">请注意周围环境安全，切勿进入危险区域</p>
+          <div v-if="treasure.password" class="password-input">
+            <input v-model="password" type="text" placeholder="输入宝藏密码" />
+          </div>
+          <button class="btn-discover" @click="handleDiscover" :disabled="discovering">
+            {{ discovering ? '发现中...' : '🎯 发现宝藏' }}
+          </button>
+          <p class="hint">需要到达宝藏 {{ treasure.location?.discoveryRadius || 50 }}m 范围内</p>
+        </div>
+      </template>
 
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       <p v-if="successMsg" class="success">{{ successMsg }}</p>
@@ -75,7 +138,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useMapStore } from '../../stores/map.js'
 import { useTreasureStore } from '../../stores/treasure.js'
 import { useUserStore } from '../../stores/user.js'
@@ -97,6 +160,18 @@ const selectedReason = ref('')
 const reporting = ref(false)
 const reportMsg = ref('')
 
+// 社交宝藏状态
+const interestLoading = ref(false)
+const acceptLoading = ref(false)
+const showInterestList = ref(false)
+const interestList = ref([])
+
+const isCreator = computed(() => {
+  if (!userStore.user?._id) return false
+  const creatorId = props.treasure.creator?._id || props.treasure.creator
+  return creatorId?.toString() === userStore.user._id.toString()
+})
+
 const reportReasons = [
   { value: 'dangerous_location', label: '⚠️ 位置危险' },
   { value: 'inappropriate_content', label: '🚫 不当内容' },
@@ -106,11 +181,54 @@ const reportReasons = [
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
-  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦'
+  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
 }
 const typeLabels = {
   note: '笔记', coupon: '优惠券', ticket: '门票', job: '招聘',
-  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义'
+  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分宝藏'
+}
+
+async function handleInterest() {
+  if (!userStore.isLoggedIn) {
+    window.__totofun_openAuth?.()
+    return
+  }
+  interestLoading.value = true
+  errorMsg.value = ''
+  try {
+    const res = await treasureStore.expressInterest(props.treasure._id)
+    successMsg.value = res.message || '已发送！'
+    props.treasure.isInterested = true
+  } catch (err) {
+    errorMsg.value = err.message || '操作失败'
+  } finally {
+    interestLoading.value = false
+  }
+}
+
+async function loadInterestList() {
+  showInterestList.value = true
+  try {
+    const res = await treasureStore.getInterests(props.treasure._id)
+    interestList.value = res.data || []
+  } catch (err) {
+    errorMsg.value = err.message || '加载失败'
+  }
+}
+
+async function handleAccept(userId) {
+  acceptLoading.value = true
+  errorMsg.value = ''
+  try {
+    const res = await treasureStore.acceptInterest(props.treasure._id, userId)
+    successMsg.value = res.message || '匹配成功！'
+    const person = interestList.value.find(p => p.userId === userId)
+    if (person) person.isMatched = true
+  } catch (err) {
+    errorMsg.value = err.message || '操作失败'
+  } finally {
+    acceptLoading.value = false
+  }
 }
 
 async function handleReport() {
@@ -357,4 +475,131 @@ async function handleDiscover() {
 }
 
 .report-msg { font-size: .8rem; color: #e65100; text-align: center; margin-top: 6px; }
+
+/* 社交宝藏样式 */
+.social-interests { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+.interest-tag {
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #fff0f6, #f3e8ff);
+  border: 1px solid #f0d0e8;
+  border-radius: 12px;
+  font-size: .78rem;
+  color: #9c27b0;
+}
+
+.contact-area { margin: 12px 0; }
+
+.match-badge {
+  background: linear-gradient(135deg, #ff6b9d, #c084fc);
+  color: #fff;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.contact-info {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: .9rem;
+}
+
+.contact-info strong { color: #333; }
+
+.contact-locked {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: .8rem;
+  color: #999;
+  margin: 10px 0;
+}
+
+.btn-interest {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #ff6b9d, #c084fc);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-interest:disabled { opacity: .6; }
+
+.interest-sent {
+  text-align: center;
+  color: #9c27b0;
+  font-size: .85rem;
+  padding: 10px;
+  background: #f3e8ff;
+  border-radius: 10px;
+}
+
+.interest-list-area { margin-top: 12px; }
+
+.btn-show-interests {
+  width: 100%;
+  padding: 12px;
+  background: #f3e8ff;
+  color: #7b1fa2;
+  border: 1px solid #e1bee7;
+  border-radius: 12px;
+  font-size: .9rem;
+  cursor: pointer;
+}
+
+.interest-list h4 { font-size: .9rem; color: #555; margin: 12px 0 8px; }
+
+.no-interests { color: #999; font-size: .85rem; text-align: center; padding: 16px; }
+
+.interest-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.person-info { flex: 1; min-width: 0; }
+
+.person-info strong { font-size: .9rem; color: #333; }
+
+.person-level { font-size: .72rem; color: #999; margin-left: 6px; }
+
+.person-bio { font-size: .78rem; color: #666; margin: 4px 0 0; }
+
+.person-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.mini-tag {
+  padding: 2px 6px;
+  background: #f3e8ff;
+  border-radius: 8px;
+  font-size: .68rem;
+  color: #9c27b0;
+}
+
+.btn-accept {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #ff6b9d, #c084fc);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: .78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.btn-accept:disabled { opacity: .5; }
+
+.matched-label { color: #9c27b0; font-size: .78rem; font-weight: 600; flex-shrink: 0; margin-left: 8px; }
 </style>

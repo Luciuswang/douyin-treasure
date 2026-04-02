@@ -37,7 +37,7 @@ let treasureMarkers = []
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
-  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦'
+  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
 }
 
 async function initMap() {

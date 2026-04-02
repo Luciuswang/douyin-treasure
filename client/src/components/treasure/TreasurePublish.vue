@@ -18,17 +18,37 @@
           </button>
         </div>
 
-        <input v-model="form.title" placeholder="宝藏标题 *" maxlength="100" />
-        <textarea v-model="form.description" placeholder="描述一下这个宝藏..." maxlength="500" rows="3"></textarea>
+        <input v-model="form.title" :placeholder="form.type === 'social' ? '给缘分宝藏起个名字' : '宝藏标题 *'" maxlength="100" />
+        <textarea v-model="form.description" :placeholder="form.type === 'social' ? '介绍一下自己吧，让对方了解你...' : '描述一下这个宝藏...'" maxlength="500" rows="3"></textarea>
 
-        <div class="content-fields">
-          <input v-if="showTextField" v-model="form.content.text" :placeholder="textPlaceholder" />
-          <input v-if="form.type === 'coupon'" v-model="form.content.couponCode" placeholder="优惠码（可选）" />
-          <input v-if="form.type === 'redpacket'" v-model.number="form.content.amount" type="number" placeholder="金额" />
-          <input v-if="form.type === 'link' || form.type === 'event'" v-model="form.content.link" placeholder="链接（可选）" />
-        </div>
+        <!-- 社交宝藏专属字段 -->
+        <template v-if="form.type === 'social'">
+          <div class="social-fields">
+            <label class="field-label">兴趣标签（选择你喜欢的）</label>
+            <div class="interest-tags">
+              <button
+                v-for="tag in interestOptions" :key="tag"
+                class="tag-btn"
+                :class="{ active: form.content.interests.includes(tag) }"
+                @click="toggleInterest(tag)"
+                type="button"
+              >{{ tag }}</button>
+            </div>
+            <input v-model="form.content.contact" placeholder="联系方式（微信号等，匹配后对方可见）" />
+            <p class="field-hint">联系方式仅在双方都点"想认识"后才会互相揭示</p>
+          </div>
+        </template>
 
-        <input v-model="form.password" placeholder="设置密码（可选，需要密码才能领取）" />
+        <!-- 普通宝藏字段 -->
+        <template v-else>
+          <div class="content-fields">
+            <input v-if="showTextField" v-model="form.content.text" :placeholder="textPlaceholder" />
+            <input v-if="form.type === 'coupon'" v-model="form.content.couponCode" placeholder="优惠码（可选）" />
+            <input v-if="form.type === 'redpacket'" v-model.number="form.content.amount" type="number" placeholder="金额" />
+            <input v-if="form.type === 'link' || form.type === 'event'" v-model="form.content.link" placeholder="链接（可选）" />
+          </div>
+          <input v-model="form.password" placeholder="设置密码（可选，需要密码才能领取）" />
+        </template>
 
         <div class="location-info">
           <span v-if="mapStore.userLocation">
@@ -77,7 +97,7 @@ const form = reactive({
   title: '',
   description: '',
   type: 'note',
-  content: { text: '', couponCode: '', amount: 0, link: '' },
+  content: { text: '', couponCode: '', amount: 0, link: '', interests: [], contact: '' },
   password: '',
   discoveryRadius: 50,
   category: '其他'
@@ -85,6 +105,7 @@ const form = reactive({
 
 const types = [
   { value: 'note', icon: '📝', label: '笔记' },
+  { value: 'social', icon: '💕', label: '交友' },
   { value: 'coupon', icon: '🎫', label: '优惠券' },
   { value: 'redpacket', icon: '🧧', label: '红包' },
   { value: 'ticket', icon: '🎬', label: '门票' },
@@ -93,6 +114,14 @@ const types = [
   { value: 'task', icon: '📋', label: '任务' },
   { value: 'custom', icon: '📦', label: '自定义' }
 ]
+
+const interestOptions = ['美食', '旅游', '摄影', '运动', '音乐', '艺术', '电影', '读书', '游戏', '健身', '咖啡', '宠物', '编程', '投资']
+
+function toggleInterest(tag) {
+  const idx = form.content.interests.indexOf(tag)
+  if (idx === -1) form.content.interests.push(tag)
+  else form.content.interests.splice(idx, 1)
+}
 
 const categories = ['美食', '旅游', '摄影', '运动', '音乐', '艺术', '历史', '购物', '咖啡', '酒吧', '电影', '其他']
 
@@ -112,7 +141,15 @@ async function handlePublish() {
     return
   }
   if (!form.title.trim()) {
-    errorMsg.value = '请输入标题'
+    if (form.type === 'social') {
+      form.title = `${userStore.username}的缘分宝藏`
+    } else {
+      errorMsg.value = '请输入标题'
+      return
+    }
+  }
+  if (form.type === 'social' && !form.content.contact?.trim()) {
+    errorMsg.value = '交友宝藏需要填写联系方式（匹配后才会显示给对方）'
     return
   }
   if (!mapStore.userLocation) {
@@ -232,6 +269,30 @@ input, textarea, select {
 textarea { resize: vertical; }
 
 .content-fields { display: flex; flex-direction: column; gap: 8px; }
+
+.social-fields { display: flex; flex-direction: column; gap: 10px; }
+
+.field-label { font-size: .85rem; color: #555; font-weight: 600; margin: 0; }
+
+.interest-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tag-btn {
+  padding: 5px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  background: #f9f9f9;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.tag-btn.active {
+  background: linear-gradient(135deg, #ff6b9d, #c084fc);
+  color: #fff;
+  border-color: transparent;
+}
+
+.field-hint { font-size: .72rem; color: #aaa; margin: 0; }
 
 .location-info { font-size: .8rem; color: #666; }
 
