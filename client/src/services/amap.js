@@ -306,6 +306,67 @@ export function stopTracking(watchId) {
 }
 
 /**
+ * 位置安全检测 — 通过逆地理编码判断是否为危险区域
+ * 返回 { safe: boolean, reason?: string, detail?: string }
+ */
+export async function checkLocationSafety(lng, lat) {
+  const DANGEROUS_POIS = [
+    '河流', '湖泊', '水库', '海域', '池塘', '水渠', '运河',
+    '高速公路', '铁路', '高架', '立交桥', '隧道', '收费站',
+    '施工', '工地', '军事', '靶场', '禁区', '变电站', '核电'
+  ]
+
+  try {
+    await loadAMap()
+
+    const result = await new Promise((resolve, reject) => {
+      const geocoder = new window.AMap.Geocoder({ extensions: 'all' })
+      geocoder.getAddress([lng, lat], (status, res) => {
+        if (status === 'complete') resolve(res)
+        else reject(new Error('逆地理编码失败'))
+      })
+    })
+
+    const component = result.regeocode?.addressComponent || {}
+    const desc = result.regeocode?.formattedAddress || ''
+    const pois = result.regeocode?.pois || []
+    const roads = result.regeocode?.roads || []
+
+    // 检查最近的 POI 名称和类型
+    for (const poi of pois.slice(0, 10)) {
+      const name = poi.name || ''
+      const poiType = poi.type || ''
+      for (const keyword of DANGEROUS_POIS) {
+        if (name.includes(keyword) || poiType.includes(keyword)) {
+          return { safe: false, reason: 'dangerous_poi', detail: `附近有危险区域：${name}` }
+        }
+      }
+    }
+
+    // 检查道路类型（高速公路、匝道）
+    for (const road of roads.slice(0, 5)) {
+      const name = road.name || ''
+      if (name.includes('高速') || name.includes('快速路')) {
+        return { safe: false, reason: 'highway', detail: `附近为高速公路：${name}` }
+      }
+    }
+
+    // 检查地址描述中的危险关键词
+    const allText = desc + ' ' + (component.township || '')
+    for (const keyword of DANGEROUS_POIS) {
+      if (allText.includes(keyword)) {
+        return { safe: false, reason: 'dangerous_area', detail: `该区域可能存在危险：${keyword}` }
+      }
+    }
+
+    return { safe: true }
+  } catch (e) {
+    console.warn('安全检测失败，放行:', e.message)
+    return { safe: true }
+  }
+}
+
+/**
  * 计算两点之间距离（米），Haversine
  */
 export function calcDistance(lat1, lng1, lat2, lng2) {

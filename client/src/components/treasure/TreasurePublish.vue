@@ -47,8 +47,9 @@
           <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
         </select>
 
+        <p class="safety-notice">发布即表示您确认此位置安全可达</p>
         <button class="btn-publish" @click="handlePublish" :disabled="publishing">
-          {{ publishing ? '发布中...' : '✨ 发布宝藏' }}
+          {{ publishing ? (safetyChecking ? '安全检测中...' : '发布中...') : '✨ 发布宝藏' }}
         </button>
         <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       </div>
@@ -61,6 +62,7 @@ import { ref, reactive, computed } from 'vue'
 import { useMapStore } from '../../stores/map.js'
 import { useTreasureStore } from '../../stores/treasure.js'
 import { useUserStore } from '../../stores/user.js'
+import { checkLocationSafety } from '../../services/amap.js'
 
 const emit = defineEmits(['close', 'published'])
 const mapStore = useMapStore()
@@ -68,6 +70,7 @@ const treasureStore = useTreasureStore()
 const userStore = useUserStore()
 
 const publishing = ref(false)
+const safetyChecking = ref(false)
 const errorMsg = ref('')
 
 const form = reactive({
@@ -122,6 +125,17 @@ async function handlePublish() {
 
   try {
     const { lat, lng } = mapStore.userLocation
+
+    // 安全检测
+    safetyChecking.value = true
+    const safety = await checkLocationSafety(lng, lat)
+    safetyChecking.value = false
+    if (!safety.safe) {
+      errorMsg.value = `${safety.detail || '该位置可能存在安全风险'}，请换个位置发布`
+      publishing.value = false
+      return
+    }
+
     const res = await treasureStore.createTreasure({
       title: form.title,
       description: form.description,
@@ -236,6 +250,13 @@ textarea { resize: vertical; }
 }
 
 .btn-publish:disabled { opacity: .6; }
+
+.safety-notice {
+  font-size: .75rem;
+  color: #999;
+  text-align: center;
+  margin: 0;
+}
 
 .error { color: #e53935; font-size: .85rem; text-align: center; }
 </style>

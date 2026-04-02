@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Treasure = require('../models/Treasure');
 const { authenticateToken } = require('../middleware/auth');
+const { checkLocationSafety } = require('../utils/locationSafety');
 
 /**
  * GET /api/treasures/nearby?lat=&lng=&radius=&type=&category=
@@ -103,6 +104,17 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: '标题和位置坐标是必填项'
+            });
+        }
+
+        // 服务端位置安全校验（兜底）
+        const [lng, lat] = location.coordinates;
+        const safety = await checkLocationSafety(lng, lat);
+        if (!safety.safe) {
+            return res.status(400).json({
+                success: false,
+                message: safety.detail || '该位置可能存在安全风险，请换个位置发布',
+                code: 'UNSAFE_LOCATION'
             });
         }
 
@@ -267,6 +279,49 @@ router.post('/:id/discover', authenticateToken, async (req, res) => {
         res.json({ success: true, message: '恭喜发现宝藏！', data: { treasure: treasure.toSafeObject(req.user.userId) } });
     } catch (error) {
         console.error('发现宝藏错误:', error);
+        res.status(500).json({ success: false, message: '服务器错误' });
+    }
+});
+
+/**
+ * POST /api/treasures/:id/report
+ * 举报宝藏（需登录，同一用户对同一宝藏只能举报一次）
+ */
+router.post('/:id/report', authenticateToken, async (req, res) => {
+    try {
+        const { reason, detail } = req.body;
+        const validReasons = ['dangerous_location', 'inappropriate_content', 'spam', 'other'];
+
+        if (!reason || !validReasons.includes(reason)) {
+            return res.status(400).json({
+                success: false,
+                message: '请提供有效的举报原因',
+                validReasons
+            });
+        }
+
+        const treasure = await Treasure.findById(req.params.id);
+        if (!treasure) {
+            return res.status(404).json({ success: false, message: '宝藏不存在' });
+        }
+
+        if (treasure.creator.toString() === req.user.userId) {
+            return res.status(400).json({ success: false, message: '不能举报自己的宝藏' });
+        }
+
+        const result = await treasure.addReport(req.user.userId, reason, detail || '');
+
+        if (!result.added) {
+            return res.status(400).json({ success: false, message: '你已经举报过这个宝藏了' });
+        }
+
+        res.json({
+            success: true,
+            message: result.statusChanged ? '举报已收到，该宝藏已进入审核' : '举报已收到，感谢反馈',
+            data: { reportCount: result.reportCount }
+        });
+    } catch (error) {
+        console.error('举报宝藏错误:', error);
         res.status(500).json({ success: false, message: '服务器错误' });
     }
 });

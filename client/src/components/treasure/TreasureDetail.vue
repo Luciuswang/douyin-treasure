@@ -33,6 +33,7 @@
       </div>
 
       <div v-else class="action-area">
+        <p class="safety-tip">请注意周围环境安全，切勿进入危险区域</p>
         <div v-if="treasure.password" class="password-input">
           <input v-model="password" type="text" placeholder="输入宝藏密码" />
         </div>
@@ -44,6 +45,31 @@
 
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       <p v-if="successMsg" class="success">{{ successMsg }}</p>
+
+      <!-- 举报区域 -->
+      <div class="report-area">
+        <button v-if="!showReportPanel" class="report-toggle" @click="showReportPanel = true">
+          🚩 举报此宝藏
+        </button>
+        <div v-if="showReportPanel" class="report-panel">
+          <p class="report-title">选择举报原因：</p>
+          <div class="report-options">
+            <button
+              v-for="r in reportReasons" :key="r.value"
+              class="report-reason-btn"
+              :class="{ active: selectedReason === r.value }"
+              @click="selectedReason = r.value"
+            >{{ r.label }}</button>
+          </div>
+          <div class="report-actions">
+            <button class="btn-report-submit" @click="handleReport" :disabled="reporting || !selectedReason">
+              {{ reporting ? '提交中...' : '提交举报' }}
+            </button>
+            <button class="btn-report-cancel" @click="showReportPanel = false; selectedReason = ''">取消</button>
+          </div>
+          <p v-if="reportMsg" class="report-msg">{{ reportMsg }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -66,6 +92,18 @@ const discovering = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
+const showReportPanel = ref(false)
+const selectedReason = ref('')
+const reporting = ref(false)
+const reportMsg = ref('')
+
+const reportReasons = [
+  { value: 'dangerous_location', label: '⚠️ 位置危险' },
+  { value: 'inappropriate_content', label: '🚫 不当内容' },
+  { value: 'spam', label: '📢 垃圾信息' },
+  { value: 'other', label: '❓ 其他' }
+]
+
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
   event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦'
@@ -73,6 +111,26 @@ const typeIcons = {
 const typeLabels = {
   note: '笔记', coupon: '优惠券', ticket: '门票', job: '招聘',
   event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义'
+}
+
+async function handleReport() {
+  if (!userStore.isLoggedIn) {
+    window.__totofun_openAuth?.()
+    return
+  }
+  if (!selectedReason.value) return
+
+  reporting.value = true
+  reportMsg.value = ''
+  try {
+    const res = await treasureStore.reportTreasure(props.treasure._id, selectedReason.value)
+    reportMsg.value = res.message || '举报已提交'
+    setTimeout(() => { showReportPanel.value = false }, 2000)
+  } catch (err) {
+    reportMsg.value = err.message || '举报失败'
+  } finally {
+    reporting.value = false
+  }
 }
 
 async function handleDiscover() {
@@ -221,6 +279,82 @@ async function handleDiscover() {
 
 .hint { text-align: center; font-size: .75rem; color: #999; margin-top: 8px; }
 
+.safety-tip {
+  background: #fff3e0;
+  color: #e65100;
+  font-size: .75rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
 .error { color: #e53935; font-size: .85rem; text-align: center; margin-top: 8px; }
 .success { color: #2e7d32; font-size: .85rem; text-align: center; margin-top: 8px; }
+
+.report-area {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.report-toggle {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: .78rem;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.report-toggle:hover { color: #e53935; }
+
+.report-panel { margin-top: 8px; }
+
+.report-title { font-size: .85rem; color: #555; margin: 0 0 8px; }
+
+.report-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+.report-reason-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  background: #f9f9f9;
+  font-size: .78rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.report-reason-btn.active {
+  background: #e53935;
+  color: #fff;
+  border-color: #e53935;
+}
+
+.report-actions { display: flex; gap: 8px; }
+
+.btn-report-submit {
+  flex: 1;
+  padding: 10px;
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+.btn-report-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-report-cancel {
+  padding: 10px 16px;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  border-radius: 20px;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+.report-msg { font-size: .8rem; color: #e65100; text-align: center; margin-top: 6px; }
 </style>

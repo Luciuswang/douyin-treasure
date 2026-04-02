@@ -108,9 +108,26 @@ const treasureSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['active', 'inactive', 'reported', 'banned', 'expired'],
+        enum: ['active', 'inactive', 'under_review', 'reported', 'banned', 'expired'],
         default: 'active'
     },
+
+    publishMethod: {
+        type: String,
+        enum: ['onsite', 'remote'],
+        default: 'onsite'
+    },
+
+    reports: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reason: {
+            type: String,
+            enum: ['dangerous_location', 'inappropriate_content', 'spam', 'other']
+        },
+        detail: { type: String, maxlength: 200 },
+        createdAt: { type: Date, default: Date.now }
+    }],
+    reportCount: { type: Number, default: 0 },
 
     likedBy: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -220,14 +237,35 @@ treasureSchema.methods.toggleLike = function (userId) {
     return { action: 'unliked', likes: this.stats.likes };
 };
 
+treasureSchema.methods.addReport = async function (userId, reason, detail) {
+    const alreadyReported = this.reports.some(
+        r => r.user.toString() === userId.toString()
+    );
+    if (alreadyReported) {
+        return { added: false, reason: 'already_reported' };
+    }
+
+    this.reports.push({ user: userId, reason, detail, createdAt: new Date() });
+    this.reportCount = this.reports.length;
+
+    if (this.reportCount >= 3 && this.status === 'active') {
+        this.status = 'under_review';
+    }
+
+    await this.save();
+    return { added: true, reportCount: this.reportCount, statusChanged: this.status === 'under_review' };
+};
+
 treasureSchema.methods.toSafeObject = function (userId) {
     const obj = this.toObject();
     if (userId) {
         obj.isLiked = this.likedBy.some(id => id.toString() === userId.toString());
         obj.isDiscovered = this.discoveredBy.some(d => d.user.toString() === userId.toString());
+        obj.isReported = this.reports.some(r => r.user.toString() === userId.toString());
     }
     delete obj.likedBy;
     delete obj.password;
+    delete obj.reports;
     return obj;
 };
 

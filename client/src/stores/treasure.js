@@ -55,8 +55,12 @@ export const useTreasureStore = defineStore('treasure', () => {
     return res
   }
 
+  async function reportTreasure(id, reason, detail) {
+    return treasureService.report(id, reason, detail)
+  }
+
   return {
     nearbyTreasures, myTreasures, discoveredTreasures, loading, selectedTreasure,
-    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, removeTreasure
+    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, removeTreasure, reportTreasure
   }
 })

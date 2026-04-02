@@ -35,5 +35,9 @@ export const treasureService = {
 
   async toggleLike(id) {
     return api.post(`/treasures/${id}/like`)
+  },
+
+  async report(id, reason, detail) {
+    return api.post(`/treasures/${id}/report`, { reason, detail })
   }
 }
