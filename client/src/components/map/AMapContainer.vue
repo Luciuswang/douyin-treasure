@@ -59,8 +59,7 @@ const clusterList = ref([])
 
 let map = null
 let userMarker = null
-let markerCluster = null
-let treasureDataMap = new Map()
+let allMarkers = []
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
@@ -165,12 +164,42 @@ function updateUserMarker(loc) {
   }
 }
 
-function renderTreasureMarkers(list) {
-  if (markerCluster) {
-    markerCluster.setMap(null)
-    markerCluster = null
+function distMeters(lng1, lat1, lng2, lat2) {
+  const R = 6378137
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function groupByProximity(items, threshold = 40) {
+  const used = new Set()
+  const groups = []
+
+  for (let i = 0; i < items.length; i++) {
+    if (used.has(i)) continue
+    const g = [items[i]]
+    used.add(i)
+    const ci = items[i].location.coordinates
+
+    for (let j = i + 1; j < items.length; j++) {
+      if (used.has(j)) continue
+      const cj = items[j].location.coordinates
+      if (distMeters(ci[0], ci[1], cj[0], cj[1]) < threshold) {
+        g.push(items[j])
+        used.add(j)
+      }
+    }
+    groups.push(g)
   }
-  treasureDataMap.clear()
+  return groups
+}
+
+function renderTreasureMarkers(list) {
+  allMarkers.forEach(m => map.remove(m))
+  allMarkers = []
   if (!window.AMap || !list.length) return
 
   const validItems = list.filter(t => {
@@ -182,73 +211,65 @@ function renderTreasureMarkers(list) {
     return true
   })
 
-  const markers = validItems.map(t => {
-    const coords = t.location.coordinates
-    const discovered = t.isDiscovered
-    const icon = typeIcons[t.type] || '📦'
+  const groups = groupByProximity(validItems)
 
-    let markerHTML
-    if (discovered) {
-      markerHTML = `<div class="t-marker t-found">${icon}</div>`
+  groups.forEach(group => {
+    if (group.length === 1) {
+      addSingleMarker(group[0])
     } else {
-      markerHTML = `<div class="t-marker t-active"><span class="t-pulse"></span>${icon}</div>`
-    }
-
-    const marker = new window.AMap.Marker({
-      position: [coords[0], coords[1]],
-      content: markerHTML,
-      offset: new window.AMap.Pixel(-22, -22),
-      zIndex: discovered ? 80 : 100
-    })
-
-    treasureDataMap.set(marker, t)
-
-    marker.on('click', () => emit('treasure-click', t))
-    marker.on('touchend', e => {
-      e.originEvent?.stopPropagation?.()
-      emit('treasure-click', t)
-    })
-    return marker
-  })
-
-  if (!markers.length) return
-
-  markerCluster = new window.AMap.MarkerCluster(map, markers, {
-    gridSize: 60,
-    maxZoom: 18,
-    renderClusterMarker(ctx) {
-      const count = ctx.count
-      const size = Math.min(24 + count * 3, 52)
-      ctx.marker.setContent(
-        `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${count}</div>`
-      )
-      ctx.marker.setOffset(new window.AMap.Pixel(-size / 2, -size / 2))
+      addClusterMarker(group)
     }
   })
+}
 
-  markerCluster.on('click', (ctx) => {
-    const clusterMarkers = ctx.clusterData
-    if (!clusterMarkers || clusterMarkers.length <= 1) return
+function addSingleMarker(t) {
+  const coords = t.location.coordinates
+  const discovered = t.isDiscovered
+  const icon = typeIcons[t.type] || '📦'
 
-    const currentZoom = map.getZoom()
-    if (currentZoom < 19) {
-      map.setZoomAndCenter(currentZoom + 2, ctx.lnglat)
-      return
-    }
+  let markerHTML
+  if (discovered) {
+    markerHTML = `<div class="t-marker t-found">${icon}</div>`
+  } else {
+    markerHTML = `<div class="t-marker t-active"><span class="t-pulse"></span>${icon}</div>`
+  }
 
-    const items = clusterMarkers
-      .map(cm => {
-        const mk = cm.marker || cm
-        return treasureDataMap.get(mk)
-      })
-      .filter(Boolean)
-
-    if (items.length > 1) {
-      clusterList.value = items
-    } else if (items.length === 1) {
-      emit('treasure-click', items[0])
-    }
+  const marker = new window.AMap.Marker({
+    position: [coords[0], coords[1]],
+    content: markerHTML,
+    offset: new window.AMap.Pixel(-22, -22),
+    zIndex: discovered ? 80 : 100
   })
+
+  marker.on('click', () => emit('treasure-click', t))
+  marker.on('touchend', e => {
+    e.originEvent?.stopPropagation?.()
+    emit('treasure-click', t)
+  })
+  map.add(marker)
+  allMarkers.push(marker)
+}
+
+function addClusterMarker(group) {
+  const avgLng = group.reduce((s, t) => s + t.location.coordinates[0], 0) / group.length
+  const avgLat = group.reduce((s, t) => s + t.location.coordinates[1], 0) / group.length
+  const size = Math.min(28 + group.length * 4, 56)
+
+  const marker = new window.AMap.Marker({
+    position: [avgLng, avgLat],
+    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${group.length}</div>`,
+    offset: new window.AMap.Pixel(-size / 2, -size / 2),
+    zIndex: 120
+  })
+
+  const handler = () => { clusterList.value = group }
+  marker.on('click', handler)
+  marker.on('touchend', e => {
+    e.originEvent?.stopPropagation?.()
+    handler()
+  })
+  map.add(marker)
+  allMarkers.push(marker)
 }
 
 function pickFromCluster(t) {
@@ -257,7 +278,6 @@ function pickFromCluster(t) {
 }
 
 onUnmounted(() => {
-  if (markerCluster) markerCluster.setMap(null)
   if (map) map.destroy()
 })
 </script>
