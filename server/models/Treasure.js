@@ -141,11 +141,10 @@ treasureSchema.virtual('discoveryCount').get(function () {
     return this.discoveredBy.length;
 });
 
-treasureSchema.pre('save', function (next) {
+treasureSchema.pre('save', function () {
     if (this.stats.attempts > 0) {
         this.stats.successRate = Math.round((this.stats.discoveries / this.stats.attempts) * 100);
     }
-    next();
 });
 
 // 附近宝藏查询（经纬度范围 + Haversine 精确过滤）
