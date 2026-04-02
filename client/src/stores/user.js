@@ -45,10 +45,11 @@ export const useUserStore = defineStore('user', () => {
       const res = await authService.getMe()
       if (res.success && res.user) {
         user.value = res.user
+        localStorage.setItem('auth_user', JSON.stringify(res.user))
       }
     } catch {
-      token.value = ''
-      user.value = null
+      // 网络失败时保留本地缓存的用户信息，不清 token
+      // 只有 api 拦截器确认 refresh 也失败后才会通过 auth:logout 事件登出
     }
   }
 
@@ -63,7 +64,7 @@ export const useUserStore = defineStore('user', () => {
     user.value = null
   }
 
-  // 初始化：尝试恢复用户
+  // 初始化：从 localStorage 恢复用户
   const savedUser = localStorage.getItem('auth_user')
   if (savedUser) {
     try { user.value = JSON.parse(savedUser) } catch { /* ignore */ }
