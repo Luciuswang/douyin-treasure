@@ -57,6 +57,7 @@ router.get('/status', (req, res) => {
     res.json({
         ok: true,
         webhook: 'active',
+        version: '1.0',
         time: new Date().toISOString()
     });
 });
