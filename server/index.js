@@ -97,6 +97,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Webhook（不受 rate limiter 限制）
+app.use('/api/webhook', require('./routes/webhook'));
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
