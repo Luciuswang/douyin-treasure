@@ -60,6 +60,8 @@ const clusterList = ref([])
 let map = null
 let userMarker = null
 let allMarkers = []
+let cachedValidItems = []
+const MARKER_PX = 48
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
@@ -106,12 +108,15 @@ async function initMap() {
       }
     })
 
+    map.on('zoomend', () => {
+      if (cachedValidItems.length) rebuildMarkers()
+    })
+
     map.on('complete', () => {
       loading.value = false
       emit('map-ready')
     })
 
-    // 3秒兜底
     setTimeout(() => {
       if (loading.value) {
         loading.value = false
@@ -130,7 +135,6 @@ onMounted(() => { initMap() })
 watch(() => mapStore.mapCenter, center => {
   if (!map || !center) return
   map.setZoomAndCenter(18, [center.lng, center.lat])
-  // 多次确认中心位置，对抗可能的重置
   ;[100, 300, 800].forEach(delay => {
     setTimeout(() => {
       if (map) map.setCenter([center.lng, center.lat])
@@ -145,7 +149,15 @@ watch(() => mapStore.userLocation, loc => {
 
 watch(() => treasureStore.nearbyTreasures, list => {
   if (!map) return
-  renderTreasureMarkers(list)
+  cachedValidItems = (list || []).filter(t => {
+    const coords = t.location?.coordinates
+    if (!coords || coords.length < 2) return false
+    const maxed = t.settings?.maxDiscoverers > 0 &&
+                  (t.stats?.discoveries || 0) >= t.settings.maxDiscoverers
+    if (maxed && !t.isDiscovered) return false
+    return true
+  })
+  rebuildMarkers()
 }, { deep: true })
 
 function updateUserMarker(loc) {
@@ -164,31 +176,35 @@ function updateUserMarker(loc) {
   }
 }
 
-function distMeters(lng1, lat1, lng2, lat2) {
-  const R = 6378137
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+function toPixel(coords) {
+  try {
+    const lnglat = new window.AMap.LngLat(coords[0], coords[1])
+    return map.lngLatToContainer(lnglat)
+  } catch {
+    return null
+  }
 }
 
-function groupByProximity(items, threshold = 40) {
+function groupByPixel(items) {
+  const entries = items.map(t => {
+    const px = toPixel(t.location.coordinates)
+    return { t, px }
+  }).filter(e => e.px)
+
   const used = new Set()
   const groups = []
 
-  for (let i = 0; i < items.length; i++) {
+  for (let i = 0; i < entries.length; i++) {
     if (used.has(i)) continue
-    const g = [items[i]]
+    const g = [entries[i].t]
     used.add(i)
-    const ci = items[i].location.coordinates
 
-    for (let j = i + 1; j < items.length; j++) {
+    for (let j = i + 1; j < entries.length; j++) {
       if (used.has(j)) continue
-      const cj = items[j].location.coordinates
-      if (distMeters(ci[0], ci[1], cj[0], cj[1]) < threshold) {
-        g.push(items[j])
+      const dx = entries[i].px.x - entries[j].px.x
+      const dy = entries[i].px.y - entries[j].px.y
+      if (dx * dx + dy * dy < MARKER_PX * MARKER_PX) {
+        g.push(entries[j].t)
         used.add(j)
       }
     }
@@ -197,21 +213,12 @@ function groupByProximity(items, threshold = 40) {
   return groups
 }
 
-function renderTreasureMarkers(list) {
+function rebuildMarkers() {
   allMarkers.forEach(m => map.remove(m))
   allMarkers = []
-  if (!window.AMap || !list.length) return
+  if (!window.AMap || !cachedValidItems.length) return
 
-  const validItems = list.filter(t => {
-    const coords = t.location?.coordinates
-    if (!coords || coords.length < 2) return false
-    const maxed = t.settings?.maxDiscoverers > 0 &&
-                  (t.stats?.discoveries || 0) >= t.settings.maxDiscoverers
-    if (maxed && !t.isDiscovered) return false
-    return true
-  })
-
-  const groups = groupByProximity(validItems)
+  const groups = groupByPixel(cachedValidItems)
 
   groups.forEach(group => {
     if (group.length === 1) {
@@ -253,11 +260,12 @@ function addSingleMarker(t) {
 function addClusterMarker(group) {
   const avgLng = group.reduce((s, t) => s + t.location.coordinates[0], 0) / group.length
   const avgLat = group.reduce((s, t) => s + t.location.coordinates[1], 0) / group.length
-  const size = Math.min(28 + group.length * 4, 56)
+  const count = group.length
+  const size = Math.min(32 + count * 3, 60)
 
   const marker = new window.AMap.Marker({
     position: [avgLng, avgLat],
-    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${group.length}</div>`,
+    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${count}</div>`,
     offset: new window.AMap.Pixel(-size / 2, -size / 2),
     zIndex: 120
   })
