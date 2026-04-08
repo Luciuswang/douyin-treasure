@@ -61,7 +61,7 @@ let map = null
 let userMarker = null
 let allMarkers = []
 let cachedValidItems = []
-const MARKER_PX = 48
+const MARKER_SIZE = 44
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
@@ -176,21 +176,22 @@ function updateUserMarker(loc) {
   }
 }
 
-function toPixel(coords) {
-  try {
-    const lnglat = new window.AMap.LngLat(coords[0], coords[1])
-    return map.lngLatToContainer(lnglat)
-  } catch {
-    return null
-  }
+function lngLatToWorldPx(lng, lat, zoom) {
+  const scale = 256 * Math.pow(2, zoom)
+  const x = ((lng + 180) / 360) * scale
+  const latRad = lat * Math.PI / 180
+  const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * scale
+  return { x, y }
 }
 
-function groupByPixel(items) {
+function groupByPixel(items, zoom) {
   const entries = items.map(t => {
-    const px = toPixel(t.location.coordinates)
-    return { t, px }
-  }).filter(e => e.px)
+    const [lng, lat] = t.location.coordinates
+    const px = lngLatToWorldPx(lng, lat, zoom)
+    return { t, x: px.x, y: px.y }
+  })
 
+  const threshold = MARKER_SIZE * MARKER_SIZE
   const used = new Set()
   const groups = []
 
@@ -201,9 +202,9 @@ function groupByPixel(items) {
 
     for (let j = i + 1; j < entries.length; j++) {
       if (used.has(j)) continue
-      const dx = entries[i].px.x - entries[j].px.x
-      const dy = entries[i].px.y - entries[j].px.y
-      if (dx * dx + dy * dy < MARKER_PX * MARKER_PX) {
+      const dx = entries[i].x - entries[j].x
+      const dy = entries[i].y - entries[j].y
+      if (dx * dx + dy * dy < threshold) {
         g.push(entries[j].t)
         used.add(j)
       }
@@ -218,7 +219,11 @@ function rebuildMarkers() {
   allMarkers = []
   if (!window.AMap || !cachedValidItems.length) return
 
-  const groups = groupByPixel(cachedValidItems)
+  const zoom = map.getZoom()
+  const groups = groupByPixel(cachedValidItems, zoom)
+
+  console.log(`[Cluster] zoom=${zoom.toFixed(1)}, ${cachedValidItems.length}items → ${groups.length}groups`,
+    groups.filter(g => g.length > 1).map(g => `${g.length}个重叠`))
 
   groups.forEach(group => {
     if (group.length === 1) {
