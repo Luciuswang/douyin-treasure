@@ -12,6 +12,7 @@
             v-for="t in types" :key="t.value"
             class="type-btn"
             :class="{ active: form.type === t.value }"
+            :style="form.type === t.value ? { background: t.color, borderColor: t.color, color: '#fff' } : { borderColor: t.color + '60', color: t.color }"
             @click="form.type = t.value"
           >
             {{ t.icon }} {{ t.label }}
@@ -104,15 +105,15 @@ const form = reactive({
 })
 
 const types = [
-  { value: 'note', icon: '📝', label: '笔记' },
-  { value: 'social', icon: '💕', label: '交友' },
-  { value: 'coupon', icon: '🎫', label: '优惠券' },
-  { value: 'redpacket', icon: '🧧', label: '红包' },
-  { value: 'ticket', icon: '🎬', label: '门票' },
-  { value: 'job', icon: '💼', label: '招聘' },
-  { value: 'event', icon: '🎉', label: '活动' },
-  { value: 'task', icon: '📋', label: '任务' },
-  { value: 'custom', icon: '📦', label: '自定义' }
+  { value: 'note', icon: '📝', label: '笔记', color: '#74b9ff' },
+  { value: 'social', icon: '💕', label: '交友', color: '#ff6b9d' },
+  { value: 'coupon', icon: '🎫', label: '优惠券', color: '#f0932b' },
+  { value: 'redpacket', icon: '🧧', label: '红包', color: '#d63031' },
+  { value: 'ticket', icon: '🎬', label: '门票', color: '#e17055' },
+  { value: 'job', icon: '💼', label: '招聘', color: '#0984e3' },
+  { value: 'event', icon: '🎉', label: '活动', color: '#6c5ce7' },
+  { value: 'task', icon: '📋', label: '任务', color: '#00b894' },
+  { value: 'custom', icon: '📦', label: '自定义', color: '#636e72' }
 ]
 
 const interestOptions = ['美食', '旅游', '摄影', '运动', '音乐', '艺术', '电影', '读书', '游戏', '健身', '咖啡', '宠物', '编程', '投资']
@@ -243,18 +244,18 @@ async function handlePublish() {
 
 .type-btn {
   padding: 6px 12px;
-  border: 1px solid #ddd;
+  border: 1.5px solid #ddd;
   border-radius: 20px;
-  background: #f9f9f9;
+  background: #fff;
   font-size: .8rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all .15s;
 }
 
 .type-btn.active {
-  background: #00d4aa;
-  color: #fff;
-  border-color: #00d4aa;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  transform: scale(1.05);
 }
 
 input, textarea, select {
