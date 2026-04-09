@@ -13,7 +13,7 @@
     </div>
 
     <!-- 重叠宝藏选择列表 -->
-    <div v-if="clusterList.length" class="cluster-picker" @click.self="clusterList = []">
+    <div v-if="clusterList.length" class="cluster-picker" @click.self="dismissCluster">
       <div class="cluster-sheet">
         <div class="cluster-header">
           <span>📍 此处有 {{ clusterList.length }} 个宝藏</span>
@@ -254,20 +254,6 @@ function addSingleMarker(t) {
   })
 
   marker.on('click', () => emit('treasure-click', t))
-
-  setTimeout(() => {
-    try {
-      const dom = marker.dom || marker.getContentDom?.() || marker.$e
-      if (dom) {
-        const el = dom.querySelector?.('.t-marker') || dom
-        el.addEventListener('pointerdown', (e) => {
-          e.stopPropagation()
-          emit('treasure-click', t)
-        }, { passive: true })
-      }
-    } catch {}
-  }, 50)
-
   map.add(marker)
   allMarkers.push(marker)
 }
@@ -289,27 +275,40 @@ function addClusterMarker(group) {
   })
 
   const handler = () => {
+    clusterOpenedAt = Date.now()
     clusterList.value = group
   }
 
-  marker.on('click', handler)
-
-  // 直接绑 DOM 解决移动端点击不灵敏
-  setTimeout(() => {
-    try {
-      const dom = marker.dom || marker.getContentDom?.() || marker.$e
-      if (dom) {
-        const el = dom.querySelector?.('[data-cluster]') || dom
-        el.addEventListener('pointerdown', (e) => {
-          e.stopPropagation()
-          handler()
-        }, { passive: true })
-      }
-    } catch {}
-  }, 50)
+  marker.on('click', (e) => {
+    e.originEvent?.stopPropagation?.()
+    handler()
+  })
 
   map.add(marker)
   allMarkers.push(marker)
+
+  // 直接绑 DOM click 解决移动端不灵敏
+  nextTick(() => {
+    try {
+      const dom = marker.dom || marker.getContentDom?.()
+      const el = dom?.querySelector?.('[data-cluster]') || dom
+      if (el) {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          handler()
+        })
+      }
+    } catch {}
+  })
+}
+
+let clusterOpenedAt = 0
+
+function dismissCluster() {
+  if (Date.now() - clusterOpenedAt > 400) {
+    clusterList.value = []
+  }
 }
 
 function pickFromCluster(t) {

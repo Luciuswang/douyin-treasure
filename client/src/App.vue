@@ -9,7 +9,7 @@
     <AuthModal v-if="showAuth" @close="showAuth = false" />
     <BotChat />
 
-    <div class="build-ver">v0409b</div>
+    <div class="build-ver">v0409c</div>
 
     <!-- 全局 Toast 通知 -->
     <transition name="toast-slide">

@@ -8,7 +8,13 @@
         <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="form" :autocomplete="mode === 'login' ? 'on' : 'off'">
+      <form
+        @submit.prevent="handleSubmit"
+        class="form"
+        method="post"
+        action="/api/auth/login"
+        autocomplete="on"
+      >
         <input
           v-if="mode === 'register'"
           v-model="username"
@@ -24,7 +30,7 @@
           v-model="email"
           type="email"
           name="email"
-          :autocomplete="mode === 'login' ? 'username' : 'email'"
+          autocomplete="email"
           placeholder="邮箱"
           required
         />
@@ -32,7 +38,7 @@
           v-model="password"
           type="password"
           name="password"
-          :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
+          autocomplete="current-password"
           placeholder="密码"
           required
           minlength="6"
@@ -74,7 +80,8 @@ async function handleSubmit() {
       const res = await userStore.login(email.value, password.value)
       if (res.success) {
         successMsg.value = '登录成功！'
-        setTimeout(() => emit('close'), 800)
+        // 延迟关闭让浏览器有时间弹出「保存密码」提示
+        setTimeout(() => emit('close'), 1500)
       } else {
         errorMsg.value = res.message || '登录失败'
       }
