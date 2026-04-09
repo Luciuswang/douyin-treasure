@@ -254,10 +254,20 @@ function addSingleMarker(t) {
   })
 
   marker.on('click', () => emit('treasure-click', t))
-  marker.on('touchend', e => {
-    e.originEvent?.stopPropagation?.()
-    emit('treasure-click', t)
-  })
+
+  setTimeout(() => {
+    try {
+      const dom = marker.dom || marker.getContentDom?.() || marker.$e
+      if (dom) {
+        const el = dom.querySelector?.('.t-marker') || dom
+        el.addEventListener('pointerdown', (e) => {
+          e.stopPropagation()
+          emit('treasure-click', t)
+        }, { passive: true })
+      }
+    } catch {}
+  }, 50)
+
   map.add(marker)
   allMarkers.push(marker)
 }
@@ -265,22 +275,39 @@ function addSingleMarker(t) {
 function addClusterMarker(group) {
   const avgLng = group.reduce((s, t) => s + t.location.coordinates[0], 0) / group.length
   const avgLat = group.reduce((s, t) => s + t.location.coordinates[1], 0) / group.length
+  const undiscovered = group.filter(t => !t.isDiscovered).length
   const count = group.length
-  const size = Math.min(32 + count * 3, 60)
+  const size = Math.max(52, Math.min(32 + count * 3, 64))
+  const label = undiscovered < count ? `${undiscovered}/${count}` : `${count}`
 
   const marker = new window.AMap.Marker({
     position: [avgLng, avgLat],
-    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px">${count}</div>`,
+    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px" data-cluster="1">${label}</div>`,
     offset: new window.AMap.Pixel(-size / 2, -size / 2),
-    zIndex: 120
+    zIndex: 120,
+    clickable: true
   })
 
-  const handler = () => { clusterList.value = group }
+  const handler = () => {
+    clusterList.value = group
+  }
+
   marker.on('click', handler)
-  marker.on('touchend', e => {
-    e.originEvent?.stopPropagation?.()
-    handler()
-  })
+
+  // 直接绑 DOM 解决移动端点击不灵敏
+  setTimeout(() => {
+    try {
+      const dom = marker.dom || marker.getContentDom?.() || marker.$e
+      if (dom) {
+        const el = dom.querySelector?.('[data-cluster]') || dom
+        el.addEventListener('pointerdown', (e) => {
+          e.stopPropagation()
+          handler()
+        }, { passive: true })
+      }
+    } catch {}
+  }, 50)
+
   map.add(marker)
   allMarkers.push(marker)
 }
@@ -505,12 +532,15 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #00d4aa, #00b894);
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
   border-radius: 50%;
-  box-shadow: 0 2px 10px rgba(0, 212, 170, .5);
-  border: 2px solid #fff;
+  box-shadow: 0 2px 12px rgba(0, 212, 170, .5);
+  border: 2.5px solid #fff;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  pointer-events: auto;
 }
 </style>

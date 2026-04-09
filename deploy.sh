@@ -4,7 +4,14 @@ set -e
 cd "$(dirname "$0")"
 
 echo "📦 拉取最新代码..."
-git pull origin main
+# 先尝试直连，失败则用代理
+git pull origin main 2>/dev/null || {
+    echo "⚠️ 直连 GitHub 失败，尝试代理..."
+    ORIG_URL=$(git remote get-url origin)
+    git remote set-url origin "https://ghfast.top/${ORIG_URL}"
+    git pull origin main
+    git remote set-url origin "${ORIG_URL}"
+}
 
 echo "📦 安装后端依赖..."
 cd server

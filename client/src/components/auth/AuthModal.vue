@@ -8,18 +8,35 @@
         <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注册</button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="form">
+      <form @submit.prevent="handleSubmit" class="form" :autocomplete="mode === 'login' ? 'on' : 'off'">
         <input
           v-if="mode === 'register'"
           v-model="username"
           type="text"
+          name="username"
+          autocomplete="username"
           placeholder="用户名"
           required
           minlength="3"
           maxlength="20"
         />
-        <input v-model="email" type="email" placeholder="邮箱" required />
-        <input v-model="password" type="password" placeholder="密码" required minlength="6" />
+        <input
+          v-model="email"
+          type="email"
+          name="email"
+          :autocomplete="mode === 'login' ? 'username' : 'email'"
+          placeholder="邮箱"
+          required
+        />
+        <input
+          v-model="password"
+          type="password"
+          name="password"
+          :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
+          placeholder="密码"
+          required
+          minlength="6"
+        />
 
         <button type="submit" class="btn-submit" :disabled="loading">
           {{ loading ? '请稍候...' : (mode === 'login' ? '登录' : '注册') }}
