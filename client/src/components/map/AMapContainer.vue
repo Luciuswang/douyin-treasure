@@ -25,6 +25,7 @@
             class="cluster-item"
             @click="pickFromCluster(t)"
           >
+            <span class="ci-color" :style="{ background: typeColors[t.type] || '#636e72' }"></span>
             <span class="ci-icon">{{ typeIcons[t.type] || '📦' }}</span>
             <div class="ci-info">
               <strong>{{ t.title }}</strong>
@@ -70,6 +71,18 @@ const typeIcons = {
 const typeLabels = {
   note: '笔记', coupon: '优惠券', ticket: '票券', job: '招聘',
   event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分'
+}
+const typeColors = {
+  social: '#ff6b9d',
+  coupon: '#f0932b',
+  job: '#0984e3',
+  event: '#6c5ce7',
+  redpacket: '#d63031',
+  ticket: '#e17055',
+  task: '#00b894',
+  note: '#74b9ff',
+  image: '#fdcb6e',
+  custom: '#636e72'
 }
 
 async function initMap() {
@@ -258,17 +271,44 @@ function addSingleMarker(t) {
   allMarkers.push(marker)
 }
 
+function buildPieGradient(group) {
+  const counts = {}
+  group.forEach(t => {
+    const type = t.type || 'custom'
+    counts[type] = (counts[type] || 0) + 1
+  })
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+  const total = group.length
+  const stops = []
+  let angle = 0
+
+  sorted.forEach(([type, cnt]) => {
+    const color = typeColors[type] || '#636e72'
+    const slice = (cnt / total) * 360
+    stops.push(`${color} ${angle}deg ${angle + slice}deg`)
+    angle += slice
+  })
+
+  return { gradient: `conic-gradient(${stops.join(', ')})`, counts: sorted }
+}
+
 function addClusterMarker(group) {
   const avgLng = group.reduce((s, t) => s + t.location.coordinates[0], 0) / group.length
   const avgLat = group.reduce((s, t) => s + t.location.coordinates[1], 0) / group.length
-  const undiscovered = group.filter(t => !t.isDiscovered).length
   const count = group.length
-  const size = Math.max(52, Math.min(32 + count * 3, 64))
-  const label = undiscovered < count ? `${undiscovered}/${count}` : `${count}`
+  const size = Math.max(52, Math.min(36 + count * 3, 68))
+  const innerSize = Math.round(size * 0.6)
+
+  const { gradient } = buildPieGradient(group)
+
+  const html = `<div class="t-cluster-pie" style="width:${size}px;height:${size}px;background:${gradient}" data-cluster="1">` +
+    `<span class="t-cluster-num" style="width:${innerSize}px;height:${innerSize}px;line-height:${innerSize}px">${count}</span>` +
+    `</div>`
 
   const marker = new window.AMap.Marker({
     position: [avgLng, avgLat],
-    content: `<div class="t-cluster" style="width:${size}px;height:${size}px;line-height:${size}px" data-cluster="1">${label}</div>`,
+    content: html,
     offset: new window.AMap.Pixel(-size / 2, -size / 2),
     zIndex: 120,
     clickable: true
@@ -287,7 +327,6 @@ function addClusterMarker(group) {
   map.add(marker)
   allMarkers.push(marker)
 
-  // 直接绑 DOM click 解决移动端不灵敏
   nextTick(() => {
     try {
       const dom = marker.dom || marker.getContentDom?.()
@@ -440,6 +479,13 @@ onUnmounted(() => {
   background: #f0faf7;
 }
 
+.ci-color {
+  width: 4px;
+  min-height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 .ci-icon {
   font-size: 1.6rem;
   flex-shrink: 0;
@@ -527,19 +573,29 @@ onUnmounted(() => {
   50% { transform: scale(1.6); opacity: 0; }
 }
 
-.t-cluster {
-  background: linear-gradient(135deg, #00d4aa, #00b894);
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  text-align: center;
+.t-cluster-pie {
   border-radius: 50%;
-  box-shadow: 0 2px 12px rgba(0, 212, 170, .5);
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
   border: 2.5px solid #fff;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   user-select: none;
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.t-cluster-num {
+  background: #fff;
+  border-radius: 50%;
+  display: block;
+  text-align: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
 </style>
