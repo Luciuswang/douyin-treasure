@@ -9,6 +9,8 @@
     <AuthModal v-if="showAuth" @close="showAuth = false" />
     <BotChat />
 
+    <div class="build-ver">v0409</div>
+
     <!-- 全局 Toast 通知 -->
     <transition name="toast-slide">
       <div v-if="toast.visible" class="global-toast" :class="toast.type" @click="toast.visible = false">
@@ -112,4 +114,14 @@ window.__totofun_openAuth = openAuth
 .toast-slide-leave-active { transition: all .3s ease; }
 .toast-slide-enter-from { transform: translateX(-50%) translateY(-30px); opacity: 0; }
 .toast-slide-leave-to { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+
+.build-ver {
+  position: fixed;
+  bottom: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: rgba(0,0,0,.15);
+  z-index: 1;
+  pointer-events: none;
+}
 </style>
