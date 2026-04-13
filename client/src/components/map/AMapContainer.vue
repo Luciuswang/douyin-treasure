@@ -47,10 +47,12 @@ import { useMapStore } from '../../stores/map.js'
 import { useTreasureStore } from '../../stores/treasure.js'
 
 const props = defineProps({
-  calibrating: { type: Boolean, default: false }
+  calibrating: { type: Boolean, default: false },
+  filterTypes: { type: Set, default: () => new Set() },
+  searchKeyword: { type: String, default: '' }
 })
 
-const emit = defineEmits(['map-ready', 'treasure-click', 'map-click'])
+const emit = defineEmits(['map-ready', 'treasure-click', 'map-click', 'filtered-update'])
 const mapEl = ref(null)
 const mapStore = useMapStore()
 const treasureStore = useTreasureStore()
@@ -173,6 +175,10 @@ watch(() => treasureStore.nearbyTreasures, list => {
   rebuildMarkers()
 }, { deep: true })
 
+watch(() => [props.filterTypes, props.searchKeyword], () => {
+  if (map && cachedValidItems.length) rebuildMarkers()
+}, { deep: true })
+
 function updateUserMarker(loc) {
   if (!window.AMap) return
   const pos = [loc.lng, loc.lat]
@@ -227,16 +233,35 @@ function groupByPixel(items, zoom) {
   return groups
 }
 
+function applyFilters(items) {
+  let result = items
+  if (props.filterTypes.size > 0) {
+    result = result.filter(t => props.filterTypes.has(t.type || 'custom'))
+  }
+  if (props.searchKeyword.trim()) {
+    const kw = props.searchKeyword.trim().toLowerCase()
+    result = result.filter(t =>
+      (t.title || '').toLowerCase().includes(kw) ||
+      (t.description || '').toLowerCase().includes(kw) ||
+      (typeLabels[t.type] || '').includes(kw)
+    )
+  }
+  return result
+}
+
 function rebuildMarkers() {
   allMarkers.forEach(m => map.remove(m))
   allMarkers = []
-  if (!window.AMap || !cachedValidItems.length) return
+  if (!window.AMap || !cachedValidItems.length) {
+    emit('filtered-update', [])
+    return
+  }
+
+  const visible = applyFilters(cachedValidItems)
+  emit('filtered-update', visible)
 
   const zoom = map.getZoom()
-  const groups = groupByPixel(cachedValidItems, zoom)
-
-  console.log(`[Cluster] zoom=${zoom.toFixed(1)}, ${cachedValidItems.length}items → ${groups.length}groups`,
-    groups.filter(g => g.length > 1).map(g => `${g.length}个重叠`))
+  const groups = groupByPixel(visible, zoom)
 
   groups.forEach(group => {
     if (group.length === 1) {
