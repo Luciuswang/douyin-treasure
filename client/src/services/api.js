@@ -1,7 +1,14 @@
 import axios from 'axios'
 
+function getBaseURL() {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  // Capacitor 原生模式下使用完整地址
+  if (window.Capacitor?.isNativePlatform()) return 'https://youkongwa.com/api'
+  return '/api'
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseURL(),
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' }
 })

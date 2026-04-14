@@ -8,7 +8,8 @@ export function connectSocket() {
   const token = localStorage.getItem('auth_token')
   if (!token) return null
 
-  const url = import.meta.env.VITE_WS_URL || window.location.origin
+  let url = import.meta.env.VITE_WS_URL || window.location.origin
+  if (window.Capacitor?.isNativePlatform()) url = 'https://youkongwa.com'
   socket = io(url, {
     auth: { token },
     transports: ['websocket', 'polling']
