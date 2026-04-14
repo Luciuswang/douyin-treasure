@@ -46,6 +46,15 @@ export const useTreasureStore = defineStore('treasure', () => {
     return res
   }
 
+  async function updateTreasure(id, data) {
+    const res = await treasureService.update(id, data)
+    if (res.success) {
+      const idx = nearbyTreasures.value.findIndex(t => t._id === id)
+      if (idx !== -1) Object.assign(nearbyTreasures.value[idx], res.data)
+    }
+    return res
+  }
+
   async function removeTreasure(id) {
     const res = await treasureService.remove(id)
     if (res.success) {
@@ -73,7 +82,7 @@ export const useTreasureStore = defineStore('treasure', () => {
 
   return {
     nearbyTreasures, myTreasures, discoveredTreasures, loading, selectedTreasure,
-    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, removeTreasure,
+    loadNearby, loadMy, loadDiscovered, createTreasure, discoverTreasure, updateTreasure, removeTreasure,
     reportTreasure, expressInterest, acceptInterest, getInterests
   }
 })

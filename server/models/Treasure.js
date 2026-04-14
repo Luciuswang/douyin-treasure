@@ -126,7 +126,7 @@ const treasureSchema = new mongoose.Schema({
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         reason: {
             type: String,
-            enum: ['dangerous_location', 'inappropriate_content', 'spam', 'other']
+            enum: ['dangerous_location', 'inappropriate_content', 'spam', 'fraud', 'misleading_info', 'expired_invalid', 'other']
         },
         detail: { type: String, maxlength: 200 },
         createdAt: { type: Date, default: Date.now }
@@ -264,12 +264,21 @@ treasureSchema.methods.addReport = async function (userId, reason, detail) {
     this.reports.push({ user: userId, reason, detail, createdAt: new Date() });
     this.reportCount = this.reports.length;
 
+    let statusChanged = false;
     if (this.reportCount >= 3 && this.status === 'active') {
         this.status = 'under_review';
+        statusChanged = true;
+
+        // 自动扣除发布者信用分 -5（预扣，管理员审核后再决定）
+        const User = mongoose.model('User');
+        await User.findByIdAndUpdate(this.creator, {
+            $inc: { 'credit.score': -5 },
+            $push: { 'credit.warnings': { reason: '宝藏被多人举报，进入审核', treasureId: this._id, at: new Date() } }
+        });
     }
 
     await this.save();
-    return { added: true, reportCount: this.reportCount, statusChanged: this.status === 'under_review' };
+    return { added: true, reportCount: this.reportCount, statusChanged };
 };
 
 treasureSchema.methods.toSafeObject = function (userId) {

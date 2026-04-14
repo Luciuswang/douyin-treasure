@@ -143,6 +143,18 @@ const userSchema = new mongoose.Schema({
         ref: 'User'
     }],
     
+    // 信用系统
+    credit: {
+        score: { type: Number, default: 100, min: 0, max: 100 },
+        warnings: [{
+            reason: { type: String },
+            treasureId: { type: mongoose.Schema.Types.ObjectId, ref: 'Treasure' },
+            at: { type: Date, default: Date.now }
+        }],
+        banUntil: { type: Date, default: null },
+        banCount: { type: Number, default: 0 }
+    },
+
     // 账户状态
     isVerified: {
         type: Boolean,

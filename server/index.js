@@ -128,6 +128,7 @@ app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/treasures', optionalAuth, treasureRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/admin', require('./routes/admin'));
 
 // 静态文件
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

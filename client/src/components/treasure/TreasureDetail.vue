@@ -158,6 +158,30 @@
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
       <p v-if="successMsg" class="success">{{ successMsg }}</p>
 
+      <!-- 创建者操作区 -->
+      <div v-if="isCreator" class="creator-actions">
+        <button v-if="!editing" class="btn-edit" @click="startEdit">✏️ 编辑</button>
+        <button v-if="!confirmingDelete" class="btn-delete" @click="confirmingDelete = true">🗑️ 删除</button>
+        <div v-if="confirmingDelete" class="delete-confirm">
+          <span>确定要删除这个宝藏吗？</span>
+          <button class="btn-delete-yes" @click="handleDelete" :disabled="deleting">{{ deleting ? '删除中...' : '确认删除' }}</button>
+          <button class="btn-delete-no" @click="confirmingDelete = false">取消</button>
+        </div>
+      </div>
+
+      <!-- 编辑表单 -->
+      <div v-if="editing" class="edit-form">
+        <input v-model="editForm.title" placeholder="标题" maxlength="100" />
+        <textarea v-model="editForm.description" placeholder="描述" maxlength="500" rows="3"></textarea>
+        <input v-model="editForm.contentText" placeholder="内容" />
+        <div class="edit-actions">
+          <button class="btn-edit-save" @click="saveEdit" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+          <button class="btn-edit-cancel" @click="editing = false">取消</button>
+        </div>
+        <p v-if="editMsg" class="edit-msg">{{ editMsg }}</p>
+        <p v-if="hasDiscoveries" class="edit-hint">此宝藏已有人发现，无法修改类型和位置</p>
+      </div>
+
       <!-- 举报区域 -->
       <div class="report-area">
         <button v-if="!showReportPanel" class="report-toggle" @click="showReportPanel = true">
@@ -173,11 +197,12 @@
               @click="selectedReason = r.value"
             >{{ r.label }}</button>
           </div>
+          <textarea v-model="reportDetail" placeholder="补充说明（可选）" maxlength="200" rows="2" class="report-detail"></textarea>
           <div class="report-actions">
             <button class="btn-report-submit" @click="handleReport" :disabled="reporting || !selectedReason">
               {{ reporting ? '提交中...' : '提交举报' }}
             </button>
-            <button class="btn-report-cancel" @click="showReportPanel = false; selectedReason = ''">取消</button>
+            <button class="btn-report-cancel" @click="showReportPanel = false; selectedReason = ''; reportDetail = ''">取消</button>
           </div>
           <p v-if="reportMsg" class="report-msg">{{ reportMsg }}</p>
         </div>
@@ -206,6 +231,7 @@ const successMsg = ref('')
 
 const showReportPanel = ref(false)
 const selectedReason = ref('')
+const reportDetail = ref('')
 const reporting = ref(false)
 const reportMsg = ref('')
 
@@ -221,10 +247,69 @@ const isCreator = computed(() => {
   return creatorId?.toString() === userStore.user._id.toString()
 })
 
+const hasDiscoveries = computed(() => (props.treasure.stats?.discoveries || 0) > 0)
+
+const editing = ref(false)
+const saving = ref(false)
+const editMsg = ref('')
+const editForm = ref({ title: '', description: '', contentText: '' })
+const confirmingDelete = ref(false)
+const deleting = ref(false)
+
+function startEdit() {
+  editForm.value = {
+    title: props.treasure.title || '',
+    description: props.treasure.description || '',
+    contentText: props.treasure.content?.text || ''
+  }
+  editing.value = true
+  editMsg.value = ''
+}
+
+async function saveEdit() {
+  saving.value = true
+  editMsg.value = ''
+  try {
+    const data = {
+      title: editForm.value.title,
+      description: editForm.value.description,
+      content: { ...props.treasure.content, text: editForm.value.contentText }
+    }
+    const res = await treasureStore.updateTreasure(props.treasure._id, data)
+    if (res.success) {
+      Object.assign(props.treasure, { title: data.title, description: data.description, content: data.content })
+      editing.value = false
+      successMsg.value = '修改已保存'
+    }
+  } catch (err) {
+    editMsg.value = err.message || '保存失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleDelete() {
+  deleting.value = true
+  try {
+    const res = await treasureStore.removeTreasure(props.treasure._id)
+    if (res.success) {
+      emit('close')
+    }
+  } catch (err) {
+    errorMsg.value = err.message || '删除失败'
+  } finally {
+    deleting.value = false
+    confirmingDelete.value = false
+  }
+}
+
 const reportReasons = [
   { value: 'dangerous_location', label: '⚠️ 位置危险' },
   { value: 'inappropriate_content', label: '🚫 不当内容' },
   { value: 'spam', label: '📢 垃圾信息' },
+  { value: 'fraud', label: '🚨 虚假信息' },
+  { value: 'misleading_info', label: '⚡ 误导内容' },
+  { value: 'expired_invalid', label: '⏰ 已失效/过期' },
   { value: 'other', label: '❓ 其他' }
 ]
 
@@ -292,9 +377,9 @@ async function handleReport() {
   reporting.value = true
   reportMsg.value = ''
   try {
-    const res = await treasureStore.reportTreasure(props.treasure._id, selectedReason.value)
+    const res = await treasureStore.reportTreasure(props.treasure._id, selectedReason.value, reportDetail.value)
     reportMsg.value = res.message || '举报已提交'
-    setTimeout(() => { showReportPanel.value = false }, 2000)
+    setTimeout(() => { showReportPanel.value = false; reportDetail.value = '' }, 2000)
   } catch (err) {
     reportMsg.value = err.message || '举报失败'
   } finally {
@@ -498,6 +583,17 @@ async function handleDiscover() {
   background: #e53935;
   color: #fff;
   border-color: #e53935;
+}
+
+.report-detail {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: .82rem;
+  resize: none;
+  margin-bottom: 10px;
+  box-sizing: border-box;
 }
 
 .report-actions { display: flex; gap: 8px; }
@@ -751,4 +847,111 @@ async function handleDiscover() {
 .btn-house {
   background: linear-gradient(135deg, #e67e22, #f39c12) !important;
 }
+
+/* 创建者操作 */
+.creator-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+.btn-edit {
+  padding: 8px 18px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: .82rem;
+  cursor: pointer;
+}
+
+.btn-delete {
+  padding: 8px 18px;
+  background: #fff;
+  border: 1px solid #e53935;
+  border-radius: 20px;
+  font-size: .82rem;
+  color: #e53935;
+  cursor: pointer;
+}
+
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: .85rem;
+  color: #e53935;
+  width: 100%;
+}
+
+.btn-delete-yes {
+  padding: 6px 14px;
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.btn-delete-yes:disabled { opacity: .5; }
+
+.btn-delete-no {
+  padding: 6px 14px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 16px;
+  font-size: .8rem;
+  cursor: pointer;
+}
+
+/* 编辑表单 */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px;
+  background: #f9f9f9;
+  border-radius: 12px;
+}
+
+.edit-form input, .edit-form textarea {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: .88rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.edit-form textarea { resize: vertical; }
+
+.edit-actions { display: flex; gap: 8px; }
+
+.btn-edit-save {
+  flex: 1;
+  padding: 10px;
+  background: linear-gradient(135deg, #00d4aa, #00b4d8);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-edit-save:disabled { opacity: .5; }
+
+.btn-edit-cancel {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 20px;
+  font-size: .88rem;
+  cursor: pointer;
+}
+
+.edit-msg { font-size: .82rem; color: #e53935; text-align: center; margin: 0; }
+.edit-hint { font-size: .75rem; color: #999; text-align: center; margin: 0; }
 </style>

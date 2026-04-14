@@ -107,6 +107,28 @@ router.post('/', authenticateToken, async (req, res) => {
             });
         }
 
+        // 信用分前置检查
+        const User = require('../models/User');
+        const publisher = await User.findById(req.user.userId);
+        if (publisher) {
+            const credit = publisher.credit || { score: 100 };
+            if (credit.banUntil && credit.banUntil > new Date()) {
+                const remain = Math.ceil((credit.banUntil - Date.now()) / 86400000);
+                return res.status(403).json({
+                    success: false,
+                    message: `账号限制发布中，还剩 ${remain} 天`,
+                    code: 'CREDIT_BAN'
+                });
+            }
+            if (credit.score < 40) {
+                return res.status(403).json({
+                    success: false,
+                    message: '信用分过低（当前 ' + credit.score + ' 分），暂时无法发布宝藏',
+                    code: 'CREDIT_LOW'
+                });
+            }
+        }
+
         // 服务端位置安全校验（兜底）
         const [lng, lat] = location.coordinates;
         const safety = await checkLocationSafety(lng, lat);
@@ -118,6 +140,8 @@ router.post('/', authenticateToken, async (req, res) => {
             });
         }
 
+        const needsReview = publisher && (publisher.credit?.score || 100) < 80;
+
         const treasure = new Treasure({
             title,
             description: description || '',
@@ -125,7 +149,7 @@ router.post('/', authenticateToken, async (req, res) => {
             content: content || {},
             password: password || '',
             location: {
-                coordinates: location.coordinates, // [lng, lat]
+                coordinates: location.coordinates,
                 address: location.address || '',
                 city: location.city || '',
                 district: location.district || '',
@@ -137,17 +161,21 @@ router.post('/', authenticateToken, async (req, res) => {
             tags: tags || [],
             category: category || '其他',
             settings: settings || {},
+            status: needsReview ? 'under_review' : 'active',
             creator: req.user.userId
         });
 
         await treasure.save();
 
-        const User = require('../models/User');
         await User.findByIdAndUpdate(req.user.userId, {
             $inc: { 'stats.treasuresCreated': 1 }
         });
 
-        res.status(201).json({ success: true, data: treasure });
+        res.status(201).json({
+            success: true,
+            data: treasure,
+            message: needsReview ? '发布成功，因信用分不足需等待审核' : undefined
+        });
     } catch (error) {
         console.error('创建宝藏错误:', error.message, error.stack);
         res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
@@ -168,16 +196,33 @@ router.put('/:id', authenticateToken, async (req, res) => {
             return res.status(403).json({ success: false, message: '无权编辑此宝藏' });
         }
 
-        const allowed = [
-            'title', 'description', 'type', 'content', 'password',
-            'challenge', 'rewards', 'tags', 'category', 'settings', 'status'
+        if (['under_review', 'banned'].includes(treasure.status)) {
+            return res.status(403).json({ success: false, message: '该宝藏正在审核或已被封禁，无法编辑' });
+        }
+
+        const hasDiscoveries = (treasure.stats?.discoveries || 0) > 0;
+
+        let allowed = [
+            'title', 'description', 'content', 'password',
+            'challenge', 'rewards', 'tags', 'category', 'settings'
         ];
+
+        if (!hasDiscoveries) {
+            allowed.push('type', 'status');
+        } else if (req.body.type && req.body.type !== treasure.type) {
+            return res.status(403).json({ success: false, message: '已有人发现的宝藏不能修改类型' });
+        }
+
         for (const key of allowed) {
             if (req.body[key] !== undefined) {
                 treasure[key] = req.body[key];
             }
         }
+
         if (req.body.location) {
+            if (hasDiscoveries) {
+                return res.status(403).json({ success: false, message: '已有人发现的宝藏不能修改位置' });
+            }
             Object.assign(treasure.location, req.body.location);
         }
 
@@ -290,7 +335,7 @@ router.post('/:id/discover', authenticateToken, async (req, res) => {
 router.post('/:id/report', authenticateToken, async (req, res) => {
     try {
         const { reason, detail } = req.body;
-        const validReasons = ['dangerous_location', 'inappropriate_content', 'spam', 'other'];
+        const validReasons = ['dangerous_location', 'inappropriate_content', 'spam', 'fraud', 'misleading_info', 'expired_invalid', 'other'];
 
         if (!reason || !validReasons.includes(reason)) {
             return res.status(400).json({
