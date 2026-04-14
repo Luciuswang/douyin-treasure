@@ -13,8 +13,10 @@ yarn-error.log*
 
 # 构建输出
 client/dist/
+client/android/
 dist/
 build/
+*.apk
 
 # 上传文件
 server/uploads/
