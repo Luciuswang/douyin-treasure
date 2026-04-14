@@ -38,6 +38,18 @@ router.beforeEach((to, from, next) => {
       return
     }
   }
+  if (to.meta.requiresAdmin) {
+    try {
+      const u = JSON.parse(localStorage.getItem('auth_user') || '{}')
+      if (u.role !== 'admin') {
+        next({ name: 'Home' })
+        return
+      }
+    } catch {
+      next({ name: 'Home' })
+      return
+    }
+  }
   next()
 })
 
