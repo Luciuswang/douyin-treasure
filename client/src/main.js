@@ -11,3 +11,11 @@ app.use(router)
 app.mount('#app')
 
 initNative()
+
+const splash = document.getElementById('splash-screen')
+if (splash) {
+  setTimeout(() => {
+    splash.classList.add('hide')
+    setTimeout(() => splash.remove(), 700)
+  }, 800)
+}
