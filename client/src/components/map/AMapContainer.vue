@@ -68,11 +68,11 @@ const MARKER_SIZE = 44
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
-  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
+  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕', house: '🏠'
 }
 const typeLabels = {
   note: '笔记', coupon: '优惠券', ticket: '票券', job: '招聘',
-  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分'
+  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分', house: '房屋'
 }
 const typeColors = {
   social: '#ff6b9d',
@@ -84,7 +84,8 @@ const typeColors = {
   task: '#00b894',
   note: '#74b9ff',
   image: '#fdcb6e',
-  custom: '#636e72'
+  custom: '#636e72',
+  house: '#e67e22'
 }
 
 async function initMap() {

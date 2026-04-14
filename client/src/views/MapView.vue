@@ -68,8 +68,13 @@
               <strong>{{ t.title }}</strong>
               <span class="li-meta">
                 {{ typeLabelMap[t.type] || t.type }}
+                <template v-if="t.type === 'house' && t.content?.extra">
+                  · {{ t.content.extra.mode === 'rent' ? '租' : '售' }}
+                  {{ t.content.extra.price }}{{ t.content.extra.mode === 'rent' ? '元/月' : '万' }}
+                  <template v-if="t.content.extra.layout"> · {{ t.content.extra.layout }}</template>
+                </template>
                 <template v-if="t._distance"> · {{ formatDist(t._distance) }}</template>
-                · {{ t.stats?.discoveries || 0 }}人发现
+                <template v-if="t.type !== 'house'"> · {{ t.stats?.discoveries || 0 }}人发现</template>
               </span>
             </div>
             <span v-if="t.isDiscovered" class="li-badge li-done">已发现</span>
@@ -128,6 +133,7 @@ let watchId = null
 
 const filterTypes = [
   { value: 'social', icon: '💕', label: '交友', color: '#ff6b9d' },
+  { value: 'house', icon: '🏠', label: '房屋', color: '#e67e22' },
   { value: 'coupon', icon: '🎫', label: '优惠券', color: '#f0932b' },
   { value: 'redpacket', icon: '🧧', label: '红包', color: '#d63031' },
   { value: 'job', icon: '💼', label: '招聘', color: '#0984e3' },
@@ -141,11 +147,11 @@ const filterTypes = [
 const typeColorMap = Object.fromEntries(filterTypes.map(f => [f.value, f.color]))
 const typeIconMap = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
-  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
+  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕', house: '🏠'
 }
 const typeLabelMap = {
   note: '笔记', coupon: '优惠券', ticket: '票券', job: '招聘',
-  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '交友'
+  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '交友', house: '房屋'
 }
 
 const typeCounts = computed(() => {

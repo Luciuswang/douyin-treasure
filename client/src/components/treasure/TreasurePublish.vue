@@ -19,8 +19,8 @@
           </button>
         </div>
 
-        <input v-model="form.title" :placeholder="form.type === 'social' ? '给缘分宝藏起个名字' : '宝藏标题 *'" maxlength="100" />
-        <textarea v-model="form.description" :placeholder="form.type === 'social' ? '介绍一下自己吧，让对方了解你...' : '描述一下这个宝藏...'" maxlength="500" rows="3"></textarea>
+        <input v-model="form.title" :placeholder="titlePlaceholder" maxlength="100" />
+        <textarea v-model="form.description" :placeholder="descPlaceholder" maxlength="500" rows="3"></textarea>
 
         <!-- 社交宝藏专属字段 -->
         <template v-if="form.type === 'social'">
@@ -37,6 +37,57 @@
             </div>
             <input v-model="form.content.contact" placeholder="联系方式（微信号等，匹配后对方可见）" />
             <p class="field-hint">联系方式仅在双方都点"想认识"后才会互相揭示</p>
+          </div>
+        </template>
+
+        <!-- 房屋租售专属字段 -->
+        <template v-else-if="form.type === 'house'">
+          <div class="house-fields">
+            <div class="house-mode-toggle">
+              <button
+                type="button"
+                class="mode-btn"
+                :class="{ active: form.house.mode === 'rent' }"
+                @click="form.house.mode = 'rent'"
+              >🔑 出租</button>
+              <button
+                type="button"
+                class="mode-btn"
+                :class="{ active: form.house.mode === 'sell' }"
+                @click="form.house.mode = 'sell'"
+              >🏷️ 出售</button>
+            </div>
+            <div class="house-row">
+              <input v-model="form.house.price" :placeholder="form.house.mode === 'rent' ? '月租金（元）' : '售价（万元）'" type="number" class="house-half" />
+              <input v-model="form.house.area" placeholder="面积（㎡）" type="number" class="house-half" />
+            </div>
+            <div class="house-row">
+              <select v-model="form.house.layout" class="house-half">
+                <option value="">户型</option>
+                <option value="1室">1室</option>
+                <option value="1室1厅">1室1厅</option>
+                <option value="2室1厅">2室1厅</option>
+                <option value="2室2厅">2室2厅</option>
+                <option value="3室1厅">3室1厅</option>
+                <option value="3室2厅">3室2厅</option>
+                <option value="4室2厅">4室2厅</option>
+                <option value="其他">其他</option>
+              </select>
+              <input v-model="form.house.floor" placeholder="楼层（如 6/18）" class="house-half" />
+            </div>
+            <input v-model="form.house.contact" placeholder="联系方式（电话/微信）*" />
+            <div class="house-features">
+              <label class="field-label">房屋亮点</label>
+              <div class="interest-tags">
+                <button
+                  v-for="tag in houseFeatureOptions" :key="tag"
+                  class="tag-btn house-tag"
+                  :class="{ active: form.house.features.includes(tag) }"
+                  @click="toggleHouseFeature(tag)"
+                  type="button"
+                >{{ tag }}</button>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -99,6 +150,7 @@ const form = reactive({
   description: '',
   type: 'note',
   content: { text: '', couponCode: '', amount: 0, link: '', interests: [], contact: '' },
+  house: { mode: 'rent', price: '', area: '', layout: '', floor: '', contact: '', features: [] },
   password: '',
   discoveryRadius: 50,
   category: '其他'
@@ -107,6 +159,7 @@ const form = reactive({
 const types = [
   { value: 'note', icon: '📝', label: '笔记', color: '#74b9ff' },
   { value: 'social', icon: '💕', label: '交友', color: '#ff6b9d' },
+  { value: 'house', icon: '🏠', label: '房屋', color: '#e67e22' },
   { value: 'coupon', icon: '🎫', label: '优惠券', color: '#f0932b' },
   { value: 'redpacket', icon: '🧧', label: '红包', color: '#d63031' },
   { value: 'ticket', icon: '🎬', label: '门票', color: '#e17055' },
@@ -118,6 +171,14 @@ const types = [
 
 const interestOptions = ['美食', '旅游', '摄影', '运动', '音乐', '艺术', '电影', '读书', '游戏', '健身', '咖啡', '宠物', '编程', '投资']
 
+const houseFeatureOptions = ['精装修', '拎包入住', '独卫', '阳台', '电梯', '停车位', '近地铁', '学区房', '南北通透', '首次出租', '可养宠', '合租']
+
+function toggleHouseFeature(tag) {
+  const idx = form.house.features.indexOf(tag)
+  if (idx === -1) form.house.features.push(tag)
+  else form.house.features.splice(idx, 1)
+}
+
 function toggleInterest(tag) {
   const idx = form.content.interests.indexOf(tag)
   if (idx === -1) form.content.interests.push(tag)
@@ -125,6 +186,18 @@ function toggleInterest(tag) {
 }
 
 const categories = ['美食', '旅游', '摄影', '运动', '音乐', '艺术', '历史', '购物', '咖啡', '酒吧', '电影', '其他']
+
+const titlePlaceholder = computed(() => {
+  if (form.type === 'social') return '给缘分宝藏起个名字'
+  if (form.type === 'house') return form.house.mode === 'rent' ? '房源标题（如：国贸精装两居）' : '房源标题（如：朝阳区南向三居）'
+  return '宝藏标题 *'
+})
+
+const descPlaceholder = computed(() => {
+  if (form.type === 'social') return '介绍一下自己吧，让对方了解你...'
+  if (form.type === 'house') return '详细描述房源情况（周边配套、交通等）'
+  return '描述一下这个宝藏...'
+})
 
 const showTextField = computed(() => ['note', 'coupon', 'ticket', 'job', 'event', 'task', 'custom'].includes(form.type))
 
@@ -153,6 +226,10 @@ async function handlePublish() {
     errorMsg.value = '交友宝藏需要填写联系方式（匹配后才会显示给对方）'
     return
   }
+  if (form.type === 'house') {
+    if (!form.house.price) { errorMsg.value = '请填写价格'; return }
+    if (!form.house.contact?.trim()) { errorMsg.value = '请填写联系方式'; return }
+  }
   if (!mapStore.userLocation) {
     errorMsg.value = '请先开启定位'
     return
@@ -174,11 +251,18 @@ async function handlePublish() {
       return
     }
 
+    const submitContent = { ...form.content }
+    if (form.type === 'house') {
+      submitContent.extra = { ...form.house }
+      submitContent.contact = form.house.contact
+      submitContent.text = `${form.house.mode === 'rent' ? '出租' : '出售'} | ${form.house.layout || ''} | ${form.house.area ? form.house.area + '㎡' : ''} | ${form.house.mode === 'rent' ? form.house.price + '元/月' : form.house.price + '万'}`
+    }
+
     const res = await treasureStore.createTreasure({
       title: form.title,
       description: form.description,
       type: form.type,
-      content: form.content,
+      content: submitContent,
       password: form.password || undefined,
       location: {
         coordinates: [lng, lat],
@@ -272,6 +356,49 @@ textarea { resize: vertical; }
 .content-fields { display: flex; flex-direction: column; gap: 8px; }
 
 .social-fields { display: flex; flex-direction: column; gap: 10px; }
+
+.house-fields { display: flex; flex-direction: column; gap: 10px; }
+
+.house-mode-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #e67e22;
+  border-radius: 12px;
+  background: #fff;
+  color: #e67e22;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.mode-btn.active {
+  background: #e67e22;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(230,126,34,.3);
+}
+
+.house-row {
+  display: flex;
+  gap: 8px;
+}
+
+.house-half {
+  flex: 1;
+  min-width: 0;
+}
+
+.house-features { display: flex; flex-direction: column; gap: 6px; }
+
+.tag-btn.house-tag.active {
+  background: #e67e22;
+  border-color: #e67e22;
+}
 
 .field-label { font-size: .85rem; color: #555; font-weight: 600; margin: 0; }
 

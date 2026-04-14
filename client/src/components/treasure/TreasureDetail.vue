@@ -79,6 +79,55 @@
         </div>
       </template>
 
+      <!-- 房屋租售专属区域 -->
+      <template v-else-if="treasure.type === 'house'">
+        <div class="house-card">
+          <div class="house-badge-row">
+            <span class="house-mode-badge" :class="houseInfo.mode">
+              {{ houseInfo.mode === 'sell' ? '🏷️ 出售' : '🔑 出租' }}
+            </span>
+          </div>
+          <div class="house-stats">
+            <div class="house-stat" v-if="houseInfo.price">
+              <span class="stat-value house-price">{{ houseInfo.price }}</span>
+              <span class="stat-unit">{{ houseInfo.mode === 'rent' ? '元/月' : '万元' }}</span>
+            </div>
+            <div class="house-stat" v-if="houseInfo.area">
+              <span class="stat-value">{{ houseInfo.area }}</span>
+              <span class="stat-unit">㎡</span>
+            </div>
+            <div class="house-stat" v-if="houseInfo.layout">
+              <span class="stat-value">{{ houseInfo.layout }}</span>
+            </div>
+            <div class="house-stat" v-if="houseInfo.floor">
+              <span class="stat-value">{{ houseInfo.floor }}</span>
+              <span class="stat-unit">层</span>
+            </div>
+          </div>
+          <div class="house-features" v-if="houseInfo.features?.length">
+            <span v-for="f in houseInfo.features" :key="f" class="house-feature-tag">{{ f }}</span>
+          </div>
+          <div class="house-contact" v-if="treasure.isDiscovered && houseInfo.contact">
+            <span>📞 联系方式：</span>
+            <strong>{{ houseInfo.contact }}</strong>
+          </div>
+          <div class="house-contact-locked" v-else-if="!treasure.isDiscovered">
+            <span>🔒 到达现场后可查看联系方式</span>
+          </div>
+        </div>
+
+        <div v-if="treasure.isDiscovered" class="discovered-badge">
+          ✅ 你已经发现了这个房源
+        </div>
+        <div v-else class="action-area">
+          <p class="safety-tip">建议带人同行看房，注意安全</p>
+          <button class="btn-discover btn-house" @click="handleDiscover" :disabled="discovering">
+            {{ discovering ? '查看中...' : '🏠 到达现场查看' }}
+          </button>
+          <p class="hint">需要到达 {{ treasure.location?.discoveryRadius || 50 }}m 范围内</p>
+        </div>
+      </template>
+
       <!-- 普通宝藏区域 -->
       <template v-else>
         <div class="content-preview" v-if="treasure.content?.text">
@@ -181,12 +230,14 @@ const reportReasons = [
 
 const typeIcons = {
   note: '📝', coupon: '🎫', ticket: '🎬', job: '💼',
-  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕'
+  event: '🎉', redpacket: '🧧', task: '📋', image: '🖼️', custom: '📦', social: '💕', house: '🏠'
 }
 const typeLabels = {
   note: '笔记', coupon: '优惠券', ticket: '门票', job: '招聘',
-  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分宝藏'
+  event: '活动', redpacket: '红包', task: '任务', image: '图片', custom: '自定义', social: '缘分宝藏', house: '房屋信息'
 }
+
+const houseInfo = computed(() => props.treasure.content?.extra || {})
 
 async function handleInterest() {
   if (!userStore.isLoggedIn) {
@@ -602,4 +653,102 @@ async function handleDiscover() {
 .btn-accept:disabled { opacity: .5; }
 
 .matched-label { color: #9c27b0; font-size: .78rem; font-weight: 600; flex-shrink: 0; margin-left: 8px; }
+
+/* 房屋租售样式 */
+.house-card {
+  background: linear-gradient(135deg, #fff8f0, #fff);
+  border: 1px solid #f0d4a8;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 10px 0;
+}
+
+.house-badge-row { margin-bottom: 10px; }
+
+.house-mode-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.house-mode-badge.rent {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.house-mode-badge.sell {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.house-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.house-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.house-price {
+  font-size: 1.4rem;
+  color: #e67e22;
+}
+
+.stat-unit {
+  font-size: .75rem;
+  color: #999;
+}
+
+.house-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.house-feature-tag {
+  padding: 3px 8px;
+  background: #fff0e0;
+  border: 1px solid #f0d4a8;
+  border-radius: 10px;
+  font-size: .72rem;
+  color: #e67e22;
+}
+
+.house-contact {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: .9rem;
+  margin-top: 8px;
+}
+
+.house-contact strong { color: #e67e22; }
+
+.house-contact-locked {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: .8rem;
+  color: #999;
+  margin-top: 8px;
+}
+
+.btn-house {
+  background: linear-gradient(135deg, #e67e22, #f39c12) !important;
+}
 </style>

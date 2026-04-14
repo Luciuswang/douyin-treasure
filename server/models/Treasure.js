@@ -20,7 +20,7 @@ const treasureSchema = new mongoose.Schema({
 
     type: {
         type: String,
-        enum: ['note', 'coupon', 'ticket', 'job', 'event', 'redpacket', 'task', 'image', 'custom', 'social'],
+        enum: ['note', 'coupon', 'ticket', 'job', 'event', 'redpacket', 'task', 'image', 'custom', 'social', 'house'],
         default: 'note'
     },
 
