@@ -5,9 +5,10 @@ const config: CapacitorConfig = {
   appName: 'Totofun 突突翻',
   webDir: 'dist',
   server: {
-    // 生产环境指向你的服务器 API
-    url: 'https://youkongwa.com',
-    cleartext: true
+    // 不设 url → 加载本地打包文件（秒开 + splash 动画）
+    // API/Socket 在 api.js 和 socket.js 中自动指向 youkongwa.com
+    cleartext: true,
+    androidScheme: 'https'
   },
   plugins: {
     SplashScreen: {
