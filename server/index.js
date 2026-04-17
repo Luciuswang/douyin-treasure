@@ -31,7 +31,11 @@ if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
                 'https://youkongwa.com',
                 'http://youkongwa.com',
                 'http://localhost:3000',
-                'http://localhost:5173'
+                'http://localhost:5173',
+                // Capacitor WebView（androidScheme: https 时为 https://localhost）
+                'https://localhost',
+                'capacitor://localhost',
+                'ionic://localhost'
             ].filter(Boolean),
             methods: ['GET', 'POST']
         }
@@ -84,8 +88,13 @@ app.use(cors({
             'http://youkongwa.com',
             'http://localhost:3000',
             'http://localhost:5173',
+            'https://localhost',
+            'capacitor://localhost',
+            'ionic://localhost',
             /^http:\/\/localhost(:\d+)?$/,
-            /^http:\/\/127\.0\.0\.1(:\d+)?$/
+            /^https:\/\/localhost(:\d+)?$/,
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+            /^https:\/\/127\.0\.0\.1(:\d+)?$/
         ].filter(Boolean);
         const ok = allowed.some(a =>
             typeof a === 'string' ? origin === a : a.test(origin)
