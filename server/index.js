@@ -9,6 +9,42 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+/** 逗号分隔，用于临时放行 App/WebView 等未列出的 Origin（见日志里的「CORS 拒绝 Origin」） */
+function parseExtraOrigins() {
+    const raw = process.env.CORS_EXTRA_ORIGINS || '';
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function isAllowedOrigin(origin) {
+    const allowed = [
+        process.env.CLIENT_URL,
+        ...parseExtraOrigins(),
+        'https://youkongwa.com',
+        'http://youkongwa.com',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'https://localhost',
+        'capacitor://localhost',
+        'ionic://localhost',
+        /^http:\/\/localhost(:\d+)?$/,
+        /^https:\/\/localhost(:\d+)?$/,
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+        /^https:\/\/127\.0\.0\.1(:\d+)?$/
+    ].filter(Boolean);
+    return allowed.some((a) => (typeof a === 'string' ? origin === a : a.test(origin)));
+}
+
+/** Express cors：生产环境拒绝时打日志，便于核对真实 Origin */
+function allowCorsOrigin(origin, tag) {
+    if (!origin) return true;
+    const ok = isAllowedOrigin(origin);
+    const allow = ok || process.env.NODE_ENV !== 'production';
+    if (!allow) {
+        console.warn(tag || 'CORS 拒绝 Origin:', origin);
+    }
+    return allow;
+}
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const treasureRoutes = require('./routes/treasures');
@@ -26,17 +62,10 @@ if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
     server = http.createServer(app);
     io = socketIo(server, {
         cors: {
-            origin: [
-                process.env.CLIENT_URL,
-                'https://youkongwa.com',
-                'http://youkongwa.com',
-                'http://localhost:3000',
-                'http://localhost:5173',
-                // Capacitor WebView（androidScheme: https 时为 https://localhost）
-                'https://localhost',
-                'capacitor://localhost',
-                'ionic://localhost'
-            ].filter(Boolean),
+            origin: (origin, cb) => {
+                const allow = allowCorsOrigin(origin, 'Socket.IO CORS 拒绝 Origin:');
+                cb(null, allow);
+            },
             methods: ['GET', 'POST']
         }
     });
@@ -81,25 +110,8 @@ app.use(helmet({ crossOriginEmbedderPolicy: false, contentSecurityPolicy: false 
 app.use(compression());
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        const allowed = [
-            process.env.CLIENT_URL,
-            'https://youkongwa.com',
-            'http://youkongwa.com',
-            'http://localhost:3000',
-            'http://localhost:5173',
-            'https://localhost',
-            'capacitor://localhost',
-            'ionic://localhost',
-            /^http:\/\/localhost(:\d+)?$/,
-            /^https:\/\/localhost(:\d+)?$/,
-            /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-            /^https:\/\/127\.0\.0\.1(:\d+)?$/
-        ].filter(Boolean);
-        const ok = allowed.some(a =>
-            typeof a === 'string' ? origin === a : a.test(origin)
-        );
-        callback(ok || process.env.NODE_ENV !== 'production' ? null : new Error('CORS'), ok || process.env.NODE_ENV !== 'production');
+        const allow = allowCorsOrigin(origin, 'CORS 拒绝 Origin:');
+        callback(allow ? null : new Error('CORS'), allow);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
