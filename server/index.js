@@ -45,13 +45,13 @@ function allowCorsOrigin(origin, tag) {
     return allow;
 }
 
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/authSecure');
 const userRoutes = require('./routes/users');
 const treasureRoutes = require('./routes/treasures');
 const uploadRoutes = require('./routes/upload');
-const { authenticateToken, optionalAuth } = require('./middleware/auth');
+const { authenticateToken, optionalAuth } = require('./middleware/authSecure');
 const { errorHandler } = require('./middleware/errorHandler');
-const { socketAuth, socketHandler } = require('./sockets/socketHandler');
+const { socketAuth, socketHandler } = require('./sockets/socketHandlerSecure');
 
 const app = express();
 app.set('trust proxy', true);
@@ -148,11 +148,37 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/treasures', optionalAuth, treasureRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
-app.use('/api/ai', require('./routes/ai'));
-app.use('/api/admin', require('./routes/admin'));
+app.use('/api/ai', require('./routes/aiSecure'));
+app.use('/api/admin', require('./routes/adminSecure'));
+app.use('/api/commercial', require('./routes/commercial'));
+app.use('/api/payments', require('./routes/payments'));
+/*
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 
 // 静态文件
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    }
+}));
+*/
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    }
+}));
+
+/*
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    }
+}));
+*/
 
 // 生产环境：托管 Vue 前端（client/dist）
 if (process.env.NODE_ENV === 'production') {

@@ -6,17 +6,29 @@ const router = express.Router();
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
+router.use(express.json({
+    limit: '1mb',
+    verify: (req, _res, buffer) => {
+        req.rawBody = buffer.toString('utf8');
+    }
+}));
+
 function verifySignature(req) {
-    if (!WEBHOOK_SECRET) return true;
+    if (!WEBHOOK_SECRET) return false;
     const sig = req.headers['x-hub-signature-256'];
-    if (!sig) return false;
+    if (!sig || !req.rawBody) return false;
     const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
-    hmac.update(JSON.stringify(req.body));
-    const expected = 'sha256=' + hmac.digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    hmac.update(req.rawBody);
+    const expected = Buffer.from(`sha256=${hmac.digest('hex')}`);
+    const provided = Buffer.from(String(sig));
+    if (expected.length !== provided.length) return false;
+    return crypto.timingSafeEqual(provided, expected);
 }
 
 router.post('/deploy', (req, res) => {
+    if (!WEBHOOK_SECRET) {
+        return res.status(503).json({ ok: false, error: 'Webhook secret not configured' });
+    }
     if (!verifySignature(req)) {
         console.warn('⚠️ Webhook 签名验证失败');
         return res.status(403).json({ error: 'Invalid signature' });
@@ -56,8 +68,9 @@ router.post('/deploy', (req, res) => {
 router.get('/status', (req, res) => {
     res.json({
         ok: true,
-        webhook: 'active',
-        version: '1.0',
+        configured: !!WEBHOOK_SECRET,
+        webhook: WEBHOOK_SECRET ? 'active' : 'disabled',
+        version: '1.1',
         time: new Date().toISOString()
     });
 });

@@ -11,8 +11,8 @@ const BOT_AVATAR = 'assets/images/xiaotu-bot01.png';
 // ==================== AI配置 ====================
 const AI_CONFIG = {
     // API Key (base64编码)
-    ENCODED_KEY: 'c2stZDE2ODIyY2VmMzk5NDUxOGJkZDQ5Nzc0MDFlZGQzZWM=',
-    API_URL: 'https://api.deepseek.com/v1/chat/completions',
+    PROXY_PATH: '/api/ai/chat',
+    API_URL: '/api/ai/chat',
     MODEL: 'deepseek-chat',
     MAX_TOKENS: 200,
     TEMPERATURE: 0.8
@@ -138,6 +138,39 @@ const chatService = {
      */
     getAIReply: async (message, context = [], username = '用户', userLevel = 1) => {
         try {
+            const token = localStorage.getItem('auth_token');
+            if (!token || !message || !message.trim()) {
+                return null;
+            }
+
+            const contextMessages = Array.isArray(context)
+                ? context.slice(-8).map((item) => ({
+                    role: item?.role === 'assistant' ? 'assistant' : 'user',
+                    content: String(item?.content || '').slice(0, 1000)
+                })).filter((item) => item.content)
+                : [];
+
+            const baseUrl = window.API_CONFIG?.BASE_URL || '';
+            const proxyResponse = await fetch(baseUrl + AI_CONFIG.PROXY_PATH, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    message: message.trim(),
+                    context: contextMessages,
+                    username,
+                    userLevel
+                })
+            });
+
+            if (!proxyResponse.ok) {
+                return null;
+            }
+
+            const proxyData = await proxyResponse.json();
+            return proxyData.success ? (proxyData.reply || null) : null;
             // 解码API Key
             const apiKey = atob(AI_CONFIG.ENCODED_KEY);
             

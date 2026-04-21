@@ -15,6 +15,13 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const mimeToExt = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp'
+};
+
 if (!multer) {
     router.post('/image', (req, res) => {
         res.status(503).json({ success: false, message: '文件上传服务未就绪，请联系管理员安装 multer' });
@@ -30,14 +37,16 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
         const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-        const ext = path.extname(file.originalname);
+        const ext = mimeToExt[file.mimetype];
+        if (!ext) {
+            return cb(new Error('UNSUPPORTED_FILE_TYPE'));
+        }
         cb(null, `${unique}${ext}`);
     }
 });
 
 const fileFilter = (req, file, cb) => {
-    const allowed = /^image\/(jpeg|jpg|png|gif|webp)$/;
-    cb(null, allowed.test(file.mimetype));
+    cb(null, !!mimeToExt[file.mimetype]);
 };
 
 const upload = multer({
@@ -72,6 +81,24 @@ router.post('/images', upload.array('images', 9), (req, res) => {
         size: f.size
     }));
     res.json({ success: true, data: files });
+});
+
+router.use((err, req, res, next) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ success: false, message: '单张图片不能超过10MB' });
+        }
+        return res.status(400).json({ success: false, message: '上传文件失败，请重试' });
+    }
+
+    if (err.message === 'UNSUPPORTED_FILE_TYPE') {
+        return res.status(400).json({ success: false, message: '仅支持 jpg/png/gif/webp 图片上传' });
+    }
+
+    console.error('文件上传错误:', err);
+    return res.status(500).json({ success: false, message: '文件上传失败' });
 });
 
 module.exports = router;

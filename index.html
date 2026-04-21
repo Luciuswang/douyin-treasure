@@ -665,7 +665,7 @@
             },
 
             // 注册
-            async register(username, email, password) {
+            async register(username, email, password, applicationNote = '') {
                 try {
                     // 如果已知 API 不可用，直接返回提示
                     if (API_CONFIG._apiUnavailable) {
@@ -688,7 +688,7 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ username, email, password })
+                        body: JSON.stringify({ username, email, password, applicationNote })
                     });
 
                     // 检查响应状态
@@ -708,12 +708,22 @@
                     
                     if (data.success) {
                         // 保存token和用户信息
-                        this.saveToken(data.data.tokens.accessToken);
-                        if (data.data.tokens.refreshToken) {
+                        if (data.data?.tokens?.accessToken) {
+                            this.saveToken(data.data.tokens.accessToken);
+                        }
+                        if (data.data?.tokens?.refreshToken) {
                             this.saveRefreshToken(data.data.tokens.refreshToken);
                         }
-                        this.saveUser(data.data.user);
-                        return { success: true, user: data.data.user };
+                        if (data.data?.user) {
+                            this.saveUser(data.data.user);
+                        }
+                        return {
+                            success: true,
+                            user: data.data?.user || null,
+                            message: data.message || '',
+                            requiresApproval: !!data.data?.requiresApproval,
+                            token: data.data?.tokens?.accessToken || null
+                        };
                     } else {
                         return { success: false, message: data.message || data.errors?.join(', ') || '注册失败' };
                     }
@@ -6232,6 +6242,13 @@
                     errorDiv.textContent = '登录成功！';
                     errorDiv.style.background = '#e8f5e9';
                     errorDiv.style.color = '#2e7d32';
+                    errorDiv.textContent = result.message || errorDiv.textContent;
+                    if (!(result.token && result.user)) {
+                        setTimeout(() => {
+                            this.showLoginForm();
+                        }, 1500);
+                        return;
+                    }
                     
                     // 🔥 同步用户信息到所有系统
                     syncUserInfoFromAuth(result.user);
@@ -6257,6 +6274,7 @@
                 const username = document.getElementById('register-username').value.trim();
                 const email = document.getElementById('register-email').value.trim();
                 const password = document.getElementById('register-password').value;
+                const applicationNote = (document.getElementById('register-application-note')?.value || '').trim();
                 const errorDiv = document.getElementById('auth-register-error');
 
                 if (!username || !email || !password) {
@@ -6283,9 +6301,16 @@
                 errorDiv.style.color = '#1976d2';
                 errorDiv.style.display = 'block';
 
-                const result = await authService.register(username, email, password);
+                const result = await authService.register(username, email, password, applicationNote);
 
                 if (result.success) {
+                    errorDiv.textContent = result.message || errorDiv.textContent;
+                    if (!(result.token && result.user)) {
+                        setTimeout(() => {
+                            this.showLoginForm();
+                        }, 1500);
+                        return;
+                    }
                     errorDiv.textContent = '注册成功！正在登录...';
                     errorDiv.style.background = '#e8f5e9';
                     errorDiv.style.color = '#2e7d32';
@@ -8138,7 +8163,7 @@
                         // 如果后端服务不可用（404/405），尝试直接调用DeepSeek API（使用编码的API key）
                         if (response.status === 404 || response.status === 405) {
                             console.log('⚠️ 后端API不可用，尝试直接调用DeepSeek API');
-                            return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                            return null;
                         }
                         
                         // 如果后端服务未配置，返回null使用默认回复
@@ -8159,7 +8184,7 @@
                         const gameUserData = storageManager.load('totofun-treasure-user');
                         const userLevel = gameUserData?.level?.currentLevel || 1;
                         const username = gameUserData?.username || this.currentUser.name;
-                        return await this.callDeepSeekDirectly(message, contextMessages, username, userLevel);
+                        return null;
                     } catch (directError) {
                         console.error('❌ 直接调用DeepSeek API也失败:', directError);
                     }
@@ -8171,8 +8196,9 @@
             // 直接调用DeepSeek API（后备方案，API key已编码）
             async callDeepSeekDirectly(message, contextMessages, username, userLevel) {
                 try {
+                    return null;
                     // API key使用base64编码，避免直接暴露（简单混淆）
-                    const encodedKey = 'c2stZDE2ODIyY2VmMzk5NDUxOGJkZDQ5Nzc0MDFlZGQzZWM=';
+                    const encodedKey = '';
                     const apiKey = atob(encodedKey); // 解码
                     
                     const systemMessage = {
@@ -8207,7 +8233,7 @@
                         }
                     ];
                     
-                    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    const response = await fetch(API_CONFIG.BASE_URL + '/api/ai/status', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -8241,12 +8267,14 @@
             
             // 配置DeepSeek API密钥
             setDeepSeekApiKey(apiKey) {
+                alert('已禁用浏览器端保存 AI API Key，请只在服务端环境变量中配置。');
+                return false;
                 if (apiKey && apiKey.trim()) {
-                    localStorage.setItem('deepseek_api_key', apiKey.trim());
+                    localStorage.setItem('disabled_client_key_storage', apiKey.trim());
                     console.log('✅ DeepSeek API密钥已保存');
                     return true;
                 } else {
-                    localStorage.removeItem('deepseek_api_key');
+                    localStorage.removeItem('disabled_client_key_storage');
                     console.log('✅ DeepSeek API密钥已清除');
                     return false;
                 }
@@ -8254,7 +8282,8 @@
             
             // 获取DeepSeek API密钥（用于显示）
             getDeepSeekApiKey() {
-                const key = localStorage.getItem('deepseek_api_key');
+                return null;
+                const key = localStorage.getItem('disabled_client_key_storage');
                 if (key) {
                     // 只显示前4位和后4位，中间用*代替
                     return key.substring(0, 4) + '****' + key.substring(key.length - 4);
@@ -8264,6 +8293,8 @@
             
             // 保存DeepSeek API密钥（从输入框）
             saveDeepSeekApiKey() {
+                alert('已禁用浏览器端保存 AI API Key，请改为配置服务端环境变量。');
+                return;
                 const input = document.getElementById('deepseek-api-key-input');
                 const apiKey = input.value.trim();
                 
@@ -8287,7 +8318,11 @@
             
             // 测试DeepSeek API连接
             async testDeepSeekApi() {
-                const apiKey = localStorage.getItem('deepseek_api_key');
+                const statusEl = document.getElementById('deepseek-status');
+                statusEl.textContent = '请检查服务端 AI 配置';
+                statusEl.style.background = '#ffaa00';
+                return;
+                const apiKey = localStorage.getItem('disabled_client_key_storage');
                 if (!apiKey) {
                     alert('❌ 请先配置API Key');
                     return;
@@ -8299,7 +8334,7 @@
                 
                 try {
                     console.log('🧪 开始测试DeepSeek API连接...');
-                    const deepseekApiUrl = 'https://api.deepseek.com/v1/chat/completions';
+                    const deepseekApiUrl = API_CONFIG.BASE_URL + '/api/ai/status';
                     
                     const response = await fetch(deepseekApiUrl, {
                         method: 'POST',
@@ -10332,6 +10367,19 @@
                         font-size: 16px;
                         box-sizing: border-box;
                     " />
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; color: #666; font-size: 14px;">申请说明（可选）</label>
+                    <textarea id="register-application-note" placeholder="简单介绍你的使用场景、城市或活动计划，方便审核" style="
+                        width: 100%;
+                        min-height: 96px;
+                        padding: 12px;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        box-sizing: border-box;
+                        resize: vertical;
+                    "></textarea>
                 </div>
                 <button onclick="authManager.handleRegister()" style="
                     width: 100%;

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Treasure = require('../models/Treasure');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/authSecure');
 const { checkLocationSafety } = require('../utils/locationSafety');
 
 /**

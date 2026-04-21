@@ -9,12 +9,13 @@ const crypto = require('crypto');
 
 // 配置
 const WEBHOOK_PORT = 9001;  // 不同于麻将的 9000
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'totofun-auto-deploy-2024';
+const WEBHOOK_SECRET = (process.env.WEBHOOK_SECRET || '').trim();
 const PROJECT_PATH = '/root/totofun';
 const PM2_APP_NAME = 'totofun';
 
 // 验证 GitHub 签名
 function verifySignature(payload, signature) {
+    if (!WEBHOOK_SECRET) return false;
     if (!signature) return false;
     const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
     const digest = 'sha256=' + hmac.update(payload).digest('hex');
@@ -32,9 +33,10 @@ function deploy() {
     const commands = `
         cd ${PROJECT_PATH} && 
         git fetch origin main &&
-        git reset --hard origin/main &&
-        npm install &&
-        cd server && npm install &&
+        git checkout main &&
+        git pull --ff-only origin main &&
+        npm ci &&
+        cd server && npm ci &&
         pm2 restart ${PM2_APP_NAME}
     `;
     
@@ -62,7 +64,7 @@ const server = http.createServer((req, res) => {
             // 验证签名（可选）
             const signature = req.headers['x-hub-signature-256'];
             
-            if (WEBHOOK_SECRET && WEBHOOK_SECRET !== 'totofun-auto-deploy-2024') {
+            if (!verifySignature(body, signature)) {
                 if (!verifySignature(body, signature)) {
                     console.log('⚠️ 签名验证失败');
                     res.writeHead(401);

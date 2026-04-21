@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { isFeatureEnabled, maskName } = require('../utils/runtime');
 
 const userSchema = new mongoose.Schema({
     // 基本信息
@@ -238,6 +239,148 @@ const userSchema = new mongoose.Schema({
                 default: true
             }
         }
+    },
+
+    registration: {
+        status: {
+            type: String,
+            enum: ['pending', 'approved', 'rejected'],
+            default: () => isFeatureEnabled('REQUIRE_REGISTRATION_APPROVAL', true) ? 'pending' : 'approved'
+        },
+        note: {
+            type: String,
+            maxlength: 300,
+            default: ''
+        },
+        requestedAt: {
+            type: Date,
+            default: Date.now
+        },
+        reviewedAt: {
+            type: Date,
+            default: null
+        },
+        reviewedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        }
+    },
+
+    identityVerification: {
+        status: {
+            type: String,
+            enum: ['unverified', 'pending', 'verified', 'rejected'],
+            default: 'unverified'
+        },
+        legalName: {
+            type: String,
+            default: '',
+            maxlength: 50
+        },
+        maskedName: {
+            type: String,
+            default: ''
+        },
+        documentType: {
+            type: String,
+            enum: ['', 'id_card', 'passport', 'other'],
+            default: ''
+        },
+        idNumberLast4: {
+            type: String,
+            default: '',
+            match: /^[A-Za-z0-9]{0,8}$/
+        },
+        submittedAt: {
+            type: Date,
+            default: null
+        },
+        reviewedAt: {
+            type: Date,
+            default: null
+        },
+        reviewedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+        reviewNote: {
+            type: String,
+            maxlength: 200,
+            default: ''
+        },
+        provider: {
+            type: String,
+            default: 'manual_review'
+        }
+    },
+
+    commercial: {
+        paymentStatus: {
+            type: String,
+            enum: ['disabled', 'pending_review', 'enabled'],
+            default: 'disabled'
+        },
+        promotionEligible: {
+            type: Boolean,
+            default: false
+        },
+        merchantApplication: {
+            status: {
+                type: String,
+                enum: ['not_submitted', 'pending', 'approved', 'rejected'],
+                default: 'not_submitted'
+            },
+            businessName: {
+                type: String,
+                default: '',
+                maxlength: 80
+            },
+            contactName: {
+                type: String,
+                default: '',
+                maxlength: 50
+            },
+            contactPhone: {
+                type: String,
+                default: '',
+                maxlength: 30
+            },
+            city: {
+                type: String,
+                default: '',
+                maxlength: 50
+            },
+            category: {
+                type: String,
+                default: '',
+                maxlength: 50
+            },
+            summary: {
+                type: String,
+                default: '',
+                maxlength: 500
+            },
+            submittedAt: {
+                type: Date,
+                default: null
+            },
+            reviewedAt: {
+                type: Date,
+                default: null
+            },
+            reviewedBy: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+                default: null
+            },
+            reviewNote: {
+                type: String,
+                default: '',
+                maxlength: 300
+            }
+        }
     }
 }, {
     timestamps: true
@@ -251,6 +394,9 @@ userSchema.index({ 'stats.treasuresCreated': -1 });
 userSchema.index({ 'stats.treasuresDiscovered': -1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ lastActiveAt: -1 });
+userSchema.index({ 'registration.status': 1, createdAt: -1 });
+userSchema.index({ 'identityVerification.status': 1, createdAt: -1 });
+userSchema.index({ 'commercial.merchantApplication.status': 1, createdAt: -1 });
 
 // 虚拟字段
 userSchema.virtual('followerCount').get(function() {
@@ -409,6 +555,43 @@ userSchema.statics.getRecommendedUsers = async function(userId, limit = 10) {
 // 输出安全的用户信息
 userSchema.methods.toSafeObject = function() {
     const obj = this.toObject();
+    const registrationStatus = obj.registration?.status || 'approved';
+    const identityStatus = obj.identityVerification?.status || 'unverified';
+
+    obj.registration = {
+        status: registrationStatus,
+        note: registrationStatus === 'rejected' ? (obj.registration?.note || '') : '',
+        requestedAt: obj.registration?.requestedAt || obj.createdAt,
+        reviewedAt: obj.registration?.reviewedAt || null
+    };
+
+    obj.identityVerification = {
+        status: identityStatus,
+        maskedName: obj.identityVerification?.maskedName || maskName(obj.identityVerification?.legalName || ''),
+        documentType: obj.identityVerification?.documentType || '',
+        idNumberLast4: obj.identityVerification?.idNumberLast4 || '',
+        submittedAt: obj.identityVerification?.submittedAt || null,
+        reviewedAt: obj.identityVerification?.reviewedAt || null,
+        reviewNote: identityStatus === 'rejected' ? (obj.identityVerification?.reviewNote || '') : ''
+    };
+
+    obj.commercial = {
+        paymentStatus: obj.commercial?.paymentStatus || 'disabled',
+        promotionEligible: !!obj.commercial?.promotionEligible,
+        merchantApplication: {
+            status: obj.commercial?.merchantApplication?.status || 'not_submitted',
+            businessName: obj.commercial?.merchantApplication?.businessName || '',
+            contactName: obj.commercial?.merchantApplication?.contactName || '',
+            contactPhone: obj.commercial?.merchantApplication?.contactPhone || '',
+            city: obj.commercial?.merchantApplication?.city || '',
+            category: obj.commercial?.merchantApplication?.category || '',
+            summary: obj.commercial?.merchantApplication?.summary || '',
+            submittedAt: obj.commercial?.merchantApplication?.submittedAt || null,
+            reviewedAt: obj.commercial?.merchantApplication?.reviewedAt || null,
+            reviewNote: obj.commercial?.merchantApplication?.reviewNote || ''
+        }
+    };
+
     delete obj.password;
     delete obj.email;
     delete obj.deviceInfo;
