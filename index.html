@@ -8318,9 +8318,9 @@
             
             // 测试DeepSeek API连接
             async testDeepSeekApi() {
-                const statusEl = document.getElementById('deepseek-status');
-                statusEl.textContent = '请检查服务端 AI 配置';
-                statusEl.style.background = '#ffaa00';
+                const deepseekStatusEl = document.getElementById('deepseek-status');
+                deepseekStatusEl.textContent = '请检查服务端 AI 配置';
+                deepseekStatusEl.style.background = '#ffaa00';
                 return;
                 const apiKey = localStorage.getItem('disabled_client_key_storage');
                 if (!apiKey) {
@@ -8415,7 +8415,7 @@
             // 检查AI服务状态（使用后端代理，不需要前端配置）
             async checkAIServiceStatus() {
                 try {
-                    const response = await fetch('/api/ai/status');
+                    const response = await API_CONFIG.fetchWithTimeout(API_CONFIG.BASE_URL + '/api/ai/status');
                     if (response.ok) {
                         const data = await response.json();
                         return data.available;
@@ -8435,7 +8435,7 @@
                 statusEl.style.background = '#22C55E';
                 
                 // 检查后端API是否可用（可选）
-                fetch('/api/ai/status')
+                API_CONFIG.fetchWithTimeout(API_CONFIG.BASE_URL + '/api/ai/status')
                     .then(res => res.json())
                     .then(data => {
                         if (data.success && data.available) {
